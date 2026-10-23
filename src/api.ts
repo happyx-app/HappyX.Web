@@ -15,14 +15,22 @@ export interface Guild {
   language: string
   report_frequency: 'weekly' | 'monthly'
   survey_hour: number
+  games_enabled: boolean
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
   active: boolean
 }
 
+// A server where the user can play the game: they take part and games are on.
+export interface GameGuild {
+  discord_guild_id: string
+  name: string
+}
+
 export interface Me {
   user: User
   guilds: Guild[]
+  games: GameGuild[]
 }
 
 export interface DayStat {
@@ -72,6 +80,66 @@ export interface MyMoods {
   guilds: MyGuildMoods[]
 }
 
+export type GamePhase = 'answering' | 'guessing' | 'finished'
+
+export interface GameAnswer {
+  id: string
+  answer: string
+  mine: boolean
+  // Only once the round is finished (and on your own answer).
+  discord_user_id?: string
+  username?: string
+  // How many guessed it right, in finished rounds.
+  right?: number
+}
+
+export interface GamePlayer {
+  discord_user_id: string
+  username: string
+}
+
+export interface GameScore {
+  discord_user_id: string
+  username: string
+  correct: number
+  guesses: number
+}
+
+export interface GameRound {
+  week: string
+  question: string
+  phase: GamePhase
+  guessing_starts: string
+  last_day: string
+  answer_count: number
+  min_answers: number
+  my_answer: string
+  answers: GameAnswer[]
+  players: GamePlayer[]
+  my_guesses: Record<string, string>
+  ranking: GameScore[]
+}
+
+export interface GameBoard {
+  discord_guild_id: string
+  name: string
+  current: GameRound | null
+  previous: GameRound | null
+}
+
+// avatarURL is the user's Discord picture, or Discord's own default one for users without a
+// picture (the same coloured logo Discord shows them), so nobody is left as a bare initial.
+export function avatarURL(userID: string, avatar: string | undefined, size = 64): string {
+  if (avatar) return `https://cdn.discordapp.com/avatars/${userID}/${avatar}.png?size=${size}`
+  let index = 0
+  try {
+    index = Number((BigInt(userID) >> 22n) % 6n)
+  } catch {
+    // Not a Discord ID: any default will do.
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`
+}
+
 const base = '/api/web'
 
 export const loginURL = `${base}/auth/login`
@@ -103,7 +171,10 @@ export const report = (guildID: string, from: string, to: string) =>
 
 export const myMoods = (from: string, to: string) => getJSON<MyMoods>(`/me/moods?from=${from}&to=${to}`)
 
+export const game = (guildID: string) => getJSON<GameBoard>(`/guilds/${encodeURIComponent(guildID)}/game`)
+
 export interface SettingsPatch {
+  games_enabled?: boolean
   anonymous?: boolean
   timezone?: string
   language?: string
@@ -112,19 +183,29 @@ export interface SettingsPatch {
   working_days?: number[]
 }
 
-export async function updateSettings(guildID: string, patch: SettingsPatch): Promise<Guild> {
-  const res = await fetch(`${base}/guilds/${encodeURIComponent(guildID)}/settings`, {
-    method: 'PATCH',
+// Writes send JSON, which the API requires so other sites can't write on the user's behalf.
+async function sendJSON<T>(method: string, path: string, payload: unknown): Promise<T> {
+  const res = await fetch(base + path, {
+    method,
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(patch),
+    body: JSON.stringify(payload),
   })
   if (res.status === 401) throw new Unauthorized()
   if (res.status === 404) throw new NotFound()
-  const body = await res.json().catch(() => ({}))
+  const body = res.status === 204 ? {} : await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : res.statusText)
-  return body as Guild
+  return body as T
 }
+
+export const updateSettings = (guildID: string, patch: SettingsPatch) =>
+  sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)
+
+export const answerGame = (guildID: string, answer: string) =>
+  sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })
+
+export const guessGame = (guildID: string, guesses: Record<string, string>) =>
+  sendJSON<void>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/guesses`, { guesses })
 
 export async function logout(): Promise<void> {
   await fetch(`${base}/auth/logout`, { method: 'POST', credentials: 'same-origin' })

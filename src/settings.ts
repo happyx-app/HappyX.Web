@@ -24,6 +24,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   language: g.language,
   survey_hour: g.survey_hour,
   report_frequency: g.report_frequency,
+  games_enabled: g.games_enabled,
   working_days: g.working_days ?? mondayToFriday,
 })
 
@@ -84,6 +85,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous, disabled })
   const anonWarning = h('p', { class: 'warning small', hidden: true }, `⚠️ ${t('settings.anonymous.off')}`)
 
+  const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled, disabled })
+
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
 
@@ -93,6 +96,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     timezone: tz.value.trim(),
     report_frequency: (freq.map((l) => l.querySelector('input')!).find((i) => i.checked)?.value ?? saved.report_frequency) as Settings['report_frequency'],
     anonymous: anon.checked,
+    games_enabled: games.checked,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
   })
   const refresh = () => {
@@ -131,6 +135,13 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       h('label', { class: 'switch', for: 'anonymous' }, anon, h('span', {}, t('settings.anonymous'))),
       h('p', { class: 'muted small' }, t('settings.anonymous.help')),
       anonWarning,
+    ),
+    h(
+      'div',
+      { class: 'field' },
+      h('label', { class: 'switch', for: 'games' }, games, h('span', {}, `🎲 ${t('settings.games')}`)),
+      h('p', { class: 'muted small' }, t('settings.games.help')),
+      h('p', { class: 'muted small' }, `👀 ${t('settings.games.privacy')}`),
     ),
     h('p', { class: 'muted small' }, `ℹ️ ${t('settings.admin.help')}`),
     h('div', { class: 'form-actions' }, save, status),

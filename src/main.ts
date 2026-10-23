@@ -6,6 +6,8 @@ import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLang
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { settingsForm } from './settings'
+import { gamePage } from './game'
+import { plaza, type PlazaHandle } from './plaza'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -13,20 +15,36 @@ import { applySavedTheme, currentTheme, setTheme } from './theme'
 //   #/g/<guildID>?p=<preset> one server's dashboard
 //   #/g/<guildID>/settings   its settings
 //   #/me?p=<period>&g=<id>   my own answers, optionally one server only
+//   #/games                  servers where I can play «Who's who?»
+//   #/game/<guildID>         the game in one server (the bot links here)
+//   #/plaza/<guildID>        the server's square, live
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
 applySavedTheme()
 let me: api.Me | null = null
+// The open square, closed whenever the page changes.
+let square: PlazaHandle | null = null
 
 async function route() {
+  square?.destroy()
+  square = null
   try {
     me ??= await api.me()
+    me.games ??= []
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLogin()
     return renderError(err)
   }
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
+  const plazaID = path.match(/^\/plaza\/(\d+)$/)?.[1]
+  if (plazaID) return renderPlaza(me, plazaID)
+  const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
+  if (gameID) return renderGame(me, gameID)
+  if (path === '/games') {
+    if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
+    return renderGames(me)
+  }
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
   if (settingsID) return renderSettings(me, settingsID)
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
@@ -91,11 +109,9 @@ function themeToggle() {
 
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
-function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
+function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
   const u = m.user
-  const avatar = u.avatar
-    ? h('img', { class: 'avatar', alt: '', src: `https://cdn.discordapp.com/avatars/${u.discord_user_id}/${u.avatar}.png?size=64` })
-    : h('span', { class: 'avatar avatar-fallback', 'aria-hidden': 'true' }, u.username.slice(0, 1).toUpperCase())
+  const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
   return h(
     'header',
     { class: 'topbar' },
@@ -109,6 +125,9 @@ function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
         h('a', { href: '#/me', class: active === 'me' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'me' ? 'page' : undefined }, t('nav.me')),
         m.guilds.length > 0
           ? h('a', { href: '#/', class: active === 'servers' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'servers' ? 'page' : undefined }, t('nav.servers'))
+          : null,
+        m.games.length > 0
+          ? h('a', { href: '#/games', class: active === 'games' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'games' ? 'page' : undefined }, t('nav.games'))
           : null,
       ),
     ),
@@ -154,6 +173,7 @@ function renderLogin() {
           feature('📈', t('login.me.title'), t('login.me.body')),
           feature('📊', t('login.servers.title'), t('login.servers.body')),
           feature('⚙️', t('login.settings.title'), t('login.settings.body')),
+          feature('🎲', t('login.game.title'), t('login.game.body')),
         ),
         failed ? h('p', { class: 'alert', role: 'alert' }, t('login.failed')) : null,
         h('a', { class: 'btn btn-discord', href: api.loginURL }, discordLogo(), t('login.button')),
@@ -460,6 +480,85 @@ function renderSettings(m: api.Me, guildID: string) {
         },
         () => renderLogin(),
       ),
+    ),
+  )
+}
+
+function renderGames(m: api.Me) {
+  const list = m.games.length
+    ? h(
+        'ul',
+        { class: 'guild-list' },
+        ...m.games.map((g) =>
+          h(
+            'li',
+            {},
+            h(
+              'a',
+              { class: 'card guild-card', href: `#/game/${g.discord_guild_id}` },
+              h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
+              h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, `🎲 ${t('game.title')}`)),
+            ),
+          ),
+        ),
+      )
+    : h('div', { class: 'card empty' }, h('p', {}, t('game.notFound')))
+  page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t('games.title')), list))
+}
+
+async function renderGame(m: api.Me, guildID: string) {
+  const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
+  page(
+    header(m, 'games'),
+    h(
+      'main',
+      { class: 'container narrow' },
+      m.games.length > 1 ? h('a', { class: 'back', href: '#/games' }, `← ${t('games.title')}`) : null,
+      h(
+        'div',
+        { class: 'title-row' },
+        h('div', {}, h('h1', {}, `🎲 ${t('game.title')}`), subtitle),
+        h('a', { class: 'btn btn-ghost', href: `#/plaza/${guildID}` }, t('plaza.link')),
+      ),
+      body,
+    ),
+  )
+  let board: api.GameBoard
+  try {
+    board = await api.game(guildID)
+  } catch (err) {
+    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.NotFound) {
+      body.replaceChildren(h('div', { class: 'card empty' }, h('p', {}, t('game.notFound')), h('a', { class: 'btn', href: '#/me' }, t('nav.me'))))
+      body.removeAttribute('aria-busy')
+      return
+    }
+    body.replaceChildren(errorCard(err))
+    return
+  }
+  subtitle.textContent = t('game.subtitle', { guild: board.name })
+  body.removeAttribute('aria-busy')
+  body.replaceChildren(...gamePage(board, () => renderLogin()))
+}
+
+function renderPlaza(m: api.Me, guildID: string) {
+  const g = m.games.find((x) => x.discord_guild_id === guildID)
+  const back = h('a', { class: 'back', href: `#/game/${guildID}` }, `← ${t('game.title')}`)
+  if (!g) {
+    page(header(m, 'games'), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('plaza.notFound')), h('a', { class: 'btn', href: '#/me' }, t('nav.me')))))
+    return
+  }
+  square = plaza(guildID, m.user.discord_user_id)
+  page(
+    header(m, 'games'),
+    h(
+      'main',
+      { class: 'container' },
+      back,
+      h('div', {}, h('h1', {}, t('plaza.title')), h('p', { class: 'muted' }, t('plaza.subtitle', { guild: g.name }))),
+      square.element,
     ),
   )
 }

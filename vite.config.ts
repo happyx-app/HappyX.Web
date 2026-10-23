@@ -9,6 +9,7 @@ export default defineConfig({
       '/api/web': {
         target: process.env.API_URL ?? 'http://localhost:8083',
         rewrite: (path) => path.replace(/^\/api/, ''),
+        ws: true, // the square
       },
     },
   },
