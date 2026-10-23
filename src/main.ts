@@ -5,10 +5,12 @@ import { h } from './dom'
 import { formatDay, formatNumber, lang, moodEmoji, moodLabel, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { settingsForm } from './settings'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none)
 //   #/g/<guildID>?p=<preset> one server's dashboard
+//   #/g/<guildID>/settings   its settings
 //   #/me?p=<period>&g=<id>   my own answers, optionally one server only
 
 const app = document.getElementById('app')!
@@ -23,6 +25,8 @@ async function route() {
     return renderError(err)
   }
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
+  const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
+  if (settingsID) return renderSettings(me, settingsID)
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
     const p = new URLSearchParams(query).get('p')
@@ -167,6 +171,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
         'div',
         { class: 'title-row' },
         h('div', {}, h('h1', {}, g.name), h('p', { class: 'muted' }, `${formatDay(range.from, { day: 'numeric', month: 'long', year: 'numeric' })} – ${formatDay(range.to, { day: 'numeric', month: 'long', year: 'numeric' })}`)),
+        h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, `⚙️ ${t('settings.link')}`),
       ),
       picker,
       body,
@@ -382,6 +387,30 @@ function swatch(color: string) {
   const el = h('span', { class: 'swatch', 'aria-hidden': 'true' })
   el.style.background = color
   return el
+}
+
+function renderSettings(m: api.Me, guildID: string) {
+  const g = m.guilds.find((x) => x.discord_guild_id === guildID)
+  if (!g) {
+    page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
+    return
+  }
+  page(
+    header(m),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`),
+      h('h1', {}, g.name),
+      settingsForm(
+        g,
+        (updated) => {
+          m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? updated : x))
+        },
+        () => renderLogin(),
+      ),
+    ),
+  )
 }
 
 function stat(label: string, value: Node | string, note?: string) {

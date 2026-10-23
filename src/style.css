@@ -223,3 +223,39 @@ a { color: var(--accent); }
 .streak { color: var(--muted); }
 .streak-on { color: var(--ink); font-weight: 500; }
 .my-guild h3 { margin: 4px 0 0; font-weight: 500; }
+
+/* Settings form */
+.container.narrow { max-width: 680px; }
+.settings { gap: 20px; }
+.field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.field > label, .field legend { font-weight: 600; font-size: 0.9375rem; padding: 0; }
+.field-row { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.settings select, .settings input:not([type]), .settings input[list] {
+  font: inherit; color: var(--ink); background: var(--surface); width: 100%;
+  border: 1px solid var(--axis); border-radius: 10px; padding: 9px 12px;
+}
+.settings select:disabled, .settings input:disabled { opacity: 0.6; }
+.settings input:invalid { border-color: var(--danger); }
+.radios { display: flex; gap: 8px; flex-wrap: wrap; }
+.radio { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--axis); border-radius: 10px; cursor: pointer; }
+.radio:has(input:checked) { border-color: var(--accent); background: var(--surface-2); }
+.radio input { accent-color: var(--accent); margin: 0; }
+.switch { display: inline-flex; align-items: center; gap: 12px; font-weight: 600; cursor: pointer; }
+.switch input {
+  appearance: none; width: 42px; height: 24px; border-radius: 999px; background: var(--axis);
+  position: relative; margin: 0; cursor: pointer; transition: background 0.15s; flex: none;
+}
+.switch input::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.switch input:checked { background: var(--series); }
+.switch input:checked::after { transform: translateX(18px); }
+.warning { color: var(--ink); background: var(--surface-2); border-left: 3px solid #eda100; padding: 8px 12px; border-radius: 6px; }
+.form-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.btn-primary { background: var(--series); color: #fff; border-color: transparent; }
+.btn-primary:disabled { opacity: 0.45; cursor: default; filter: none; }
+.success { color: #006300; }
+.error { color: var(--danger); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .success { color: #0ca30c; } }
+:root[data-theme='dark'] .success { color: #0ca30c; }
