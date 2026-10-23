@@ -460,7 +460,11 @@ function messagesCard(r: api.Report) {
     'section',
     { class: 'card' },
     h('h2', {}, t('messages.title')),
-    r.anonymous ? h('p', { class: 'muted small' }, `🔒 ${t('messages.anonymous')}`) : null,
+    r.anonymous
+      ? h('p', { class: 'muted small' }, `🔒 ${t('messages.anonymous')}`)
+      : r.messages.some((m) => !m.username)
+        ? h('p', { class: 'muted small' }, `🔒 ${t('messages.earlier_anonymous')}`)
+        : null,
     list,
   )
 }
