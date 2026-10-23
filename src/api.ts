@@ -125,6 +125,19 @@ export interface GameBoard {
   previous: GameRound | null
 }
 
+// avatarURL is the user's Discord picture, or Discord's own default one for users without a
+// picture (the same coloured logo Discord shows them), so nobody is left as a bare initial.
+export function avatarURL(userID: string, avatar: string | undefined, size = 64): string {
+  if (avatar) return `https://cdn.discordapp.com/avatars/${userID}/${avatar}.png?size=${size}`
+  let index = 0
+  try {
+    index = Number((BigInt(userID) >> 22n) % 6n)
+  } catch {
+    // Not a Discord ID: any default will do.
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`
+}
+
 const base = '/api/web'
 
 export const loginURL = `${base}/auth/login`

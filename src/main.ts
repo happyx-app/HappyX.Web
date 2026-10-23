@@ -80,9 +80,7 @@ const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'b
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
   const u = m.user
-  const avatar = u.avatar
-    ? h('img', { class: 'avatar', alt: '', src: `https://cdn.discordapp.com/avatars/${u.discord_user_id}/${u.avatar}.png?size=64` })
-    : h('span', { class: 'avatar avatar-fallback', 'aria-hidden': 'true' }, u.username.slice(0, 1).toUpperCase())
+  const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
   return h(
     'header',
     { class: 'topbar' },

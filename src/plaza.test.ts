@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { approach, keyVector, toWorld, uiScale } from './plaza'
+import { approach, easeOutBack, keyVector, mulberry32, toWorld, uiScale } from './plaza'
 
 it('turns held keys into a direction', () => {
   expect(keyVector(new Set())).toEqual([0, 0])
@@ -25,4 +25,18 @@ it('draws avatars larger on small screens only', () => {
   expect(uiScale(1.6)).toBe(1) // desktop
   expect(uiScale(0.375)).toBe(2) // phone
   expect(uiScale(0.5)).toBeCloseTo(1.5)
+})
+
+it('pops emote bubbles past full size and settles', () => {
+  expect(easeOutBack(0)).toBeCloseTo(0)
+  expect(easeOutBack(1)).toBeCloseTo(1)
+  expect(Math.max(...[0.6, 0.7, 0.8, 0.9].map(easeOutBack))).toBeGreaterThan(1)
+})
+
+it('scatters the grass the same way every time', () => {
+  const a = mulberry32(7)
+  const b = mulberry32(7)
+  const xs = [a(), a(), a()]
+  expect([b(), b(), b()]).toEqual(xs)
+  expect(xs.every((x) => x >= 0 && x < 1)).toBe(true)
 })
