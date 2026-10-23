@@ -6,6 +6,7 @@ import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLang
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { settingsForm } from './settings'
+import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none)
@@ -15,6 +16,7 @@ import { settingsForm } from './settings'
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
+applySavedTheme()
 let me: api.Me | null = null
 
 async function route() {
@@ -58,6 +60,23 @@ function languagePicker(short = false) {
   )
 }
 
+// Shows the mode it switches to, like most theme buttons.
+function themeToggle() {
+  const btn = h('button', { class: 'btn btn-ghost theme-toggle', type: 'button' })
+  const paint = () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark'
+    btn.textContent = next === 'dark' ? '🌙' : '☀️'
+    btn.setAttribute('aria-label', t(next === 'dark' ? 'nav.theme.dark' : 'nav.theme.light'))
+    btn.title = btn.getAttribute('aria-label')!
+  }
+  btn.addEventListener('click', () => {
+    setTheme(currentTheme() === 'dark' ? 'light' : 'dark')
+    paint()
+  })
+  paint()
+  return btn
+}
+
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
 function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
@@ -84,6 +103,7 @@ function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
     h(
       'div',
       { class: 'user' },
+      themeToggle(),
       languagePicker(true),
       avatar,
       h('span', { class: 'user-name' }, u.username),
@@ -109,7 +129,7 @@ function renderLogin() {
     h(
       'main',
       { class: 'login' },
-      h('div', { class: 'login-top' }, languagePicker()),
+      h('div', { class: 'login-top' }, themeToggle(), languagePicker()),
       h(
         'section',
         { class: 'card login-card' },

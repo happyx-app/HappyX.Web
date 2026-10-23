@@ -97,6 +97,8 @@ const en = {
   'login.settings.title': 'Settings',
   'login.settings.body': 'Change the language, survey time, timezone, reports and anonymity without typing commands.',
   'nav.language': 'Language',
+  'nav.theme.dark': 'Switch to dark mode',
+  'nav.theme.light': 'Switch to light mode',
 }
 
 export type Key = keyof typeof en
@@ -197,6 +199,8 @@ const es: Record<Key, string> = {
   'login.settings.title': 'Ajustes',
   'login.settings.body': 'Cambia el idioma, la hora de la encuesta, la zona horaria, los reports y el anonimato sin escribir comandos.',
   'nav.language': 'Idioma',
+  'nav.theme.dark': 'Cambiar a modo oscuro',
+  'nav.theme.light': 'Cambiar a modo claro',
 }
 
 export const messages: Record<string, Record<Key, string>> = { en, es }
