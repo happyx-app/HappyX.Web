@@ -1,7 +1,7 @@
 import './style.css'
 import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
-import { h } from './dom'
+import { h, s } from './dom'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
@@ -60,12 +60,24 @@ function languagePicker(short = false) {
   )
 }
 
+// Line icons in the text colour, so they stay black and white in both modes.
+const icon = (...shapes: SVGElement[]) =>
+  s('svg', { viewBox: '0 0 24 24', class: 'icon', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, ...shapes)
+
+const sunIcon = () =>
+  icon(
+    s('circle', { cx: 12, cy: 12, r: 4 }),
+    s('path', { d: 'M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41' }),
+  )
+
+const moonIcon = () => icon(s('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' }))
+
 // Shows the mode it switches to, like most theme buttons.
 function themeToggle() {
   const btn = h('button', { class: 'btn btn-ghost theme-toggle', type: 'button' })
   const paint = () => {
     const next = currentTheme() === 'dark' ? 'light' : 'dark'
-    btn.textContent = next === 'dark' ? '🌙' : '☀️'
+    btn.replaceChildren(next === 'dark' ? moonIcon() : sunIcon())
     btn.setAttribute('aria-label', t(next === 'dark' ? 'nav.theme.dark' : 'nav.theme.light'))
     btn.title = btn.getAttribute('aria-label')!
   }
