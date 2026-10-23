@@ -1,13 +1,15 @@
 import './style.css'
 import * as api from './api'
-import { distributionChart, trendChart, trendTable } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
 import { h } from './dom'
 import { formatDay, formatNumber, lang, moodEmoji, moodLabel, t } from './i18n'
+import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 
 // Routes live in the hash so nginx only has to serve index.html:
-//   #/                       servers
+//   #/                       servers (or my evolution for someone who manages none)
 //   #/g/<guildID>?p=<preset> one server's dashboard
+//   #/me?p=<period>&g=<id>   my own answers, optionally one server only
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
@@ -26,6 +28,11 @@ async function route() {
     const p = new URLSearchParams(query).get('p')
     return renderGuild(me, guildID, isPreset(p) ? p : 'last-30')
   }
+  if (path === '/me' || (path === '' && me.guilds.length === 0)) {
+    const q = new URLSearchParams(query)
+    const p = q.get('p')
+    return renderMe(me, isEvolutionPeriod(p) ? p : 'month', q.get('g'))
+  }
   if (me.guilds.length === 1 && path === '') {
     location.replace(`#/g/${me.guilds[0].discord_guild_id}`)
     return
@@ -38,9 +45,9 @@ function page(...children: (Node | null)[]) {
   window.scrollTo(0, 0)
 }
 
-const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), 'HappyX')
+const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
-function header(m: api.Me) {
+function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
   const u = m.user
   const avatar = u.avatar
     ? h('img', { class: 'avatar', alt: '', src: `https://cdn.discordapp.com/avatars/${u.discord_user_id}/${u.avatar}.png?size=64` })
@@ -48,7 +55,19 @@ function header(m: api.Me) {
   return h(
     'header',
     { class: 'topbar' },
-    brand(),
+    h(
+      'div',
+      { class: 'topbar-left' },
+      brand(),
+      h(
+        'nav',
+        { class: 'nav' },
+        h('a', { href: '#/me', class: active === 'me' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'me' ? 'page' : undefined }, t('nav.me')),
+        m.guilds.length > 0
+          ? h('a', { href: '#/', class: active === 'servers' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'servers' ? 'page' : undefined }, t('nav.servers'))
+          : null,
+      ),
+    ),
     h(
       'div',
       { class: 'user' },
@@ -197,6 +216,172 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       messagesCard(r),
     ),
   )
+}
+
+async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
+  const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
+  const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  page(
+    header(m, 'me'),
+    h(
+      'main',
+      { class: 'container' },
+      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted' }, `🔒 ${t('me.subtitle')}`)),
+      h(
+        'div',
+        { class: 'segmented', role: 'radiogroup', 'aria-label': t('me.period.label') },
+        ...evolutionPeriods.map((p) =>
+          h('a', { href: href(p, filter), role: 'radio', 'aria-checked': String(p === period), class: p === period ? 'seg seg-on' : 'seg' }, t(`me.period.${p}`)),
+        ),
+      ),
+      body,
+    ),
+  )
+
+  let data: api.MyMoods
+  try {
+    data = await api.myMoods(range.from, range.to)
+  } catch (err) {
+    if (err instanceof api.Unauthorized) return renderLogin()
+    body.replaceChildren(errorCard(err))
+    return
+  }
+  body.removeAttribute('aria-busy')
+  if (data.guilds.every((g) => g.responses === 0)) {
+    body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    return
+  }
+
+  // Colours come from each server's place in the full list, so filtering never repaints a line.
+  const all = data.guilds.map((g, i) => ({ g, color: seriesColor(i) }))
+  const selected = all.some(({ g }) => g.discord_guild_id === filter) ? filter : null
+  const shown = all.filter(({ g }) => selected === null || g.discord_guild_id === selected)
+  const pts = toPoints(data.guilds, range, period)
+  const lines = shown.filter((s): s is { g: api.MyGuildMoods; color: string } => s.color !== null)
+  const series: Series[] = lines.map(({ g, color }) => ({ name: g.name, color, values: pts.values.get(g.discord_guild_id)! }))
+  const xLabel = (x: string) => (pts.byWeek ? t('me.weekOf', { day: formatDay(x) }) : formatDay(x, { weekday: 'short', day: 'numeric', month: 'short' }))
+
+  const chart = lineChart(pts.xs, series, {
+    label: t('me.chart'),
+    tick: (x) => formatDay(x, pts.byWeek ? { month: 'short' } : { day: 'numeric', month: 'short' }),
+    // By week, label the first week of each month.
+    tickAt: pts.byWeek ? (i) => i === 0 || pts.xs[i].slice(0, 7) !== pts.xs[i - 1].slice(0, 7) : undefined,
+    tooltip: (i) => [
+      h('div', { class: 'tooltip-title' }, xLabel(pts.xs[i])),
+      ...lines.map(({ g, color }) => {
+        const v = pts.values.get(g.discord_guild_id)![i]
+        const n = pts.counts.get(g.discord_guild_id)![i]
+        return h(
+          'div',
+          { class: 'tooltip-row' },
+          swatch(color),
+          h('span', { class: 'tooltip-name' }, g.name),
+          v === null
+            ? h('span', { class: 'muted' }, '–')
+            : h('strong', {}, `${moodEmoji(v)} ${formatNumber(v, pts.byWeek ? 1 : 0)}`, pts.byWeek ? h('span', { class: 'muted' }, ` · ${answers(n)}`) : null),
+        )
+      }),
+    ],
+  })
+
+  const table = h(
+    'table',
+    { class: 'table' },
+    h('thead', {}, h('tr', {}, h('th', {}, t('chart.day')), ...lines.map(({ g }) => h('th', { class: 'num' }, g.name)))),
+    h(
+      'tbody',
+      {},
+      ...pts.xs.map((x, i) =>
+        h('tr', {}, h('td', {}, xLabel(x)), ...lines.map(({ g }) => {
+          const v = pts.values.get(g.discord_guild_id)![i]
+          return h('td', { class: 'num' }, v === null ? '–' : `${moodEmoji(v)} ${formatNumber(v, pts.byWeek ? 1 : 0)}`)
+        })),
+      ),
+    ),
+  )
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, table)
+  const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
+  toggle.addEventListener('click', () => {
+    tableWrap.hidden = !tableWrap.hidden
+    toggle.setAttribute('aria-expanded', String(!tableWrap.hidden))
+    toggle.textContent = t(tableWrap.hidden ? 'chart.table.show' : 'chart.table.hide')
+  })
+
+  // The chips are the legend and the filter at once.
+  const chips =
+    all.length > 1
+      ? h(
+          'div',
+          { class: 'chips', role: 'group', 'aria-label': t('me.filter.label') },
+          h('a', { href: href(period, null), class: selected === null ? 'chip chip-on' : 'chip', 'aria-pressed': String(selected === null) }, t('me.all')),
+          ...all.map(({ g, color }) =>
+            h(
+              'a',
+              { href: href(period, g.discord_guild_id), class: selected === g.discord_guild_id ? 'chip chip-on' : 'chip', 'aria-pressed': String(selected === g.discord_guild_id) },
+              color ? swatch(color) : null,
+              g.name,
+            ),
+          ),
+        )
+      : null
+
+  body.replaceChildren(
+    h(
+      'section',
+      { class: 'card' },
+      h('div', { class: 'card-head' }, h('h2', {}, t('me.chart')), toggle),
+      h('p', { class: 'muted small' }, t(pts.byWeek ? 'me.chart.desc.week' : 'me.chart.desc.day')),
+      chips,
+      chart,
+      tableWrap,
+    ),
+    h('div', { class: 'grid-2' }, ...shown.map(({ g, color }) => myGuildCard(g, color))),
+  )
+}
+
+function myGuildCard(g: api.MyGuildMoods, color: string | null) {
+  const msgs = latestMessages(g)
+  const streak = g.streak === 0 ? t('me.streak.none') : g.streak === 1 ? t('me.streak.one') : t('me.streak', { n: formatNumber(g.streak) })
+  return h(
+    'section',
+    { class: 'card my-guild' },
+    h('h2', { class: 'my-guild-name' }, color ? swatch(color) : null, g.name),
+    h(
+      'div',
+      { class: 'my-guild-stats' },
+      g.responses > 0
+        ? h('span', { class: 'stat-value' }, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(g.average)), formatNumber(g.average, 1), h('span', { class: 'stat-unit' }, ' / 5'))
+        : h('span', { class: 'stat-value muted' }, '–'),
+      h(
+        'span',
+        { class: 'my-guild-meta' },
+        h('span', {}, g.responses > 0 ? `${moodLabel(g.average)} · ${answers(g.responses)}` : t('chart.noAnswers')),
+        h('span', { class: g.streak > 0 ? 'streak streak-on' : 'streak' }, g.streak > 0 ? `🔥 ${streak}` : streak),
+      ),
+    ),
+    h('h3', { class: 'small secondary' }, t('me.latest')),
+    msgs.length
+      ? h(
+          'ul',
+          { class: 'messages' },
+          ...msgs.map((e) =>
+            h(
+              'li',
+              {},
+              h('span', { class: 'msg-mood', title: moodLabel(e.mood) }, moodEmoji(e.mood)),
+              h('div', {}, h('p', { class: 'msg-text' }, e.message ?? ''), h('span', { class: 'muted small' }, formatDay(e.day, { weekday: 'short', day: 'numeric', month: 'short' }))),
+            ),
+          ),
+        )
+      : h('p', { class: 'muted small' }, t('me.noComments')),
+  )
+}
+
+function swatch(color: string) {
+  const el = h('span', { class: 'swatch', 'aria-hidden': 'true' })
+  el.style.background = color
+  return el
 }
 
 function stat(label: string, value: Node | string, note?: string) {

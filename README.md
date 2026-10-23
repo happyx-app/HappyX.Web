@@ -1,7 +1,9 @@
 # HappyX.Web
 
-Dashboard for HappyX: admins log in with Discord and see how their servers feel, with the daily
-average mood, answers by mood and the (anonymous by default) messages for any period.
+Dashboard for HappyX. Anyone logs in with Discord and sees **My evolution**: their own answers,
+one line per server, by week, month or year, with each server's average, streak and latest
+comments. Server admins also see how their servers feel: the daily average mood, answers by mood
+and the (anonymous by default) messages for any period.
 
 TypeScript without a framework, built with Vite. Charts are plain SVG, no chart library.
 Served by nginx, which also forwards `/api/web/*` to [HappyX.Api](https://github.com/moixblau/HappyX.Api),
@@ -10,9 +12,10 @@ so the browser only talks to one origin and the API doesn't need to be public.
 ## Layout
 
 ```
-src/main.ts      routes (#/ servers, #/g/<id>?p=<period>) and screens
+src/main.ts      routes (#/ servers, #/g/<id>?p=<period>, #/me?p=<week|month|year>&g=<id>) and screens
+src/evolution.ts My evolution: periods, per-server points (by day, or by week for a year), colours
 src/api.ts       client for the API's /web routes
-src/charts.ts    daily mood line chart (hover tooltip + table view) and answers-by-mood bars
+src/charts.ts    mood line chart, one or more series (hover tooltip + table view), answers-by-mood bars
 src/periods.ts   period presets, computed in the server's timezone
 src/i18n.ts      UI strings (en default, es, ca), picked from the browser's language
 nginx.conf.template  production server: static files, /api/web proxy, CSP
@@ -20,7 +23,7 @@ nginx.conf.template  production server: static files, /api/web proxy, CSP
 
 ## Who sees what
 
-A user sees a server if they are the admin who gets the reports, or the owner or an Administrator
+Everyone sees their own answers in every server. A user sees a server's charts if they are the admin who gets the reports, or the owner or an Administrator
 of the server on Discord. The API enforces this; the web only shows what it gets back.
 
 ## Development

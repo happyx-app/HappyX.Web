@@ -47,6 +47,28 @@ export interface Report {
   messages: ReportMessage[]
 }
 
+export interface MyMood {
+  day: string
+  mood: number
+  message?: string
+}
+
+export interface MyGuildMoods {
+  discord_guild_id: string
+  name: string
+  timezone: string
+  responses: number
+  average: number
+  streak: number
+  entries: MyMood[]
+}
+
+export interface MyMoods {
+  from: string
+  to: string
+  guilds: MyGuildMoods[]
+}
+
 const base = '/api/web'
 
 export const loginURL = `${base}/auth/login`
@@ -66,6 +88,8 @@ export const me = () => getJSON<Me>('/me')
 
 export const report = (guildID: string, from: string, to: string) =>
   getJSON<Report>(`/guilds/${encodeURIComponent(guildID)}/report?from=${from}&to=${to}`)
+
+export const myMoods = (from: string, to: string) => getJSON<MyMoods>(`/me/moods?from=${from}&to=${to}`)
 
 export async function logout(): Promise<void> {
   await fetch(`${base}/auth/logout`, { method: 'POST', credentials: 'same-origin' })

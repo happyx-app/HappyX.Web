@@ -1,12 +1,28 @@
-// Hand-drawn SVG/HTML charts. One measure per chart in a single hue, so no legend is needed;
-// thin 2px lines, 8px markers, recessive grid, hover tooltip and a table view for each.
+// Hand-drawn SVG/HTML charts: thin 2px lines, 8px markers, recessive grid, a crosshair
+// tooltip and a table view. Mood is always on a 1-5 axis labelled with the survey's emojis.
 
 import type { DayStat, Report } from './api'
 import { h, s } from './dom'
 import { formatDay, formatNumber, moodEmoji, moodLabel, t } from './i18n'
 
-// Average mood per day, 1-5, with gaps on days without answers.
-export function trendChart(days: DayStat[]): HTMLElement {
+export interface Series {
+  name: string
+  color: string // a CSS colour, e.g. var(--cat-1)
+  values: (number | null)[] // one per x point; null leaves a gap
+}
+
+interface LineChartOptions {
+  label: string
+  // Builds the tooltip for x point i.
+  tooltip: (i: number) => Node[]
+  // Formats an x label; labels are thinned to fit.
+  tick?: (x: string) => string
+  // Which points may get a label (default: all, thinned evenly).
+  tickAt?: (i: number) => boolean
+}
+
+// Mood over time, one line per series, redrawn to fit its container.
+export function lineChart(xs: string[], series: Series[], opts: LineChartOptions): HTMLElement {
   const wrap = h('div', { class: 'trend' })
   const tooltip = h('div', { class: 'tooltip', role: 'status', hidden: true })
   let drawnWidth = 0
@@ -14,28 +30,47 @@ export function trendChart(days: DayStat[]): HTMLElement {
     const width = Math.round(wrap.clientWidth)
     if (width === 0 || width === drawnWidth) return
     drawnWidth = width
-    wrap.replaceChildren(drawTrend(days, Math.max(280, width), tooltip), tooltip)
+    wrap.replaceChildren(drawLines(xs, series, opts, Math.max(280, width), tooltip), tooltip)
   }).observe(wrap)
   return wrap
 }
 
-function answers(n: number): string {
+// Average mood per day of a server, with gaps on days without answers.
+export function trendChart(days: DayStat[]): HTMLElement {
+  return lineChart(
+    days.map((d) => d.day),
+    [{ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (d.responses > 0 ? d.average : null)) }],
+    {
+      label: t('chart.trend'),
+      tooltip: (i) => {
+        const d = days[i]
+        return [
+          h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
+          d.responses > 0
+            ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
+            : h('div', { class: 'muted' }, t('chart.noAnswers')),
+        ]
+      },
+    },
+  )
+}
+
+export function answers(n: number): string {
   return n === 1 ? t('chart.answer') : t('chart.answers', { n: formatNumber(n) })
 }
 
-function drawTrend(days: DayStat[], width: number, tooltip: HTMLElement): SVGSVGElement {
+function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): SVGSVGElement {
   const height = 260
   const m = { top: 12, right: 12, bottom: 28, left: 34 }
   const iw = width - m.left - m.right
   const ih = height - m.top - m.bottom
-  const step = days.length > 1 ? iw / (days.length - 1) : 0
-  const x = (i: number) => m.left + (days.length > 1 ? i * step : iw / 2)
+  const n = xs.length
+  const step = n > 1 ? iw / (n - 1) : 0
+  const x = (i: number) => m.left + (n > 1 ? i * step : iw / 2)
   const y = (v: number) => m.top + ((5 - v) / 4) * ih
+  const tick = opts.tick ?? ((d: string) => formatDay(d))
 
-  const svg = s('svg', {
-    width, height, viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
-    'aria-label': t('chart.trend'),
-  })
+  const svg = s('svg', { width, height, viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img', 'aria-label': opts.label })
 
   // Grid: one hairline per mood, with the emoji as the tick label.
   for (let v = 1; v <= 5; v++) {
@@ -45,57 +80,79 @@ function drawTrend(days: DayStat[], width: number, tooltip: HTMLElement): SVGSVG
     )
   }
 
-  // X ticks: about one every 80px, always including the last day.
-  const every = Math.max(1, Math.ceil(days.length / Math.max(1, Math.floor(iw / 80))))
-  days.forEach((d, i) => {
-    if (i % every !== 0 && i !== days.length - 1) return
-    if (i !== days.length - 1 && days.length - 1 - i < every * 0.75) return // keep the last label clear
-    const anchor = days.length === 1 ? 'middle' : i === 0 ? 'start' : i === days.length - 1 ? 'end' : 'middle'
-    svg.append(s('text', { x: x(i), y: height - 8, class: 'tick', 'text-anchor': anchor }, formatDay(d.day)))
-  })
+  // X ticks: about one every 80px. Evenly spaced (always including the last point), or
+  // only at the points tickAt allows (at least 56px apart).
+  if (opts.tickAt) {
+    let last = -Infinity
+    xs.forEach((d, i) => {
+      if (!opts.tickAt!(i) || x(i) - last < 56 || x(i) > width - m.right - 16) return
+      last = x(i)
+      svg.append(s('text', { x: x(i), y: height - 8, class: 'tick', 'text-anchor': i === 0 ? 'start' : 'middle' }, tick(d)))
+    })
+  } else {
+    const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(iw / 80))))
+    xs.forEach((d, i) => {
+      if (i % every !== 0 && i !== n - 1) return
+      if (i !== n - 1 && n - 1 - i < every * 0.75) return // keep the last label clear
+      const anchor = n === 1 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'
+      svg.append(s('text', { x: x(i), y: height - 8, class: 'tick', 'text-anchor': anchor }, tick(d)))
+    })
+  }
 
-  // Line segments between consecutive days with answers.
-  let path = ''
-  days.forEach((d, i) => {
-    if (d.responses === 0) return
-    path += `${i > 0 && days[i - 1].responses > 0 ? 'L' : 'M'}${x(i).toFixed(1)},${y(d.average).toFixed(1)}`
-  })
-  svg.append(s('path', { d: path, class: 'line' }))
-  days.forEach((d, i) => {
-    if (d.responses > 0) svg.append(s('circle', { cx: x(i), cy: y(d.average), r: 4, class: 'dot' }))
-  })
+  // Lines are joined only between consecutive points that both have a value.
+  for (const se of series) {
+    let path = ''
+    se.values.forEach((v, i) => {
+      if (v === null) return
+      path += `${i > 0 && se.values[i - 1] !== null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`
+    })
+    const line = s('path', { d: path, class: 'line' })
+    line.style.stroke = se.color
+    svg.append(line)
+    se.values.forEach((v, i) => {
+      if (v === null) return
+      const dot = s('circle', { cx: x(i), cy: y(v), r: 4, class: 'dot' })
+      dot.style.fill = se.color
+      svg.append(dot)
+    })
+  }
 
-  // Hover: crosshair on the nearest day + tooltip.
+  // Hover: crosshair on the nearest point + tooltip.
   const cross = s('line', { y1: m.top, y2: m.top + ih, class: 'crosshair', visibility: 'hidden' })
-  const focus = s('circle', { r: 6, class: 'focus', visibility: 'hidden' })
-  svg.append(cross, focus)
+  const focus = series.map((se) => {
+    const c = s('circle', { r: 6, class: 'focus', visibility: 'hidden' })
+    c.style.fill = se.color
+    return c
+  })
+  svg.append(cross, ...focus)
   const hit = s('rect', { x: m.left - step / 2, y: 0, width: iw + step, height, fill: 'transparent' })
   const show = (clientX: number) => {
     const box = svg.getBoundingClientRect()
-    const i = Math.max(0, Math.min(days.length - 1, Math.round((clientX - box.left - m.left) / (step || 1))))
-    const d = days[i]
+    const i = Math.max(0, Math.min(n - 1, Math.round((clientX - box.left - m.left) / (step || 1))))
     cross.setAttribute('x1', String(x(i)))
     cross.setAttribute('x2', String(x(i)))
     cross.setAttribute('visibility', 'visible')
-    if (d.responses > 0) {
-      focus.setAttribute('cx', String(x(i)))
-      focus.setAttribute('cy', String(y(d.average)))
-      focus.setAttribute('visibility', 'visible')
-    } else focus.setAttribute('visibility', 'hidden')
-    tooltip.replaceChildren(
-      h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
-      d.responses > 0
-        ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
-        : h('div', { class: 'muted' }, t('chart.noAnswers')),
-    )
+    let top = m.top + ih / 2
+    series.forEach((se, k) => {
+      const v = se.values[i]
+      if (v === null) {
+        focus[k].setAttribute('visibility', 'hidden')
+        return
+      }
+      focus[k].setAttribute('cx', String(x(i)))
+      focus[k].setAttribute('cy', String(y(v)))
+      focus[k].setAttribute('visibility', 'visible')
+      top = Math.min(top, y(v))
+    })
+    tooltip.replaceChildren(...opts.tooltip(i))
     tooltip.hidden = false
     const left = Math.min(Math.max(x(i) - tooltip.offsetWidth / 2, 0), width - tooltip.offsetWidth)
     tooltip.style.left = `${left}px`
-    tooltip.style.top = `${(d.responses > 0 ? y(d.average) : m.top + ih / 2) - tooltip.offsetHeight - 14}px`
+    tooltip.style.top = `${Math.max(0, top - tooltip.offsetHeight - 14)}px`
   }
   const hide = () => {
     cross.setAttribute('visibility', 'hidden')
-    focus.setAttribute('visibility', 'hidden')
+    focus.forEach((f) => f.setAttribute('visibility', 'hidden'))
     tooltip.hidden = true
   }
   hit.addEventListener('pointermove', (e) => show(e.clientX))
