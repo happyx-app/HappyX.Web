@@ -2,7 +2,7 @@ import './style.css'
 import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
 import { h } from './dom'
-import { formatDay, formatNumber, lang, moodEmoji, moodLabel, t } from './i18n'
+import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { settingsForm } from './settings'
@@ -49,6 +49,15 @@ function page(...children: (Node | null)[]) {
   window.scrollTo(0, 0)
 }
 
+// The top bar shows short codes so it still fits on a phone.
+function languagePicker(short = false) {
+  return h(
+    'select',
+    { class: 'lang-picker', 'aria-label': t('nav.language'), onchange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value) },
+    ...languages.map(([code, name]) => h('option', { value: code, selected: code === lang }, short ? code.toUpperCase() : name)),
+  )
+}
+
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
 function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
@@ -75,6 +84,7 @@ function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
     h(
       'div',
       { class: 'user' },
+      languagePicker(true),
       avatar,
       h('span', { class: 'user-name' }, u.username),
       h('button', {
@@ -93,21 +103,30 @@ function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
 function renderLogin() {
   const failed = new URLSearchParams(location.search).get('login') === 'failed'
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
+  const feature = (icon: string, title: string, body: string) =>
+    h('li', { class: 'feature' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('span', {}, h('strong', {}, title), h('span', { class: 'secondary' }, body)))
   page(
     h(
       'main',
       { class: 'login' },
+      h('div', { class: 'login-top' }, languagePicker()),
       h(
         'section',
         { class: 'card login-card' },
         brand(),
         h('h1', {}, t('login.title')),
         h('p', { class: 'secondary' }, t('login.body')),
+        h(
+          'ul',
+          { class: 'features' },
+          feature('📈', t('login.me.title'), t('login.me.body')),
+          feature('📊', t('login.servers.title'), t('login.servers.body')),
+          feature('⚙️', t('login.settings.title'), t('login.settings.body')),
+        ),
         failed ? h('p', { class: 'alert', role: 'alert' }, t('login.failed')) : null,
         h('a', { class: 'btn btn-discord', href: api.loginURL }, discordLogo(), t('login.button')),
         h('p', { class: 'muted small' }, t('login.privacy')),
       ),
-      h('p', { class: 'muted small' }, t('app.tagline')),
     ),
   )
 }
