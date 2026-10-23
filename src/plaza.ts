@@ -378,7 +378,12 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
   // --- drawing ---
 
   let palette = readPalette()
-  const themeWatch = window.setInterval(() => (palette = readPalette()), 1000)
+  // Repaint when the theme toggle flips data-theme, and when the system theme changes.
+  const repaint = () => (palette = readPalette())
+  const themeWatch = new MutationObserver(repaint)
+  themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+  systemTheme.addEventListener('change', repaint)
 
   const ro = new ResizeObserver(() => resize())
   ro.observe(stage)
@@ -599,7 +604,8 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
       cancelAnimationFrame(frame)
       clearTimeout(retryTimer)
       clearTimeout(toastTimer)
-      clearInterval(themeWatch)
+      themeWatch.disconnect()
+      systemTheme.removeEventListener('change', repaint)
       ro.disconnect()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

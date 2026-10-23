@@ -177,6 +177,8 @@ const en = {
   'plaza.comeBack': 'Use it here',
   'plaza.notFound': "There's no square for you in this server. Games may be off, or you may have paused HappyX there.",
   'nav.language': 'Language',
+  'nav.theme.dark': 'Switch to dark mode',
+  'nav.theme.light': 'Switch to light mode',
 }
 
 export type Key = keyof typeof en
@@ -357,6 +359,8 @@ const es: Record<Key, string> = {
   'plaza.comeBack': 'Usarla aquí',
   'plaza.notFound': 'No hay plaza para ti en este servidor. Puede que los juegos estén desactivados o que hayas pausado HappyX allí.',
   'nav.language': 'Idioma',
+  'nav.theme.dark': 'Cambiar a modo oscuro',
+  'nav.theme.light': 'Cambiar a modo claro',
 }
 
 export const messages: Record<string, Record<Key, string>> = { en, es }
