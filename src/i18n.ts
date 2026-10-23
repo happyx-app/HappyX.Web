@@ -1,10 +1,9 @@
-// UI strings. English is the default; the browser's language picks another when we have it.
+// UI strings. English is the default; the language picker in the page chooses another and remembers it.
 // Adding a language = one more entry in `messages` with the same keys as `en`.
 
 const en = {
-  'app.tagline': 'How your Discord server feels, day by day.',
-  'login.title': 'See how your server is doing',
-  'login.body': 'Log in with Discord to see how your mood evolves and, if you manage a server, its charts and reports.',
+  'login.title': "Your Discord server's mood, day by day",
+  'login.body': 'HappyX asks your server how everyone feels each day. Log in with Discord to see the results.',
   'login.button': 'Log in with Discord',
   'login.failed': "We couldn't log you in. Try again.",
   'login.privacy': 'We only read your Discord name and which servers you manage.',
@@ -91,14 +90,20 @@ const en = {
   'settings.saving': 'Saving…',
   'settings.saved': 'Saved. The bot uses the new settings within a minute.',
   'settings.error': "Couldn't save",
+  'login.me.title': 'Your evolution',
+  'login.me.body': 'Your own answers in every server, by week, month or year. Only you can see them.',
+  'login.servers.title': 'Server reports',
+  'login.servers.body': 'If you manage a server: average mood, trends, how answers spread and the latest messages.',
+  'login.settings.title': 'Settings',
+  'login.settings.body': 'Change the language, survey time, timezone, reports and anonymity without typing commands.',
+  'nav.language': 'Language',
 }
 
 export type Key = keyof typeof en
 
 const es: Record<Key, string> = {
-  'app.tagline': 'Cómo se siente tu servidor de Discord, día a día.',
-  'login.title': 'Mira cómo está tu servidor',
-  'login.body': 'Entra con Discord para ver la evolución de tu ánimo y, si administras un servidor, sus gráficas y reports.',
+  'login.title': 'El ánimo de tu servidor de Discord, día a día',
+  'login.body': 'HappyX pregunta cada día a tu servidor cómo está todo el mundo. Entra con Discord para ver los resultados.',
   'login.button': 'Entrar con Discord',
   'login.failed': 'No hemos podido iniciar sesión. Vuelve a intentarlo.',
   'login.privacy': 'Solo leemos tu nombre de Discord y qué servidores administras.',
@@ -185,112 +190,48 @@ const es: Record<Key, string> = {
   'settings.saving': 'Guardando…',
   'settings.saved': 'Guardado. El bot usa los ajustes nuevos en menos de un minuto.',
   'settings.error': 'No se ha podido guardar',
+  'login.me.title': 'Tu evolución',
+  'login.me.body': 'Tus propias respuestas en cada servidor, por semana, mes o año. Solo las ves tú.',
+  'login.servers.title': 'Reports del servidor',
+  'login.servers.body': 'Si administras un servidor: ánimo medio, tendencia, cómo se reparten las respuestas y los últimos mensajes.',
+  'login.settings.title': 'Ajustes',
+  'login.settings.body': 'Cambia el idioma, la hora de la encuesta, la zona horaria, los reports y el anonimato sin escribir comandos.',
+  'nav.language': 'Idioma',
 }
 
-const ca: Record<Key, string> = {
-  'app.tagline': 'Com se sent el teu servidor de Discord, dia a dia.',
-  'login.title': 'Mira com està el teu servidor',
-  'login.body': 'Entra amb Discord per veure l’evolució del teu ànim i, si administres un servidor, les seves gràfiques i reports.',
-  'login.button': 'Entra amb Discord',
-  'login.failed': 'No hem pogut iniciar la sessió. Torna-ho a provar.',
-  'login.privacy': 'Només llegim el teu nom de Discord i quins servidors administres.',
-  'nav.logout': 'Surt',
-  'nav.servers': 'Servidors',
-  'guilds.title': 'Els teus servidors',
-  'guilds.empty.title': 'Encara no hi ha servidors',
-  'guilds.empty.body':
-    'Veuràs un servidor aquí quan HappyX hi sigui i en siguis el propietari, Administrador o l’admin que rep els reports.',
-  'guilds.inactive': 'Bot eliminat',
-  'guilds.anonymous': 'Anònim',
-  'guilds.named': 'Noms visibles',
-  'guilds.weekly': 'Reports setmanals',
-  'guilds.monthly': 'Reports mensuals',
-  'guild.notFound': 'Aquest servidor no existeix o no el pots veure.',
-  'period.label': 'Període',
-  'period.last-30': 'Últims 30 dies',
-  'period.last-90': 'Últims 90 dies',
-  'period.this-week': 'Aquesta setmana',
-  'period.last-week': 'La setmana passada',
-  'period.this-month': 'Aquest mes',
-  'period.last-month': 'El mes passat',
-  'stat.average': 'Ànim mitjà',
-  'stat.responses': 'Respostes',
-  'stat.respondents': 'Persones que han respost',
-  'chart.trend': 'Ànim mitjà per dia',
-  'chart.trend.desc': 'Mitjana de les respostes de cada dia, d’1 (molt malament) a 5 (genial). Els buits són dies sense respostes.',
-  'chart.distribution': 'Respostes per estat d’ànim',
-  'chart.table.show': 'Mostra com a taula',
-  'chart.table.hide': 'Amaga la taula',
-  'chart.day': 'Dia',
-  'chart.noAnswers': 'Sense respostes',
-  'chart.answers': '{n} respostes',
-  'chart.answer': '1 resposta',
-  'messages.title': 'Missatges',
-  'messages.anonymous': 'Anònim: els missatges es mostren sense l’autor.',
-  'messages.empty': 'Ningú no ha deixat cap missatge en aquest període.',
-  'empty.title': 'No hi ha respostes en aquest període',
-  'empty.body': 'Tria un període més llarg o espera la propera enquesta diària.',
-  'error.generic': 'Alguna cosa ha fallat en carregar les dades.',
-  'error.retry': 'Torna-ho a provar',
-  'mood.1': 'Molt malament',
-  'mood.2': 'Malament',
-  'mood.3': 'Normal',
-  'mood.4': 'Bé',
-  'mood.5': 'Genial',
-  'nav.me': 'La meva evolució',
-  'me.subtitle': 'Només tu veus les teves respostes.',
-  'me.period.label': 'Període',
-  'me.period.week': 'Setmana',
-  'me.period.month': 'Mes',
-  'me.period.year': 'Any',
-  'me.filter.label': 'Servidors',
-  'me.all': 'Tots',
-  'me.chart': 'El teu ànim',
-  'me.chart.desc.day': 'La teva resposta de cada dia, d’1 (molt malament) a 5 (genial). Els buits són dies sense respondre.',
-  'me.chart.desc.week': 'La teva mitjana de cada setmana, d’1 (molt malament) a 5 (genial).',
-  'me.weekOf': 'Setmana del {day}',
-  'me.empty.title': 'No has respost en aquest període',
-  'me.empty.body': 'Respon l’enquesta diària que t’envia HappyX per Discord i aquí veuràs la teva evolució.',
-  'me.streak': '{n} dies seguits',
-  'me.streak.one': '1 dia seguit',
-  'me.streak.none': 'Ara mateix sense ratxa',
-  'me.latest': 'Últims comentaris',
-  'me.noComments': 'Sense comentaris en aquest període.',
-  'settings.link': 'Configuració',
-  'settings.title': 'Configuració del servidor',
-  'settings.back': 'Torna a les gràfiques',
-  'settings.language': 'Idioma del bot',
-  'settings.language.help': 'Idioma de l’enquesta diària i dels reports en aquest servidor.',
-  'settings.hour': 'Hora de l’enquesta',
-  'settings.hour.help': 'Quan reben els membres l’enquesta diària.',
-  'settings.timezone': 'Zona horària',
-  'settings.timezone.help': 'Es fa servir per a l’hora de l’enquesta i per saber quan acaba un dia, una setmana o un mes.',
-  'settings.timezone.invalid': 'Tria una zona horària de la llista, per exemple Europe/Madrid.',
-  'settings.frequency': 'Reports',
-  'settings.frequency.help': 'Cada quant rep l’admin la imatge del report per missatge privat.',
-  'settings.anonymous': 'Respostes anònimes',
-  'settings.anonymous.help': 'Els reports i aquest panell mostren els missatges sense dir qui els ha escrit.',
-  'settings.anonymous.off': 'Si ho desactives, els reports i aquest panell mostraran qui ha escrit cada missatge, també els que es van escriure quan el servidor era anònim.',
-  'settings.admin.help': 'Qui rep els reports es canvia a Discord amb /happyx config admin.',
-  'settings.inactive': 'HappyX ja no és en aquest servidor, així que no se’n pot canviar la configuració.',
-  'settings.save': 'Desa els canvis',
-  'settings.saving': 'S’està desant…',
-  'settings.saved': 'Desat. El bot fa servir la configuració nova en menys d’un minut.',
-  'settings.error': 'No s’ha pogut desar',
+export const messages: Record<string, Record<Key, string>> = { en, es }
+
+export const languages = [
+  ['en', 'English'],
+  ['es', 'Español'],
+] as const
+
+const storageKey = 'happyx.lang'
+
+// The saved choice if we still have that language, English otherwise.
+export function pickLanguage(saved: string | null): string {
+  return saved && messages[saved] ? saved : 'en'
 }
 
-export const messages: Record<string, Record<Key, string>> = { en, es, ca }
-
-export function pickLanguage(preferred: readonly string[]): string {
-  for (const tag of preferred) {
-    if (messages[tag]) return tag
-    const base = tag.split('-')[0]
-    if (messages[base]) return base
+function savedLanguage(): string | null {
+  try {
+    return localStorage.getItem(storageKey)
+  } catch {
+    return null
   }
-  return 'en'
 }
 
-export const lang = pickLanguage(typeof navigator === 'undefined' ? [] : navigator.languages)
+export const lang = pickLanguage(typeof localStorage === 'undefined' ? null : savedLanguage())
+
+// Every string is read at render time, so a reload is the simplest way to switch.
+export function setLanguage(code: string) {
+  try {
+    localStorage.setItem(storageKey, code)
+  } catch {
+    // Private mode: the choice lasts until the reload below, which is as good as it gets.
+  }
+  location.reload()
+}
 
 export function t(key: Key, vars: Record<string, string | number> = {}): string {
   const s = messages[lang][key] ?? en[key]

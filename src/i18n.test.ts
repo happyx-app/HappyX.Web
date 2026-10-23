@@ -8,9 +8,9 @@ it('every language has the same keys as English', () => {
   }
 })
 
-it('picks the first language we have', () => {
-  expect(pickLanguage(['fr-FR', 'es-ES', 'en'])).toBe('es')
-  expect(pickLanguage(['ca'])).toBe('ca')
-  expect(pickLanguage(['ja'])).toBe('en')
-  expect(pickLanguage([])).toBe('en')
+it('uses the saved language and English otherwise', () => {
+  expect(pickLanguage('es')).toBe('es')
+  expect(pickLanguage('ca')).toBe('en')
+  expect(pickLanguage('ja')).toBe('en')
+  expect(pickLanguage(null)).toBe('en')
 })
