@@ -15,6 +15,8 @@ export interface Guild {
   language: string
   report_frequency: 'weekly' | 'monthly'
   survey_hour: number
+  // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
+  working_days?: number[]
   active: boolean
 }
 
@@ -107,6 +109,7 @@ export interface SettingsPatch {
   language?: string
   survey_hour?: number
   report_frequency?: 'weekly' | 'monthly'
+  working_days?: number[]
 }
 
 export async function updateSettings(guildID: string, patch: SettingsPatch): Promise<Guild> {
