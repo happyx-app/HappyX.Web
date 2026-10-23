@@ -14,6 +14,7 @@ export interface Guild {
   timezone: string
   language: string
   report_frequency: 'weekly' | 'monthly'
+  survey_hour: number
   active: boolean
 }
 
@@ -75,6 +76,15 @@ export const loginURL = `${base}/auth/login`
 
 export class Unauthorized extends Error {}
 export class NotFound extends Error {}
+// ApiError carries the API's error message, e.g. a validation reason.
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message)
+  }
+}
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(base + path, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
@@ -90,6 +100,28 @@ export const report = (guildID: string, from: string, to: string) =>
   getJSON<Report>(`/guilds/${encodeURIComponent(guildID)}/report?from=${from}&to=${to}`)
 
 export const myMoods = (from: string, to: string) => getJSON<MyMoods>(`/me/moods?from=${from}&to=${to}`)
+
+export interface SettingsPatch {
+  anonymous?: boolean
+  timezone?: string
+  language?: string
+  survey_hour?: number
+  report_frequency?: 'weekly' | 'monthly'
+}
+
+export async function updateSettings(guildID: string, patch: SettingsPatch): Promise<Guild> {
+  const res = await fetch(`${base}/guilds/${encodeURIComponent(guildID)}/settings`, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (res.status === 401) throw new Unauthorized()
+  if (res.status === 404) throw new NotFound()
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : res.statusText)
+  return body as Guild
+}
 
 export async function logout(): Promise<void> {
   await fetch(`${base}/auth/logout`, { method: 'POST', credentials: 'same-origin' })
