@@ -4,7 +4,8 @@
 
 import { avatarURL } from './api'
 import { h } from './dom'
-import { t } from './i18n'
+import { t, type Key } from './i18n'
+import { launchGame, type GameView, type LaunchHandle, type Office, type Person } from './launch'
 
 export interface Obstacle {
   kind: 'fountain' | 'bench' | 'tree' | string
@@ -28,6 +29,7 @@ interface PlayerMsg {
   color: number
   x: number
   y: number
+  host?: boolean
 }
 
 type ServerMsg =
@@ -37,6 +39,10 @@ type ServerMsg =
   | { t: 'state'; p: { id: string; x: number; y: number }[] }
   | { t: 'emote'; id: string; e: Emote }
   | { t: 'high_five'; a: string; b: string }
+  | { t: 'game_start'; map: Office; players: string[] }
+  | GameView
+  | { t: 'game_end' }
+  | { t: 'error'; code: string }
 
 export const emotes = ['wave', 'clap', 'laugh', 'heart', 'coffee', 'highfive'] as const
 export type Emote = (typeof emotes)[number]
@@ -164,11 +170,17 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
     ),
   )
   const stage = h('div', { class: 'plaza-stage' }, canvas, toast)
+  // The host starts «El gran lanzamiento» from here; everyone else learns it exists.
+  const launchButton = h('button', { class: 'btn btn-primary', type: 'button', hidden: true, onclick: () => send({ t: 'launch' }) }, t('launch.start'))
+  const launchNote = h('p', { class: 'muted small' }, t('launch.askHost'))
+  const launchCard = h('section', { class: 'card plaza-launch' }, h('h2', {}, `🚀 ${t('launch.name')}`), h('p', { class: 'small' }, t('launch.pitch')), launchButton, launchNote)
+  const plazaCard = h('section', { class: 'card plaza-card' }, stage, h('div', { class: 'plaza-toolbar' }, status, emoteBar))
+  const main = h('div', { class: 'plaza-main' }, plazaCard)
   const element = h(
     'div',
     { class: 'plaza' },
-    h('section', { class: 'card plaza-card' }, stage, h('div', { class: 'plaza-toolbar' }, status, emoteBar)),
-    h('aside', { class: 'plaza-side' }, h('section', { class: 'card' }, peopleTitle, people, copyButton), help),
+    main,
+    h('aside', { class: 'plaza-side' }, h('section', { class: 'card' }, peopleTitle, people, copyButton), launchCard, help),
   )
 
   let world: World | null = null
@@ -183,6 +195,10 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
   let frame = 0
   let toastTimer = 0
   let destroyed = false
+  let host = false
+  let game: LaunchHandle | null = null
+  // Everyone seen in the square, kept while a game runs so players who drop out keep a name.
+  const known = new Map<string, Person>()
 
   function send(msg: object) {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
@@ -209,7 +225,37 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
     // Until the picture loads (or if the CDN is unreachable) the initial is drawn instead.
     const img = new Image()
     img.src = avatarURL(p.id, p.avatar, 128)
-    return { id: p.id, name: p.name, color: ringColors[p.color % ringColors.length], img, x: p.x, y: p.y, tx: p.x, ty: p.y }
+    const a = { id: p.id, name: p.name, color: ringColors[p.color % ringColors.length], img, x: p.x, y: p.y, tx: p.x, ty: p.y }
+    known.set(p.id, a)
+    return a
+  }
+
+  function renderLaunch() {
+    launchButton.hidden = !host || game !== null
+    launchButton.disabled = avatars.size < 3
+    launchNote.hidden = host && avatars.size >= 3
+    launchNote.textContent = host ? t('launch.needPeople') : t('launch.askHost')
+    launchCard.hidden = game !== null
+  }
+
+  function startGame(office: Office) {
+    game?.destroy()
+    keys.clear()
+    updateMove()
+    game = launchGame({ office, me: myID, host, person: (id) => known.get(id), send })
+    plazaCard.hidden = true
+    help.hidden = true
+    main.prepend(game.element)
+    renderLaunch()
+  }
+
+  function endGame() {
+    game?.destroy()
+    game = null
+    plazaCard.hidden = false
+    help.hidden = false
+    renderLaunch()
+    resize()
   }
 
   function renderPeople() {
@@ -224,6 +270,7 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
     peopleTitle.textContent = t('plaza.people', { n: avatars.size })
     copyButton.hidden = avatars.size !== 1
     canvas.setAttribute('aria-label', t('plaza.canvas.count', { n: avatars.size }))
+    renderLaunch()
   }
 
   function setStatus(text: string, live: boolean, action?: HTMLElement) {
@@ -260,6 +307,8 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
         dots = grassDots(world)
         avatars.clear()
         for (const p of m.players) avatars.set(p.id, avatarOf(p))
+        host = !!m.players.find((p) => p.id === m.you)?.host
+        if (game) endGame()
         setStatus(t('plaza.connected'), true)
         retries = 0
         renderPeople()
@@ -290,6 +339,18 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
         if (a && b) highFive(a, b, now)
         break
       }
+      case 'game_start':
+        startGame(m.map)
+        break
+      case 'game':
+        game?.update(m)
+        break
+      case 'game_end':
+        endGame()
+        break
+      case 'error':
+        showToast(t(`launch.error.${m.code}` as Key), false)
+        break
     }
   }
 
@@ -310,6 +371,7 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
       if (destroyed || ws !== sock) return
       ws = null
       avatars.clear()
+      if (game) endGame()
       renderPeople()
       if (ev.code === closedElsewhere) {
         setStatus(t('plaza.elsewhere'), false, h('button', { class: 'btn btn-ghost small', type: 'button', onclick: () => connect() }, t('plaza.comeBack')))
@@ -342,7 +404,7 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return
+    if (game || typing(e) || e.metaKey || e.ctrlKey || e.altKey) return
     const k = keyNames[e.key]
     if (k) {
       e.preventDefault() // arrows would scroll the page
@@ -401,7 +463,7 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
     const ctx = canvas.getContext('2d')
-    if (!ctx || !world) return
+    if (!ctx || !world || game) return
     const s = canvas.width / world.w
     ctx.setTransform(s, 0, 0, s, 0, 0)
     const k = uiScale(canvas.getBoundingClientRect().width / world.w)
@@ -610,6 +672,7 @@ export function plaza(guildID: string, myID: string): PlazaHandle {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
+      game?.destroy()
       ws?.close(1000)
       ws = null
     },

@@ -19,6 +19,7 @@ src/api.ts       client for the API's /web routes
 src/charts.ts    mood line chart, one or more series (hover tooltip + table view), answers-by-mood bars
 src/periods.ts   period presets, computed in the server's timezone
 src/plaza.ts     the server's square (#/plaza/<id>): live avatars on a canvas over a WebSocket
+src/launch.ts    «El gran lanzamiento», the office game drawn inside the square
 src/i18n.ts      UI strings (en default, es), chosen with the language picker and kept in localStorage
 src/theme.ts     light/dark toggle; follows the system until chosen, kept in localStorage
 nginx.conf.template  production server: static files, /api/web proxy (WebSockets too), CSP
