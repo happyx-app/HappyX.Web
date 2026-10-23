@@ -16,6 +16,8 @@ export interface Guild {
   report_frequency: 'weekly' | 'monthly'
   survey_hour: number
   games_enabled: boolean
+  // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
+  working_days?: number[]
   active: boolean
 }
 
@@ -178,6 +180,7 @@ export interface SettingsPatch {
   language?: string
   survey_hour?: number
   report_frequency?: 'weekly' | 'monthly'
+  working_days?: number[]
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.
