@@ -1,0 +1,191 @@
+// UI strings. English is the default; the browser's language picks another when we have it.
+// Adding a language = one more entry in `messages` with the same keys as `en`.
+
+const en = {
+  'app.tagline': 'How your Discord server feels, day by day.',
+  'login.title': 'See how your server is doing',
+  'login.body': 'Log in with Discord to see the mood charts and reports of the servers you manage.',
+  'login.button': 'Log in with Discord',
+  'login.failed': "We couldn't log you in. Try again.",
+  'login.privacy': 'We only read your Discord name and which servers you manage.',
+  'nav.logout': 'Log out',
+  'nav.servers': 'Servers',
+  'guilds.title': 'Your servers',
+  'guilds.empty.title': 'No servers yet',
+  'guilds.empty.body':
+    "You'll see a server here when HappyX is in it and you are its owner, an Administrator, or the admin who gets the reports.",
+  'guilds.inactive': 'Bot removed',
+  'guilds.anonymous': 'Anonymous',
+  'guilds.named': 'Names visible',
+  'guilds.weekly': 'Weekly reports',
+  'guilds.monthly': 'Monthly reports',
+  'guild.notFound': "This server doesn't exist or you can't see it.",
+  'period.label': 'Period',
+  'period.last-30': 'Last 30 days',
+  'period.last-90': 'Last 90 days',
+  'period.this-week': 'This week',
+  'period.last-week': 'Last week',
+  'period.this-month': 'This month',
+  'period.last-month': 'Last month',
+  'stat.average': 'Average mood',
+  'stat.responses': 'Answers',
+  'stat.respondents': 'People who answered',
+  'chart.trend': 'Daily average mood',
+  'chart.trend.desc': 'Average of the answers each day, from 1 (awful) to 5 (great). Gaps are days without answers.',
+  'chart.distribution': 'Answers by mood',
+  'chart.table.show': 'Show as table',
+  'chart.table.hide': 'Hide table',
+  'chart.day': 'Day',
+  'chart.noAnswers': 'No answers',
+  'chart.answers': '{n} answers',
+  'chart.answer': '1 answer',
+  'messages.title': 'Messages',
+  'messages.anonymous': 'Anonymous: messages are shown without their author.',
+  'messages.empty': 'Nobody left a message in this period.',
+  'empty.title': 'No answers in this period',
+  'empty.body': 'Pick a longer period, or wait for the next daily survey.',
+  'error.generic': 'Something went wrong loading the data.',
+  'error.retry': 'Retry',
+  'mood.1': 'Awful',
+  'mood.2': 'Bad',
+  'mood.3': 'Okay',
+  'mood.4': 'Good',
+  'mood.5': 'Great',
+}
+
+export type Key = keyof typeof en
+
+const es: Record<Key, string> = {
+  'app.tagline': 'Cómo se siente tu servidor de Discord, día a día.',
+  'login.title': 'Mira cómo está tu servidor',
+  'login.body': 'Entra con Discord para ver las gráficas de ánimo y los reports de los servidores que administras.',
+  'login.button': 'Entrar con Discord',
+  'login.failed': 'No hemos podido iniciar sesión. Vuelve a intentarlo.',
+  'login.privacy': 'Solo leemos tu nombre de Discord y qué servidores administras.',
+  'nav.logout': 'Salir',
+  'nav.servers': 'Servidores',
+  'guilds.title': 'Tus servidores',
+  'guilds.empty.title': 'Todavía no hay servidores',
+  'guilds.empty.body':
+    'Verás un servidor aquí cuando HappyX esté en él y seas su dueño, Administrador o el admin que recibe los reports.',
+  'guilds.inactive': 'Bot eliminado',
+  'guilds.anonymous': 'Anónimo',
+  'guilds.named': 'Nombres visibles',
+  'guilds.weekly': 'Reports semanales',
+  'guilds.monthly': 'Reports mensuales',
+  'guild.notFound': 'Este servidor no existe o no puedes verlo.',
+  'period.label': 'Periodo',
+  'period.last-30': 'Últimos 30 días',
+  'period.last-90': 'Últimos 90 días',
+  'period.this-week': 'Esta semana',
+  'period.last-week': 'Semana pasada',
+  'period.this-month': 'Este mes',
+  'period.last-month': 'Mes pasado',
+  'stat.average': 'Ánimo medio',
+  'stat.responses': 'Respuestas',
+  'stat.respondents': 'Personas que han respondido',
+  'chart.trend': 'Ánimo medio por día',
+  'chart.trend.desc': 'Media de las respuestas de cada día, de 1 (muy mal) a 5 (genial). Los huecos son días sin respuestas.',
+  'chart.distribution': 'Respuestas por estado de ánimo',
+  'chart.table.show': 'Ver como tabla',
+  'chart.table.hide': 'Ocultar tabla',
+  'chart.day': 'Día',
+  'chart.noAnswers': 'Sin respuestas',
+  'chart.answers': '{n} respuestas',
+  'chart.answer': '1 respuesta',
+  'messages.title': 'Mensajes',
+  'messages.anonymous': 'Anónimo: los mensajes se muestran sin su autor.',
+  'messages.empty': 'Nadie ha dejado un mensaje en este periodo.',
+  'empty.title': 'No hay respuestas en este periodo',
+  'empty.body': 'Elige un periodo más largo o espera a la próxima encuesta diaria.',
+  'error.generic': 'Algo ha fallado al cargar los datos.',
+  'error.retry': 'Reintentar',
+  'mood.1': 'Muy mal',
+  'mood.2': 'Mal',
+  'mood.3': 'Normal',
+  'mood.4': 'Bien',
+  'mood.5': 'Genial',
+}
+
+const ca: Record<Key, string> = {
+  'app.tagline': 'Com se sent el teu servidor de Discord, dia a dia.',
+  'login.title': 'Mira com està el teu servidor',
+  'login.body': 'Entra amb Discord per veure les gràfiques d’ànim i els reports dels servidors que administres.',
+  'login.button': 'Entra amb Discord',
+  'login.failed': 'No hem pogut iniciar la sessió. Torna-ho a provar.',
+  'login.privacy': 'Només llegim el teu nom de Discord i quins servidors administres.',
+  'nav.logout': 'Surt',
+  'nav.servers': 'Servidors',
+  'guilds.title': 'Els teus servidors',
+  'guilds.empty.title': 'Encara no hi ha servidors',
+  'guilds.empty.body':
+    'Veuràs un servidor aquí quan HappyX hi sigui i en siguis el propietari, Administrador o l’admin que rep els reports.',
+  'guilds.inactive': 'Bot eliminat',
+  'guilds.anonymous': 'Anònim',
+  'guilds.named': 'Noms visibles',
+  'guilds.weekly': 'Reports setmanals',
+  'guilds.monthly': 'Reports mensuals',
+  'guild.notFound': 'Aquest servidor no existeix o no el pots veure.',
+  'period.label': 'Període',
+  'period.last-30': 'Últims 30 dies',
+  'period.last-90': 'Últims 90 dies',
+  'period.this-week': 'Aquesta setmana',
+  'period.last-week': 'La setmana passada',
+  'period.this-month': 'Aquest mes',
+  'period.last-month': 'El mes passat',
+  'stat.average': 'Ànim mitjà',
+  'stat.responses': 'Respostes',
+  'stat.respondents': 'Persones que han respost',
+  'chart.trend': 'Ànim mitjà per dia',
+  'chart.trend.desc': 'Mitjana de les respostes de cada dia, d’1 (molt malament) a 5 (genial). Els buits són dies sense respostes.',
+  'chart.distribution': 'Respostes per estat d’ànim',
+  'chart.table.show': 'Mostra com a taula',
+  'chart.table.hide': 'Amaga la taula',
+  'chart.day': 'Dia',
+  'chart.noAnswers': 'Sense respostes',
+  'chart.answers': '{n} respostes',
+  'chart.answer': '1 resposta',
+  'messages.title': 'Missatges',
+  'messages.anonymous': 'Anònim: els missatges es mostren sense l’autor.',
+  'messages.empty': 'Ningú no ha deixat cap missatge en aquest període.',
+  'empty.title': 'No hi ha respostes en aquest període',
+  'empty.body': 'Tria un període més llarg o espera la propera enquesta diària.',
+  'error.generic': 'Alguna cosa ha fallat en carregar les dades.',
+  'error.retry': 'Torna-ho a provar',
+  'mood.1': 'Molt malament',
+  'mood.2': 'Malament',
+  'mood.3': 'Normal',
+  'mood.4': 'Bé',
+  'mood.5': 'Genial',
+}
+
+export const messages: Record<string, Record<Key, string>> = { en, es, ca }
+
+export function pickLanguage(preferred: readonly string[]): string {
+  for (const tag of preferred) {
+    if (messages[tag]) return tag
+    const base = tag.split('-')[0]
+    if (messages[base]) return base
+  }
+  return 'en'
+}
+
+export const lang = pickLanguage(typeof navigator === 'undefined' ? [] : navigator.languages)
+
+export function t(key: Key, vars: Record<string, string | number> = {}): string {
+  const s = messages[lang][key] ?? en[key]
+  return s.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''))
+}
+
+export const moodEmojis = ['😞', '😕', '😐', '🙂', '🤩'] as const
+
+export const moodEmoji = (mood: number) => moodEmojis[Math.min(5, Math.max(1, Math.round(mood))) - 1]
+
+export const moodLabel = (mood: number) => t(`mood.${Math.min(5, Math.max(1, Math.round(mood)))}` as Key)
+
+export function formatDay(day: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
+  return new Intl.DateTimeFormat(lang, { ...opts, timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`))
+}
+
+export const formatNumber = (n: number, digits = 0) =>
+  new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n)
