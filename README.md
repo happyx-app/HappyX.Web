@@ -18,8 +18,9 @@ src/evolution.ts My evolution: periods, per-server points (by day, or by week fo
 src/api.ts       client for the API's /web routes
 src/charts.ts    mood line chart, one or more series (hover tooltip + table view), answers-by-mood bars
 src/periods.ts   period presets, computed in the server's timezone
+src/plaza.ts     the server's square (#/plaza/<id>): live avatars on a canvas over a WebSocket
 src/i18n.ts      UI strings (en default, es), chosen with the language picker and kept in localStorage
-nginx.conf.template  production server: static files, /api/web proxy, CSP
+nginx.conf.template  production server: static files, /api/web proxy (WebSockets too), CSP
 ```
 
 ## Who sees what
@@ -27,6 +28,10 @@ nginx.conf.template  production server: static files, /api/web proxy, CSP
 Everyone sees their own answers in every server. A user sees a server's charts, and can change its
 settings, if they are the admin who gets the reports, or the owner or an Administrator
 of the server on Discord. The API enforces this; the web only shows what it gets back.
+
+The square is open to the members who can play the games. The API moves the avatars and sends
+their positions 20 times a second; the page sends only the keys held, taps and emotes, and
+glides each avatar toward its latest position.
 
 ## Development
 

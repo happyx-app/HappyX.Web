@@ -16,6 +16,12 @@
   --danger: #d03b3b;
   --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 4px 16px rgba(11, 11, 11, 0.04);
   --radius: 14px;
+  --plaza-ground: #e3ecd9;
+  --plaza-path: #efe8da;
+  --plaza-stone: #cfc9bd;
+  --plaza-water: #9cc7ef;
+  --plaza-tree: #7fb069;
+  --plaza-bench: #b48a62;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -34,6 +40,12 @@
     --series-soft: #184f95;
     --accent: #6da7ec;
     --shadow: none;
+    --plaza-ground: #1f2a1c;
+    --plaza-path: #2c2a25;
+    --plaza-stone: #4a4740;
+    --plaza-water: #1f4a75;
+    --plaza-tree: #3d6b2f;
+    --plaza-bench: #6e5236;
   }
 }
 :root[data-theme='dark'] {
@@ -51,6 +63,12 @@
   --series-soft: #184f95;
   --accent: #6da7ec;
   --shadow: none;
+  --plaza-ground: #1f2a1c;
+  --plaza-path: #2c2a25;
+  --plaza-stone: #4a4740;
+  --plaza-water: #1f4a75;
+  --plaza-tree: #3d6b2f;
+  --plaza-bench: #6e5236;
 }
 
 * { box-sizing: border-box; }
@@ -321,3 +339,25 @@ a { color: var(--accent); }
   .user .lang-picker { padding: 5px 4px; }
   .user .btn { padding: 6px 8px; }
 }
+
+/* The square */
+.plaza { display: grid; gap: 16px; }
+.plaza-card { padding: 12px; gap: 10px; }
+.plaza-stage { position: relative; }
+.plaza-canvas { display: block; width: 100%; aspect-ratio: 960 / 600; border-radius: 10px; touch-action: none; cursor: pointer; background: var(--plaza-ground); }
+.plaza-toast {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); margin: 0;
+  padding: 6px 14px; border-radius: 999px; background: var(--surface); color: var(--ink);
+  font-weight: 600; box-shadow: var(--shadow); border: 1px solid var(--border); white-space: nowrap;
+}
+.plaza-emotes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.plaza-emote {
+  font-size: 1.375rem; line-height: 1; width: 48px; height: 44px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2);
+}
+.plaza-emote:hover { background: var(--surface); border-color: var(--series); }
+.plaza-emote:active { transform: scale(0.94); }
+.plaza-status { text-align: center; }
+.plaza-people { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.plaza-people .chip { cursor: default; }
+@media (max-width: 480px) { .plaza-card { padding: 8px; } .plaza-emote { width: 44px; height: 40px; font-size: 1.25rem; } .plaza-toast { white-space: normal; text-align: center; width: max-content; max-width: 90%; } }
