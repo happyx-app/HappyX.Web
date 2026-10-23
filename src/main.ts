@@ -1,11 +1,12 @@
 import './style.css'
 import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
-import { h } from './dom'
+import { h, s } from './dom'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { settingsForm } from './settings'
+import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none)
@@ -15,6 +16,7 @@ import { settingsForm } from './settings'
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
+applySavedTheme()
 let me: api.Me | null = null
 
 async function route() {
@@ -58,6 +60,35 @@ function languagePicker(short = false) {
   )
 }
 
+// Line icons in the text colour, so they stay black and white in both modes.
+const icon = (...shapes: SVGElement[]) =>
+  s('svg', { viewBox: '0 0 24 24', class: 'icon', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, ...shapes)
+
+const sunIcon = () =>
+  icon(
+    s('circle', { cx: 12, cy: 12, r: 4 }),
+    s('path', { d: 'M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41' }),
+  )
+
+const moonIcon = () => icon(s('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' }))
+
+// Shows the mode it switches to, like most theme buttons.
+function themeToggle() {
+  const btn = h('button', { class: 'btn btn-ghost theme-toggle', type: 'button' })
+  const paint = () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark'
+    btn.replaceChildren(next === 'dark' ? moonIcon() : sunIcon())
+    btn.setAttribute('aria-label', t(next === 'dark' ? 'nav.theme.dark' : 'nav.theme.light'))
+    btn.title = btn.getAttribute('aria-label')!
+  }
+  btn.addEventListener('click', () => {
+    setTheme(currentTheme() === 'dark' ? 'light' : 'dark')
+    paint()
+  })
+  paint()
+  return btn
+}
+
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
 function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
@@ -84,6 +115,7 @@ function header(m: api.Me, active: 'me' | 'servers' = 'servers') {
     h(
       'div',
       { class: 'user' },
+      themeToggle(),
       languagePicker(true),
       avatar,
       h('span', { class: 'user-name' }, u.username),
@@ -109,7 +141,7 @@ function renderLogin() {
     h(
       'main',
       { class: 'login' },
-      h('div', { class: 'login-top' }, languagePicker()),
+      h('div', { class: 'login-top' }, themeToggle(), languagePicker()),
       h(
         'section',
         { class: 'card login-card' },
