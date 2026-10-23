@@ -270,3 +270,54 @@ a { color: var(--accent); }
 .error { color: var(--danger); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .success { color: #0ca30c; } }
 :root[data-theme='dark'] .success { color: #0ca30c; }
+
+/* «Who's who?» game */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); color: var(--ink-2); min-width: 0; }
+.step > span:last-child { display: grid; min-width: 0; }
+.step-num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 600; font-size: 0.875rem; background: var(--surface); border: 1px solid var(--border); }
+.step-on { background: var(--surface); color: var(--ink); border: 1px solid var(--series); box-shadow: var(--shadow); }
+.step-on .step-num { background: var(--series); color: #fff; border-color: transparent; }
+.step-done .step-num { color: var(--series); }
+@media (max-width: 480px) { .step { flex-direction: column; align-items: start; gap: 6px; padding: 10px; } }
+.game-card { gap: 16px; }
+.game-question { display: grid; gap: 4px; }
+.game-question h2 { font-size: 1.375rem; font-weight: 650; text-wrap: balance; }
+.game-big { font-size: 2.5rem; }
+.field-label { font-weight: 600; font-size: 0.9375rem; }
+.game-card textarea, .game-card select {
+  font: inherit; color: var(--ink); background: var(--surface); width: 100%;
+  border: 1px solid var(--axis); border-radius: 10px; padding: 9px 12px;
+}
+.game-card textarea { resize: vertical; min-height: 84px; }
+.counter { font-variant-numeric: tabular-nums; }
+.guesses { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.guess { display: grid; grid-template-columns: auto 1fr minmax(150px, 210px); gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 12px; }
+.guess-mine { background: var(--surface-2); }
+.guess-mine .badge { justify-self: start; background: var(--surface); }
+.guess-n { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--series-soft); font-weight: 600; font-size: 0.875rem; }
+@media (max-width: 560px) { .guess { grid-template-columns: auto 1fr; } .guess select, .guess .badge { grid-column: 1 / -1; } }
+.grid-results { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+.grid-results h3 { margin: 0 0 8px; font-size: 0.9375rem; font-weight: 600; }
+.ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rank { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+.rank-top { background: var(--surface-2); }
+.rank-medal { font-size: 1.25rem; text-align: center; }
+.reveal { list-style: none; margin: 0; padding: 0; display: grid; }
+.reveal li { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.reveal li:last-child { border-bottom: 0; }
+.reveal-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 0.875rem; }
+.pill { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+.pill-right { background: #d6f2e0; color: #0b5a2a; }
+.pill-wrong { background: var(--surface-2); color: var(--ink-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .pill-right { background: #12391f; color: #8fe0aa; } }
+:root[data-theme='dark'] .pill-right { background: #12391f; color: #8fe0aa; }
+/* Three nav links still fit next to the language picker on a phone. */
+.nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+@media (max-width: 420px) {
+  .topbar { gap: 8px; }
+  .topbar .brand { display: none; }
+  .nav-link { padding: 6px 6px; font-size: 0.8125rem; }
+  .user .lang-picker { padding: 5px 4px; }
+  .user .btn { padding: 6px 8px; }
+}
