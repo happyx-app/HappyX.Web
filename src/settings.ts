@@ -3,7 +3,7 @@
 
 import * as api from './api'
 import { h } from './dom'
-import { t } from './i18n'
+import { formatDay, t } from './i18n'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
 export const botLanguages: [code: string, name: string][] = [
@@ -24,13 +24,20 @@ export const settingsOf = (g: api.Guild): Settings => ({
   language: g.language,
   survey_hour: g.survey_hour,
   report_frequency: g.report_frequency,
+  working_days: g.working_days ?? mondayToFriday,
 })
+
+export const mondayToFriday = [1, 2, 3, 4, 5]
+
+// weekdayName names an ISO day (1 is Monday) in the page's language.
+export const weekdayName = (iso: number, width: 'short' | 'long' = 'short') =>
+  formatDay(`2026-10-${18 + iso}`, { weekday: width }) // 19 October 2026 is a Monday
 
 // changes returns only the fields that differ, so a save never rewrites what didn't change.
 export function changes(before: Settings, after: Settings): api.SettingsPatch {
   const out: api.SettingsPatch = {}
   for (const k of Object.keys(after) as (keyof Settings)[]) {
-    if (after[k] !== before[k]) (out as Record<string, unknown>)[k] = after[k]
+    if (JSON.stringify(after[k]) !== JSON.stringify(before[k])) (out as Record<string, unknown>)[k] = after[k]
   }
   return out
 }
@@ -64,6 +71,16 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency, disabled }), t(`guilds.${f}`)),
   )
 
+  const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
+    h(
+      'label',
+      { class: 'radio day', title: weekdayName(d, 'long') },
+      h('input', { type: 'checkbox', name: 'working_days', value: d, checked: saved.working_days.includes(d), disabled }),
+      weekdayName(d),
+    ),
+  )
+  const daysError = h('p', { class: 'error small', hidden: true }, t('settings.days.none'))
+
   const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous, disabled })
   const anonWarning = h('p', { class: 'warning small', hidden: true }, `⚠️ ${t('settings.anonymous.off')}`)
 
@@ -76,13 +93,15 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     timezone: tz.value.trim(),
     report_frequency: (freq.map((l) => l.querySelector('input')!).find((i) => i.checked)?.value ?? saved.report_frequency) as Settings['report_frequency'],
     anonymous: anon.checked,
+    working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
   })
   const refresh = () => {
     const now = read()
     const dirty = Object.keys(changes(saved, now)).length > 0
     const tzValid = zones.length === 0 || zones.includes(now.timezone) || now.timezone === saved.timezone
     tz.setCustomValidity(tzValid ? '' : t('settings.timezone.invalid'))
-    save.disabled = disabled || !dirty || !tzValid
+    daysError.hidden = now.working_days.length > 0
+    save.disabled = disabled || !dirty || !tzValid || now.working_days.length === 0
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     if (dirty) status.textContent = ''
   }
@@ -96,6 +115,14 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     h('div', { class: 'field-row' },
       field('hour', t('settings.hour'), t('settings.hour.help'), hour),
       field('timezone', t('settings.timezone'), t('settings.timezone.help'), h('div', {}, tz, tzList)),
+    ),
+    h(
+      'fieldset',
+      { class: 'field' },
+      h('legend', {}, t('settings.days')),
+      h('div', { class: 'radios days' }, ...days),
+      daysError,
+      h('p', { class: 'muted small' }, t('settings.days.help')),
     ),
     h('fieldset', { class: 'field' }, h('legend', {}, t('settings.frequency')), h('div', { class: 'radios' }, ...freq), h('p', { class: 'muted small' }, t('settings.frequency.help'))),
     h(
