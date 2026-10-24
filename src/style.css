@@ -336,6 +336,32 @@ a { color: var(--accent); }
 .switch input:checked::after { transform: translateX(18px); }
 .warning { color: var(--ink); background: var(--surface-2); border-left: 3px solid var(--sun); padding: 8px 12px; border-radius: 6px; }
 .form-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.survey-message textarea {
+  font: inherit; color: var(--ink); background: var(--surface); width: 100%; resize: vertical; min-height: 96px;
+  border: 1px solid var(--axis); border-radius: 10px; padding: 9px 12px;
+}
+.survey-message textarea[aria-invalid='true'] { border-color: var(--danger); }
+.survey-meta { display: flex; align-items: flex-start; gap: 12px; }
+.survey-meta .error { margin: 0; flex: 1; }
+.survey-count { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.survey-count.error { color: var(--danger); }
+.survey-vars { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.survey-vars li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip-code { font: 500 0.8125rem ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); cursor: pointer; color: var(--accent); }
+/* A Discord DM, in Discord's own dark colours whatever the page theme. */
+.dc-preview {
+  display: flex; gap: 14px; padding: 14px 16px; border-radius: 10px; background: #313338; color: #dbdee1;
+  font-size: 0.9375rem; line-height: 1.375; overflow-wrap: anywhere;
+}
+.dc-avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; }
+.dc-body { display: grid; gap: 4px; min-width: 0; }
+.dc-head { display: flex; align-items: center; gap: 6px; color: #f2f3f5; }
+.dc-app { background: #5865f2; color: #fff; font-size: 0.625rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; }
+.dc-content strong { color: #f2f3f5; }
+.dc-content code { background: #2b2d31; padding: 1px 4px; border-radius: 4px; font-size: 0.85em; }
+.dc-mention { background: rgba(88, 101, 242, 0.3); color: #c9cdfb; border-radius: 3px; padding: 0 2px; font-weight: 500; }
+.dc-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.dc-button { background: #4e5058; color: #fff; border-radius: 4px; padding: 6px 12px; font-size: 0.875rem; font-weight: 500; }
 .btn-primary { background: var(--primary); color: #fff; border-color: transparent; }
 .btn-primary:disabled { opacity: 0.45; cursor: default; filter: none; }
 .success { color: #006300; }
