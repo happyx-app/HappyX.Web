@@ -7,7 +7,6 @@ import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, se
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { settingsForm } from './settings'
 import { gamePage } from './game'
-import { plaza, type PlazaHandle } from './plaza'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -17,18 +16,13 @@ import { applySavedTheme, currentTheme, setTheme } from './theme'
 //   #/me?p=<period>&g=<id>   my own answers, optionally one server only
 //   #/games                  servers where I can play «Who's who?»
 //   #/game/<guildID>         the game in one server (the bot links here)
-//   #/plaza/<guildID>        the server's square, live
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
 applySavedTheme()
 let me: api.Me | null = null
-// The open square, closed whenever the page changes.
-let square: PlazaHandle | null = null
 
 async function route() {
-  square?.destroy()
-  square = null
   try {
     me ??= await api.me()
     me.games ??= []
@@ -37,8 +31,6 @@ async function route() {
     return renderError(err)
   }
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
-  const plazaID = path.match(/^\/plaza\/(\d+)$/)?.[1]
-  if (plazaID) return renderPlaza(me, plazaID)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
   if (gameID) return renderGame(me, gameID)
   if (path === '/games') {
@@ -516,12 +508,7 @@ async function renderGame(m: api.Me, guildID: string) {
       'main',
       { class: 'container narrow' },
       m.games.length > 1 ? h('a', { class: 'back', href: '#/games' }, `← ${t('games.title')}`) : null,
-      h(
-        'div',
-        { class: 'title-row' },
-        h('div', {}, h('h1', {}, `🎲 ${t('game.title')}`), subtitle),
-        h('a', { class: 'btn btn-ghost', href: `#/plaza/${guildID}` }, t('plaza.link')),
-      ),
+      h('div', {}, h('h1', {}, `🎲 ${t('game.title')}`), subtitle),
       body,
     ),
   )
@@ -541,26 +528,6 @@ async function renderGame(m: api.Me, guildID: string) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLogin()))
-}
-
-function renderPlaza(m: api.Me, guildID: string) {
-  const g = m.games.find((x) => x.discord_guild_id === guildID)
-  const back = h('a', { class: 'back', href: `#/game/${guildID}` }, `← ${t('game.title')}`)
-  if (!g) {
-    page(header(m, 'games'), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('plaza.notFound')), h('a', { class: 'btn', href: '#/me' }, t('nav.me')))))
-    return
-  }
-  square = plaza(guildID, m.user.discord_user_id)
-  page(
-    header(m, 'games'),
-    h(
-      'main',
-      { class: 'container' },
-      back,
-      h('div', {}, h('h1', {}, t('plaza.title')), h('p', { class: 'muted' }, t('plaza.subtitle', { guild: g.name }))),
-      square.element,
-    ),
-  )
 }
 
 function stat(label: string, value: Node | string, note?: string) {
