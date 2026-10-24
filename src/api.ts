@@ -156,6 +156,7 @@ export function avatarURL(userID: string, avatar: string | undefined, size = 64)
 const base = '/api/web'
 
 export const loginURL = `${base}/auth/login`
+export const inviteURL = `${base}/auth/invite`
 
 export class Unauthorized extends Error {}
 export class NotFound extends Error {}
