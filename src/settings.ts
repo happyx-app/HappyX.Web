@@ -1,5 +1,5 @@
 // Server settings form: the same options as the bot's /happyx config, except who receives the
-// reports, which stays in Discord.
+// reports, which is chosen with the permissions (see access.ts).
 
 import * as api from './api'
 import { h } from './dom'
@@ -141,7 +141,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       h('p', { class: 'muted small' }, t('settings.games.help')),
       h('p', { class: 'muted small' }, `👀 ${t('settings.games.privacy')}`),
     ),
-    h('p', { class: 'muted small' }, `ℹ️ ${t('settings.admin.help')}`),
+    h('p', { class: 'muted small' }, `ℹ️ ${t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')}`),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('input', refresh)

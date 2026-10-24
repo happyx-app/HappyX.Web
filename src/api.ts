@@ -19,6 +19,40 @@ export interface Guild {
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
   active: boolean
+  // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
+  access?: AccessLevel
+}
+
+// view: reports. manage: reports and settings. owner: also who has access, and deleting.
+export type AccessLevel = 'view' | 'manage' | 'owner'
+export type GrantLevel = 'view' | 'manage'
+
+export const canManage = (g: Guild) => g.access !== 'view'
+export const isOwner = (g: Guild) => g.access === undefined || g.access === 'owner'
+
+export interface Grant {
+  kind: 'user' | 'role'
+  id: string
+  level: GrantLevel
+}
+
+export interface Role {
+  id: string
+  name: string
+  color: number // RGB, 0 means no colour
+  position: number
+}
+
+export interface Member {
+  discord_user_id: string
+  username: string
+}
+
+export interface Access {
+  admin_discord_user_id: string
+  grants: Grant[]
+  roles: Role[]
+  members: Member[]
 }
 
 // A server where the user can play the game: they take part and games are on.
@@ -218,6 +252,11 @@ export const updateSettings = (guildID: string, patch: SettingsPatch) =>
 // must be the server's name, as the user typed it.
 export const deleteGuild = (guildID: string, confirmName: string) =>
   sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}`, { confirm_name: confirmName })
+
+export const access = (guildID: string) => getJSON<Access>(`/guilds/${encodeURIComponent(guildID)}/access`)
+
+export const setAccess = (guildID: string, adminID: string, grants: Grant[]) =>
+  sendJSON<Access>('PUT', `/guilds/${encodeURIComponent(guildID)}/access`, { admin_discord_user_id: adminID, grants })
 
 export const answerGame = (guildID: string, answer: string) =>
   sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })
