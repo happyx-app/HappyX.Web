@@ -5,7 +5,7 @@ import { h, s } from './dom'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { dangerZone, settingsForm } from './settings'
+import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
@@ -549,6 +549,9 @@ function renderSettings(m: api.Me, guildID: string) {
   }
   // Who has access, the server export and deleting it are for owners only.
   const owner = api.isOwner(g)
+  const onSaved = (updated: api.Guild) => {
+    m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
+  }
   page(
     header(m),
     h(
@@ -556,14 +559,8 @@ function renderSettings(m: api.Me, guildID: string) {
       { class: 'container narrow' },
       back,
       h('h1', {}, g.name),
-      settingsForm(
-        g,
-        (updated) => {
-          m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
-        },
-        () => renderLanding(null),
-        m.user,
-      ),
+      settingsForm(g, onSaved, () => renderLanding(null)),
+      surveyMessageCard(g, onSaved, () => renderLanding(null), m.user),
       owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null,
       owner ? guildExport(g, () => renderLanding(null)) : null,
       owner
