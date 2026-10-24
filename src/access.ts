@@ -4,6 +4,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import * as icons from './icons'
 import { t } from './i18n'
 
 export interface Option {
@@ -216,7 +217,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
     if (dirty) status.textContent = ''
     const admin = byKey.get(`user:${state.admin}`)
     adminWarning.hidden = state.admin === saved.admin
-    adminWarning.textContent = `⚠️ ${t('access.adminChange', { name: admin?.label ?? '' })}`
+    adminWarning.replaceChildren(icons.inline(icons.alert), t('access.adminChange', { name: admin?.label ?? '' }))
     empty.hidden = state.grants.length > 0
     rows.replaceChildren(...state.grants.map(grantRow))
   }
@@ -232,7 +233,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       state.grants[i] = { ...gr, level: level.value as api.GrantLevel }
       refresh()
     })
-    const remove = h('button', { class: 'btn btn-ghost btn-icon', type: 'button', 'aria-label': t('access.remove', { name: o.label }), title: t('access.remove', { name: o.label }) }, '✕')
+    const remove = h('button', { class: 'btn btn-ghost btn-icon', type: 'button', 'aria-label': t('access.remove', { name: o.label }), title: t('access.remove', { name: o.label }) }, icons.x())
     remove.addEventListener('click', () => {
       state.grants.splice(i, 1)
       refresh()
@@ -269,7 +270,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
     'form',
     { class: 'access-form', novalidate: true },
     h('div', { class: 'field' },
-      h('label', { for: 'main-admin' }, `👑 ${t('access.admin')}`),
+      h('label', { for: 'main-admin' }, t('access.admin')),
       adminPicker,
       h('p', { class: 'muted small' }, t('access.admin.help')),
       adminWarning,
@@ -282,13 +283,13 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       droppedNote,
       h('label', { class: 'sr-only', for: 'add-grant' }, t('access.add')),
       addPicker,
-      roles.length === 0 ? h('p', { class: 'muted small' }, `ℹ️ ${t('access.noRoles')}`) : null,
+      roles.length === 0 ? h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.noRoles')) : null,
     ),
     h('dl', { class: 'levels small' },
       h('dt', {}, t('access.level.view')), h('dd', {}, t('access.level.view.help')),
       h('dt', {}, t('access.level.manage')), h('dd', {}, t('access.level.manage.help')),
     ),
-    h('p', { class: 'muted small' }, `ℹ️ ${t('access.discordAdmins')}`),
+    h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.discordAdmins')),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('submit', async (e) => {
@@ -304,7 +305,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       known.dropped = 0
       droppedNote?.remove()
       status.className = 'small success'
-      status.textContent = `✓ ${t('access.saved')}`
+      status.replaceChildren(icons.inline(icons.check), t('access.saved'))
       refresh()
       if (adminChanged) onAdminChanged()
     } catch (err) {

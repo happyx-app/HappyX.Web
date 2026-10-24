@@ -3,6 +3,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import * as icons from './icons'
 import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
@@ -85,7 +86,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const daysError = h('p', { class: 'error small', hidden: true }, t('settings.days.none'))
 
   const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous })
-  const anonWarning = h('p', { class: 'warning small', hidden: true }, `⚠️ ${t('settings.anonymous.off')}`)
+  const anonWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.anonymous.off'))
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
 
@@ -142,12 +143,12 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       h(
         'div',
         { class: 'field' },
-        h('label', { class: 'switch', for: 'games' }, games, h('span', {}, `🎲 ${t('settings.games')}`)),
+        h('label', { class: 'switch', for: 'games' }, games, h('span', {}, t('settings.games'))),
         h('p', { class: 'muted small' }, t('settings.games.help')),
-        h('p', { class: 'muted small' }, `👀 ${t('settings.games.privacy')}`),
+        h('p', { class: 'muted small' }, icons.inline(icons.eye), t('settings.games.privacy')),
       ),
     ),
-    h('p', { class: 'muted small' }, `ℹ️ ${t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')}`),
+    h('p', { class: 'muted small' }, icons.inline(icons.info), t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('input', refresh)
@@ -163,7 +164,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       const updated = await api.updateSettings(g.discord_guild_id, patch)
       saved = settingsOf(updated)
       status.className = 'small success'
-      status.textContent = `✓ ${t('settings.saved')}`
+      status.replaceChildren(icons.inline(icons.check), t('settings.saved'))
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
@@ -192,7 +193,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
   const count = h('span', { class: 'muted small survey-count' })
   const problem = h('p', { class: 'error small', role: 'alert', hidden: true })
-  const reset = h('button', { class: 'btn btn-ghost', type: 'button' }, `↺ ${t('survey.reset')}`)
+  const reset = h('button', { class: 'btn btn-ghost', type: 'button' }, icons.inline(icons.undo), t('survey.reset'))
   const previewTitle = h('p', { class: 'field-label small' })
   const content = h('div', { class: 'dc-content' })
   const b = () => survey.botStrings[current().language] ?? survey.botStrings.en
@@ -261,7 +262,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
   const form = h(
     'form',
     { class: 'card settings survey-message', novalidate: true, 'aria-labelledby': 'survey-title' },
-    h('h2', { id: 'survey-title' }, `✏️ ${t('survey.title')}`),
+    h('h2', { id: 'survey-title' }, t('survey.title')),
     h('p', { class: 'muted small' }, t('survey.help')),
     // On a wide card the editor and its variables sit side by side; the preview keeps the full width.
     h(
@@ -270,7 +271,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       h('div', { class: 'field' }, input, h('div', { class: 'survey-meta' }, problem, count), h('div', {}, reset)),
       h('div', { class: 'field' }, h('p', { class: 'field-label' }, t('survey.vars.title')), h('p', { class: 'muted small' }, t('survey.vars')), h('ul', { class: 'survey-vars' }, ...vars)),
     ),
-    h('div', { class: 'field' }, previewTitle, preview, h('p', { class: 'muted small' }, `🔒 ${t('survey.always')}`)),
+    h('div', { class: 'field' }, previewTitle, preview, h('p', { class: 'muted small' }, icons.inline(icons.lock), t('survey.always'))),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('input', refresh)
@@ -291,7 +292,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       saved = updated.survey_message ?? ''
       input.value = saved
       status.className = 'small success'
-      status.textContent = `✓ ${t('settings.saved')}`
+      status.replaceChildren(icons.inline(icons.check), t('settings.saved'))
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
@@ -331,7 +332,7 @@ export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () 
       { class: 'danger-list small' },
       ...(['danger.lose.moods', 'danger.lose.members', 'danger.lose.kudos', 'danger.lose.game', 'danger.lose.settings'] as const).map((k) => h('li', {}, t(k))),
     ),
-    h('p', { class: 'small' }, `🚪 ${t('danger.bot')}`),
+    h('p', { class: 'small' }, icons.inline(icons.logOut), t('danger.bot')),
     h('div', { class: 'field' }, h('label', { for: 'confirm-name' }, before, name, after), input),
     h('div', { class: 'form-actions' }, remove, cancel, status),
   )
