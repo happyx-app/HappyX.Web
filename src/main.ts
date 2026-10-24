@@ -552,17 +552,13 @@ function renderSettings(m: api.Me, guildID: string) {
   const onSaved = (updated: api.Guild) => {
     m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
   }
-  page(
-    header(m),
-    h(
-      'main',
-      { class: 'container narrow' },
-      back,
-      h('h1', {}, g.name),
-      settingsForm(g, onSaved, () => renderLanding(null)),
-      surveyMessageCard(g, onSaved, () => renderLanding(null), m.user),
-      owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null,
-      owner ? guildExport(g, () => renderLanding(null)) : null,
+  const sections: [label: string, card: HTMLElement | null][] = [
+    [t('settings.title'), settingsForm(g, onSaved, () => renderLanding(null))],
+    [t('survey.title'), surveyMessageCard(g, onSaved, () => renderLanding(null), m.user)],
+    [t('access.title'), owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null],
+    [t('export.title'), owner ? guildExport(g, () => renderLanding(null)) : null],
+    [
+      t('danger.title'),
       owner
         ? dangerZone(
             g,
@@ -573,8 +569,49 @@ function renderSettings(m: api.Me, guildID: string) {
             () => renderLanding(null),
           )
         : null,
+    ],
+  ]
+  const cards = sections.flatMap(([label, card], i) => (card ? [{ label, card, id: `section-${i}` }] : []))
+  cards.forEach((c) => (c.card.id ||= c.id))
+  page(
+    header(m),
+    h(
+      'main',
+      { class: 'container settings-page' },
+      h(
+        'div',
+        { class: 'settings-layout' },
+        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name)),
+        sectionNav(cards),
+        h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card)),
+      ),
     ),
   )
+}
+
+// sectionNav lists the settings cards beside them on a wide screen and above them on a phone.
+// The links scroll instead of changing the hash, which the router owns, and the one being read
+// is highlighted as the page scrolls.
+function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement {
+  const links = cards.map(({ label, card }) =>
+    h('button', { class: 'section-link', type: 'button', onclick: () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, label),
+  )
+  const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
+  const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))
+  mark(0)
+  const visible = new Set<Element>()
+  const spy = new IntersectionObserver(
+    (entries) => {
+      if (!nav.isConnected) return spy.disconnect()
+      for (const e of entries) (e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))
+      const atBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 4
+      const i = atBottom ? cards.length - 1 : cards.findIndex((c) => visible.has(c.card))
+      if (i >= 0) mark(i)
+    },
+    { rootMargin: '-80px 0px -55% 0px' },
+  )
+  cards.forEach((c) => spy.observe(c.card))
+  return nav
 }
 
 // refreshAfterHandover reloads what the user can do once they gave the main admin to someone
