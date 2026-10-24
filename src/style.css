@@ -121,9 +121,11 @@ a { color: var(--accent); }
 .discord-logo { width: 22px; height: 22px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.theme-toggle { padding: 6px 8px; color: var(--ink-2); }
-.theme-toggle:hover { color: var(--ink); }
+.icon-btn { padding: 6px 8px; color: var(--ink-2); }
+.icon-btn:hover { color: var(--ink); }
 .icon { width: 18px; height: 18px; display: block; }
+.icon-inline { display: inline-block; width: 1.05em; height: 1.05em; vertical-align: -0.16em; margin-right: 0.45em; flex: none; }
+.btn .icon-inline { margin-right: 0.4em; }
 .feature-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--series-soft); font-size: 1.25rem; }
 .btn-outline { background: transparent; padding: 12px 20px; font-size: 1rem; }
 .btn-outline:hover { background: var(--surface-2); filter: none; }
@@ -196,7 +198,8 @@ a { color: var(--accent); }
 
 .back { color: var(--ink-2); text-decoration: none; font-size: 0.875rem; }
 .back:hover { color: var(--ink); }
-.title-row { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+.title-row { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.title-row > .icon-btn { flex: none; margin-top: 4px; }
 
 .segmented { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
 .seg { flex: none; padding: 6px 12px; border-radius: 9px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; font-weight: 500; white-space: nowrap; }
@@ -492,7 +495,7 @@ a { color: var(--accent); }
   padding: 8px 8px 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2);
 }
 .settings .grant select { width: auto; padding: 6px 10px; }
-.btn-icon { padding: 6px 10px; line-height: 1; color: var(--muted); }
+.btn-icon { padding: 6px 8px; line-height: 1; color: var(--muted); }
 .btn-icon:hover { color: var(--danger); }
 .grant-empty[hidden] { display: none; }
 .levels { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--ink-2); }

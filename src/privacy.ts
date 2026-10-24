@@ -2,6 +2,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import * as icons from './icons'
 import { t, type Key } from './i18n'
 
 // confirmedUser tells whether what the user typed is their username, ignoring surrounding spaces.
@@ -9,7 +10,7 @@ export const confirmedUser = (u: api.User, typed: string) => typed.trim() !== ''
 
 function downloadButton(label: string, run: () => Promise<void>, onLoggedOut: () => void) {
   const status = h('p', { class: 'small', role: 'status' })
-  const btn = h('button', { class: 'btn btn-primary', type: 'button' }, `⬇️ ${label}`)
+  const btn = h('button', { class: 'btn btn-primary', type: 'button' }, icons.inline(icons.download), label)
   btn.addEventListener('click', async () => {
     btn.disabled = true
     status.className = 'small muted'
@@ -17,7 +18,7 @@ function downloadButton(label: string, run: () => Promise<void>, onLoggedOut: ()
     try {
       await run()
       status.className = 'small success'
-      status.textContent = `✓ ${t('privacy.downloaded')}`
+      status.replaceChildren(icons.inline(icons.check), t('privacy.downloaded'))
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
       status.className = 'small error'
@@ -116,7 +117,7 @@ export function guildExport(g: api.Guild, onLoggedOut: () => void): HTMLElement 
     h('h2', {}, t('export.title')),
     h('p', { class: 'secondary small' }, t('export.body')),
     bullets(['export.has.moods', 'export.has.members', 'export.has.kudos', 'export.has.game']),
-    h('p', { class: 'muted small' }, `🔒 ${t(g.anonymous ? 'export.anonymous' : 'export.named')}`),
+    h('p', { class: 'muted small' }, icons.inline(icons.lock), t(g.anonymous ? 'export.anonymous' : 'export.named')),
     downloadButton(t('export.button'), () => api.downloadGuildData(g.discord_guild_id), onLoggedOut),
   )
 }
