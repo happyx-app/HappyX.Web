@@ -118,6 +118,18 @@ export interface GameRound {
   players: GamePlayer[]
   my_guesses: Record<string, string>
   ranking: GameScore[]
+  // A member proposed the question; who did is only sent once the round is finished.
+  proposed?: boolean
+  proposed_by?: GamePlayer
+  my_question?: boolean
+}
+
+// Next week's question: members propose one Thursday to Sunday and one is drawn on Monday.
+export interface GameProposal {
+  open: boolean
+  week: string
+  mine: string
+  count: number
 }
 
 export interface GameBoard {
@@ -125,6 +137,7 @@ export interface GameBoard {
   name: string
   current: GameRound | null
   previous: GameRound | null
+  proposal?: GameProposal
 }
 
 // avatarURL is the user's Discord picture, or Discord's own default one for users without a
@@ -203,6 +216,9 @@ export const updateSettings = (guildID: string, patch: SettingsPatch) =>
 
 export const answerGame = (guildID: string, answer: string) =>
   sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })
+
+export const proposeQuestion = (guildID: string, question: string) =>
+  sendJSON<{ week: string; question: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/proposal`, { question })
 
 export const guessGame = (guildID: string, guesses: Record<string, string>) =>
   sendJSON<void>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/guesses`, { guesses })
