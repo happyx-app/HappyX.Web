@@ -562,6 +562,7 @@ function renderSettings(m: api.Me, guildID: string) {
           m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
         },
         () => renderLanding(null),
+        m.user,
       ),
       owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null,
       owner ? guildExport(g, () => renderLanding(null)) : null,

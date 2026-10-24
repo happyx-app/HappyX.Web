@@ -18,6 +18,8 @@ export interface Guild {
   games_enabled: boolean
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
+  // The admin's own survey text with {{variables}}; empty or missing means the default text.
+  survey_message?: string
   active: boolean
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
@@ -229,6 +231,7 @@ export interface SettingsPatch {
   survey_hour?: number
   report_frequency?: 'weekly' | 'monthly'
   working_days?: number[]
+  survey_message?: string // "" goes back to the default text
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.

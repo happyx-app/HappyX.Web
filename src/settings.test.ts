@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { changes, confirmed, type Settings, weekdayName } from './settings'
 
-const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', games_enabled: false, working_days: [1, 2, 3, 4, 5] }
+const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', games_enabled: false, working_days: [1, 2, 3, 4, 5], survey_message: '' }
 
 it('sends only what changed', () => {
   expect(changes(base, base)).toEqual({})

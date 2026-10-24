@@ -4,6 +4,7 @@
 import * as api from './api'
 import { h } from './dom'
 import { formatDay, t } from './i18n'
+import * as survey from './surveyMessage'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
 export const botLanguages: [code: string, name: string][] = [
@@ -26,6 +27,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   report_frequency: g.report_frequency,
   games_enabled: g.games_enabled,
   working_days: g.working_days ?? mondayToFriday,
+  survey_message: g.survey_message ?? '',
 })
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
@@ -51,7 +53,7 @@ export function timezones(): string[] {
   }
 }
 
-export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLoggedOut: () => void): HTMLElement {
+export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLoggedOut: () => void, viewer?: api.User): HTMLElement {
   let saved = settingsOf(g)
 
   const language = h('select', { id: 'language' }, ...botLanguages.map(([code, name]) => h('option', { value: code, selected: code === saved.language }, name)))
@@ -86,6 +88,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
 
+  const message = surveyMessageField(g, saved.survey_message, viewer, () => ({ language: language.value, anonymous: anon.checked }))
+
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
 
@@ -97,6 +101,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     anonymous: anon.checked,
     games_enabled: games.checked,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
+    survey_message: message.value(),
   })
   const refresh = () => {
     const now = read()
@@ -104,7 +109,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     const tzValid = zones.length === 0 || zones.includes(now.timezone) || now.timezone === saved.timezone
     tz.setCustomValidity(tzValid ? '' : t('settings.timezone.invalid'))
     daysError.hidden = now.working_days.length > 0
-    save.disabled = !dirty || !tzValid || now.working_days.length === 0
+    const messageValid = message.refresh()
+    save.disabled = !dirty || !tzValid || now.working_days.length === 0 || !messageValid
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     if (dirty) status.textContent = ''
   }
@@ -126,6 +132,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       daysError,
       h('p', { class: 'muted small' }, t('settings.days.help')),
     ),
+    message.el,
     h('fieldset', { class: 'field' }, h('legend', {}, t('settings.frequency')), h('div', { class: 'radios' }, ...freq), h('p', { class: 'muted small' }, t('settings.frequency.help'))),
     h(
       'div',
@@ -156,6 +163,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     try {
       const updated = await api.updateSettings(g.discord_guild_id, patch)
       saved = settingsOf(updated)
+      message.saved(saved.survey_message)
       status.className = 'small success'
       status.textContent = `✓ ${t('settings.saved')}`
       onSaved(updated)
@@ -167,6 +175,98 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     refresh()
   })
   return form
+}
+
+// surveyMessageField edits the admin's own survey text, with the variables to insert, the same
+// checks as the API and a preview of the DM as the viewer would get it. current tells the
+// language and anonymity picked in the form, which the preview follows before saving.
+function surveyMessageField(g: api.Guild, initial: string, viewer: api.User | undefined, current: () => { language: string; anonymous: boolean }) {
+  const today = new Date()
+  const me: survey.Recipient = { id: viewer?.discord_user_id ?? '0', name: viewer?.username ?? 'Ana', streak: 0 }
+  const input = h('textarea', { id: 'survey-message', rows: 4, spellcheck: 'true' }) as HTMLTextAreaElement
+  input.value = initial
+  const count = h('span', { class: 'muted small survey-count' })
+  const problem = h('p', { class: 'error small', role: 'alert', hidden: true })
+  const reset = h('button', { class: 'btn btn-ghost', type: 'button' }, `↺ ${t('survey.reset')}`)
+  const previewTitle = h('p', { class: 'field-label small' })
+  const content = h('div', { class: 'dc-content' })
+  const b = () => survey.botStrings[current().language] ?? survey.botStrings.en
+
+  const vars = survey.surveyVars.map((v) => {
+    const chip = h('button', { class: 'chip chip-code', type: 'button' }, `{{${v.name}}}`)
+    chip.addEventListener('click', () => {
+      const start = input.selectionStart ?? input.value.length
+      input.setRangeText(`{{${v.name}}}`, start, input.selectionEnd ?? start, 'end')
+      input.focus()
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const help = t(v.help, { date: survey.longDate(current().language, today), weekday: b().weekdays[today.getDay()] })
+    return h('li', {}, chip, h('span', { class: 'muted small' }, help))
+  })
+
+  const moodRow = h('div', { class: 'dc-buttons' })
+  const stopRow = h('div', { class: 'dc-buttons' })
+  const preview = h(
+    'div',
+    { class: 'dc-preview', 'aria-live': 'polite' },
+    h('div', { class: 'dc-avatar', 'aria-hidden': 'true' }, '💙'),
+    h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), content, moodRow, stopRow),
+  )
+
+  const refresh = (): boolean => {
+    const text = input.value
+    const p = survey.check(text)
+    count.textContent = t('survey.count', { n: [...text].length, max: survey.maxSurveyMessage })
+    count.classList.toggle('error', p.tooLong)
+    problem.textContent = p.unclosed
+      ? t('survey.unclosed')
+      : p.unknown.length
+        ? t('survey.unknown', { vars: p.unknown.map((v) => `{{${v}}}`).join(', ') })
+        : p.tooLong
+          ? t('survey.tooLong', { max: survey.maxSurveyMessage })
+          : ''
+    problem.hidden = problem.textContent === ''
+    input.setAttribute('aria-invalid', String(!survey.isValid(p)))
+    reset.hidden = text.trim() === ''
+    const { language, anonymous } = current()
+    input.placeholder = t('survey.placeholder', { text: survey.surveyContent('', g.name, language, true, me, today).split('\n')[0].replaceAll('**', '') })
+    previewTitle.textContent = t(text.trim() === '' ? 'survey.preview.default' : 'survey.preview')
+    content.replaceChildren(...survey.markdown(survey.surveyContent(text, g.name, language, anonymous, me, today), () => me.name))
+    moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button' }, `${survey.moodEmojis[i]} ${m}`)))
+    stopRow.replaceChildren(h('span', { class: 'dc-button' }, `🔕 ${b().stop}`))
+    return survey.isValid(p)
+  }
+  reset.addEventListener('click', () => {
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+
+  // The preview shows the viewer's real streak in this server once it's known.
+  const day = today.toISOString().slice(0, 10)
+  api
+    .myMoods(day, day)
+    .then((r) => {
+      me.streak = r.guilds.find((x) => x.discord_guild_id === g.discord_guild_id)?.streak ?? 0
+      refresh()
+    })
+    .catch(() => {})
+
+  const el = h(
+    'fieldset',
+    { class: 'field survey-message' },
+    h('legend', {}, `✏️ ${t('survey.title')}`),
+    h('p', { class: 'muted small' }, t('survey.help')),
+    input,
+    h('div', { class: 'survey-meta' }, problem, count),
+    h('p', { class: 'muted small' }, t('survey.vars')),
+    h('ul', { class: 'survey-vars' }, ...vars),
+    h('p', { class: 'muted small' }, `🔒 ${t('survey.always')}`),
+    previewTitle,
+    preview,
+    h('div', {}, reset),
+  )
+  refresh()
+  return { el, refresh, value: () => input.value.trim(), saved: (text: string) => (input.value = text) }
 }
 
 function field(id: string, label: string, help: string, control: HTMLElement) {
