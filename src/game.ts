@@ -7,6 +7,7 @@ import { h } from './dom'
 import { formatDay, formatNumber, t } from './i18n'
 
 export const maxAnswer = 200
+export const maxProposal = 200
 
 const steps = ['answering', 'guessing', 'finished'] as const
 
@@ -38,6 +39,7 @@ export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLEle
   if (!cur) out.push(h('section', { class: 'card empty' }, h('span', { class: 'game-big', 'aria-hidden': 'true' }, '🎲'), h('p', { class: 'secondary' }, t('game.none'))))
   else if (cur.phase === 'answering') out.push(answerCard(board.discord_guild_id, cur, onLoggedOut))
   else out.push(guessCard(board.discord_guild_id, cur, onLoggedOut))
+  if (board.proposal?.open) out.push(proposalCard(board.discord_guild_id, board.proposal, onLoggedOut))
   if (board.previous) out.push(resultsCard(board.previous))
   return out
 }
@@ -60,8 +62,65 @@ function stepper(phase: api.GamePhase) {
 }
 
 function question(r: api.GameRound) {
-  return h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, t('game.thisWeek')), h('h2', {}, r.question))
+  return h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, t('game.thisWeek')), h('h2', {}, r.question), proposedLine(r))
 }
+
+// proposedLine says the question came from the team: the proposer learns it is theirs, everyone
+// else finds out who once the round is over.
+export function proposedLine(r: api.GameRound) {
+  if (r.proposed_by) return h('p', { class: 'muted small' }, `💡 ${r.my_question ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })}`)
+  if (r.my_question) return h('p', { class: 'small success' }, `💡 ${t('game.myQuestion')}`)
+  if (r.proposed) return h('p', { class: 'muted small' }, `💡 ${t('game.proposed')}`)
+  return null
+}
+
+function proposalCard(guildID: string, p: api.GameProposal, onLoggedOut: () => void) {
+  let saved = p.mine
+  const input = h('textarea', { id: 'game-proposal', maxlength: maxProposal, rows: 2, placeholder: t('game.propose.placeholder') })
+  input.value = saved
+  const counter = h('span', { class: 'muted small counter' })
+  const save = h('button', { class: 'btn', type: 'submit' }, t(saved ? 'game.propose.update' : 'game.propose.save'))
+  const status = h('p', { class: saved ? 'small success' : 'small muted', role: 'status' }, saved ? `✓ ${t('game.propose.saved')}` : '')
+  const count = h('p', { class: 'muted small' }, proposalCount(p.count))
+  const refresh = () => {
+    counter.textContent = `${input.value.length}/${maxProposal}`
+    save.disabled = input.value.trim() === '' || input.value.trim() === saved
+  }
+  const form = h(
+    'form',
+    { class: 'card game-card', novalidate: true },
+    h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, t('game.propose.kicker')), h('h2', {}, `💡 ${t('game.propose.title')}`)),
+    h('p', { class: 'secondary small' }, t('game.propose.body')),
+    h('label', { for: 'game-proposal', class: 'field-label' }, t('game.propose.label')),
+    input,
+    h('div', { class: 'form-actions' }, save, counter, status),
+    count,
+  )
+  form.addEventListener('input', refresh)
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    save.disabled = true
+    try {
+      const res = await api.proposeQuestion(guildID, input.value.trim())
+      if (!saved) p.count++
+      saved = res.question
+      input.value = saved
+      save.textContent = t('game.propose.update')
+      status.className = 'small success'
+      status.textContent = `✓ ${t('game.propose.saved')}`
+      count.textContent = proposalCount(p.count)
+    } catch (err) {
+      if (err instanceof api.Unauthorized) return onLoggedOut()
+      showError(status, err)
+    }
+    refresh()
+  })
+  refresh()
+  return form
+}
+
+export const proposalCount = (n: number) =>
+  n === 0 ? t('game.propose.count.none') : n === 1 ? t('game.propose.count.one') : t('game.propose.count', { n: formatNumber(n) })
 
 function answerCard(guildID: string, r: api.GameRound, onLoggedOut: () => void) {
   const until = longDay(dayBefore(r.guessing_starts))
@@ -185,7 +244,7 @@ function guessCard(guildID: string, r: api.GameRound, onLoggedOut: () => void) {
 }
 
 function resultsCard(r: api.GameRound) {
-  const head = h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, `${t('game.results')} · ${formatDay(r.week)}–${formatDay(r.last_day)}`), h('h2', {}, r.question))
+  const head = h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, `${t('game.results')} · ${formatDay(r.week)}–${formatDay(r.last_day)}`), h('h2', {}, r.question), proposedLine(r))
   if (r.answer_count < r.min_answers) {
     return h('section', { class: 'card game-card' }, head, h('p', { class: 'secondary' }, t('game.tooFew', { n: r.answer_count, min: r.min_answers })))
   }
