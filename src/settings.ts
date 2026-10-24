@@ -53,39 +53,38 @@ export function timezones(): string[] {
 
 export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLoggedOut: () => void): HTMLElement {
   let saved = settingsOf(g)
-  const disabled = !g.active
 
-  const language = h('select', { id: 'language', disabled }, ...botLanguages.map(([code, name]) => h('option', { value: code, selected: code === saved.language }, name)))
+  const language = h('select', { id: 'language' }, ...botLanguages.map(([code, name]) => h('option', { value: code, selected: code === saved.language }, name)))
   if (!botLanguages.some(([code]) => code === saved.language)) language.append(h('option', { value: saved.language, selected: true }, saved.language))
 
   const hour = h(
     'select',
-    { id: 'hour', disabled },
+    { id: 'hour' },
     ...Array.from({ length: 24 }, (_, i) => h('option', { value: i, selected: i === saved.survey_hour }, `${String(i).padStart(2, '0')}:00`)),
   )
 
   const zones = timezones()
-  const tz = h('input', { id: 'timezone', list: 'timezones', value: saved.timezone, autocomplete: 'off', spellcheck: 'false', disabled })
+  const tz = h('input', { id: 'timezone', list: 'timezones', value: saved.timezone, autocomplete: 'off', spellcheck: 'false' })
   const tzList = h('datalist', { id: 'timezones' }, ...zones.map((z) => h('option', { value: z })))
 
   const freq = (['weekly', 'monthly'] as const).map((f) =>
-    h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency, disabled }), t(`guilds.${f}`)),
+    h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency }), t(`guilds.${f}`)),
   )
 
   const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
     h(
       'label',
       { class: 'radio day', title: weekdayName(d, 'long') },
-      h('input', { type: 'checkbox', name: 'working_days', value: d, checked: saved.working_days.includes(d), disabled }),
+      h('input', { type: 'checkbox', name: 'working_days', value: d, checked: saved.working_days.includes(d) }),
       weekdayName(d),
     ),
   )
   const daysError = h('p', { class: 'error small', hidden: true }, t('settings.days.none'))
 
-  const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous, disabled })
+  const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous })
   const anonWarning = h('p', { class: 'warning small', hidden: true }, `⚠️ ${t('settings.anonymous.off')}`)
 
-  const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled, disabled })
+  const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
 
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
@@ -105,7 +104,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     const tzValid = zones.length === 0 || zones.includes(now.timezone) || now.timezone === saved.timezone
     tz.setCustomValidity(tzValid ? '' : t('settings.timezone.invalid'))
     daysError.hidden = now.working_days.length > 0
-    save.disabled = disabled || !dirty || !tzValid || now.working_days.length === 0
+    save.disabled = !dirty || !tzValid || now.working_days.length === 0
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     if (dirty) status.textContent = ''
   }
@@ -114,7 +113,6 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     'form',
     { class: 'card settings', novalidate: true },
     h('h2', {}, t('settings.title')),
-    disabled ? h('p', { class: 'warning small' }, t('settings.inactive')) : null,
     field('language', t('settings.language'), t('settings.language.help'), language),
     h('div', { class: 'field-row' },
       field('hour', t('settings.hour'), t('settings.hour.help'), hour),
@@ -173,4 +171,73 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
 
 function field(id: string, label: string, help: string, control: HTMLElement) {
   return h('div', { class: 'field' }, h('label', { for: id }, label), control, h('p', { class: 'muted small' }, help))
+}
+
+// confirmed tells whether what the user typed names the server, ignoring surrounding spaces.
+export const confirmed = (g: api.Guild, typed: string) => typed.trim() !== '' && typed.trim() === g.name.trim()
+
+// dangerZone offers to delete the server from HappyX. The user must open it and type the server's
+// name before the delete button works.
+export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () => void): HTMLElement {
+  const input = h('input', { id: 'confirm-name', autocomplete: 'off', spellcheck: 'false' })
+  const status = h('p', { class: 'small', role: 'status' })
+  const remove = h('button', { class: 'btn btn-danger', type: 'submit', disabled: true }, t('danger.delete'))
+  const cancel = h('button', { class: 'btn btn-ghost', type: 'button' }, t('danger.cancel'))
+  const open = h('button', { class: 'btn btn-danger-outline', type: 'button' }, t('danger.open'))
+
+  const name = h('strong', {}, g.name)
+  const [before, after] = t('danger.type', { name: '\u0000' }).split('\u0000')
+  const confirm = h(
+    'form',
+    { class: 'danger-confirm', hidden: true },
+    h('p', { class: 'small' }, t('danger.lose')),
+    h(
+      'ul',
+      { class: 'danger-list small' },
+      ...(['danger.lose.moods', 'danger.lose.members', 'danger.lose.kudos', 'danger.lose.game', 'danger.lose.settings'] as const).map((k) => h('li', {}, t(k))),
+    ),
+    h('p', { class: 'small' }, `🚪 ${t('danger.bot')}`),
+    h('div', { class: 'field' }, h('label', { for: 'confirm-name' }, before, name, after), input),
+    h('div', { class: 'form-actions' }, remove, cancel, status),
+  )
+  input.addEventListener('input', () => {
+    remove.disabled = !confirmed(g, input.value)
+  })
+  open.addEventListener('click', () => {
+    open.hidden = true
+    confirm.hidden = false
+    input.focus()
+  })
+  cancel.addEventListener('click', () => {
+    input.value = ''
+    remove.disabled = true
+    status.textContent = ''
+    confirm.hidden = true
+    open.hidden = false
+  })
+  confirm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    if (!confirmed(g, input.value)) return
+    remove.disabled = cancel.disabled = input.disabled = true
+    status.className = 'small muted'
+    status.textContent = t('danger.deleting')
+    try {
+      await api.deleteGuild(g.discord_guild_id, input.value.trim())
+      onDeleted()
+    } catch (err) {
+      if (err instanceof api.Unauthorized) return onLoggedOut()
+      status.className = 'small error'
+      status.textContent = t('error.generic')
+      remove.disabled = cancel.disabled = input.disabled = false
+    }
+  })
+
+  return h(
+    'section',
+    { class: 'card danger', 'aria-labelledby': 'danger-title' },
+    h('h2', { id: 'danger-title' }, t('danger.title')),
+    h('p', { class: 'muted small' }, t('danger.help')),
+    h('div', {}, open),
+    confirm,
+  )
 }

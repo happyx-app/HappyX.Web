@@ -5,7 +5,7 @@ import { h, s } from './dom'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { settingsForm } from './settings'
+import { dangerZone, settingsForm } from './settings'
 import { gamePage } from './game'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 
@@ -197,7 +197,6 @@ function renderGuilds(m: api.Me) {
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
                 ].join(' · ')),
               ),
-              g.active ? null : h('span', { class: 'badge' }, t('guilds.inactive')),
             ),
           ),
         ),
@@ -471,6 +470,31 @@ function renderSettings(m: api.Me, guildID: string) {
           m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? updated : x))
         },
         () => renderLogin(),
+      ),
+      dangerZone(
+        g,
+        () => {
+          m.guilds = m.guilds.filter((x) => x.discord_guild_id !== guildID)
+          renderDeleted(m, g.name)
+        },
+        () => renderLogin(),
+      ),
+    ),
+  )
+}
+
+function renderDeleted(m: api.Me, name: string) {
+  page(
+    header(m),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h(
+        'div',
+        { class: 'card empty' },
+        h('h1', {}, t('danger.done.title')),
+        h('p', {}, t('danger.done.body', { name })),
+        h('a', { class: 'btn', href: '#/' }, t('nav.servers')),
       ),
     ),
   )

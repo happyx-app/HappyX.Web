@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { changes, type Settings, weekdayName } from './settings'
+import { changes, confirmed, type Settings, weekdayName } from './settings'
 
 const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', games_enabled: false, working_days: [1, 2, 3, 4, 5] }
 
@@ -17,4 +17,14 @@ it('compares working days by value', () => {
 
 it('names ISO days', () => {
   expect([1, 7].map((d) => weekdayName(d))).toEqual(['Mon', 'Sun'])
+})
+
+it('asks for the exact server name before deleting', () => {
+  const g = { name: 'Equipo A' } as Parameters<typeof confirmed>[0]
+  expect(confirmed(g, 'Equipo A')).toBe(true)
+  expect(confirmed(g, '  Equipo A ')).toBe(true)
+  expect(confirmed(g, 'equipo a')).toBe(false)
+  expect(confirmed(g, 'Equipo')).toBe(false)
+  expect(confirmed(g, '')).toBe(false)
+  expect(confirmed({ name: '  ' } as typeof g, '  ')).toBe(false)
 })
