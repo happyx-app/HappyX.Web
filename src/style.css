@@ -329,7 +329,6 @@ a { color: var(--accent); }
   .section-link[aria-current] { background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 }
 .survey-layout { display: grid; gap: 20px 28px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
-.survey-edit { display: grid; gap: 20px; min-width: 0; }
 .settings { gap: 20px; }
 .field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .field > label, .field legend { font-weight: 600; font-size: 0.9375rem; padding: 0; }

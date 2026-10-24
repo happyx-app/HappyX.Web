@@ -263,18 +263,14 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     { class: 'card settings survey-message', novalidate: true, 'aria-labelledby': 'survey-title' },
     h('h2', { id: 'survey-title' }, `✏️ ${t('survey.title')}`),
     h('p', { class: 'muted small' }, t('survey.help')),
-    // On a wide card the editor and its variables sit on the left and the preview on the right.
+    // On a wide card the editor and its variables sit side by side; the preview keeps the full width.
     h(
       'div',
       { class: 'survey-layout' },
-      h(
-        'div',
-        { class: 'survey-edit' },
-        h('div', { class: 'field' }, input, h('div', { class: 'survey-meta' }, problem, count), h('div', {}, reset)),
-        h('div', { class: 'field' }, h('p', { class: 'field-label' }, t('survey.vars.title')), h('p', { class: 'muted small' }, t('survey.vars')), h('ul', { class: 'survey-vars' }, ...vars)),
-      ),
-      h('div', { class: 'field survey-preview' }, previewTitle, preview, h('p', { class: 'muted small' }, `🔒 ${t('survey.always')}`)),
+      h('div', { class: 'field' }, input, h('div', { class: 'survey-meta' }, problem, count), h('div', {}, reset)),
+      h('div', { class: 'field' }, h('p', { class: 'field-label' }, t('survey.vars.title')), h('p', { class: 'muted small' }, t('survey.vars')), h('ul', { class: 'survey-vars' }, ...vars)),
     ),
+    h('div', { class: 'field' }, previewTitle, preview, h('p', { class: 'muted small' }, `🔒 ${t('survey.always')}`)),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('input', refresh)
