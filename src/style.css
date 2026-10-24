@@ -283,6 +283,20 @@ a { color: var(--accent); }
 .btn-primary:disabled { opacity: 0.45; cursor: default; filter: none; }
 .success { color: #006300; }
 .error { color: var(--danger); }
+.danger { margin-top: 24px; border-color: color-mix(in srgb, var(--danger) 45%, transparent); gap: 12px; }
+.danger h2 { color: var(--danger); }
+.danger-confirm { display: grid; gap: 12px; }
+.danger-confirm[hidden], .danger .btn[hidden] { display: none; }
+.danger-confirm input {
+  font: inherit; color: var(--ink); background: var(--surface); width: 100%;
+  border: 1px solid var(--axis); border-radius: 10px; padding: 9px 12px;
+}
+.danger-confirm input:focus-visible { outline: 2px solid var(--danger); outline-offset: 1px; }
+.danger-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; color: var(--ink-2); }
+.btn-danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn-danger:disabled { opacity: 0.45; cursor: default; filter: none; }
+.btn-danger-outline { color: var(--danger); border-color: var(--danger); background: transparent; }
+.btn-danger-outline:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); filter: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .success { color: #0ca30c; } }
 :root[data-theme='dark'] .success { color: #0ca30c; }
 

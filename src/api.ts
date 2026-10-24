@@ -214,6 +214,11 @@ async function sendJSON<T>(method: string, path: string, payload: unknown): Prom
 export const updateSettings = (guildID: string, patch: SettingsPatch) =>
   sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)
 
+// deleteGuild deletes the server and all its data from HappyX; the bot then leaves it. confirmName
+// must be the server's name, as the user typed it.
+export const deleteGuild = (guildID: string, confirmName: string) =>
+  sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}`, { confirm_name: confirmName })
+
 export const answerGame = (guildID: string, answer: string) =>
   sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })
 
