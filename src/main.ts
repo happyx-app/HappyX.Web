@@ -7,6 +7,7 @@ import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, se
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { dangerZone, settingsForm } from './settings'
 import { gamePage } from './game'
+import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -17,6 +18,7 @@ import { applySavedTheme, currentTheme, setTheme } from './theme'
 //   #/me?p=<period>&g=<id>   my own answers, optionally one server only
 //   #/games                  servers where I can play «Who's who?»
 //   #/game/<guildID>         the game in one server (the bot links here)
+//   #/privacy                the user's own data: download or erase it
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
@@ -39,6 +41,7 @@ async function route() {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
   }
+  if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
   if (settingsID) return renderSettings(me, settingsID)
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
@@ -59,9 +62,11 @@ async function route() {
 }
 
 function page(...children: (Node | null)[]) {
-  app.replaceChildren(...children.filter((c): c is Node => c !== null))
+  app.replaceChildren(...children.filter((c): c is Node => c !== null), ...(me ? [footer()] : []))
   window.scrollTo(0, 0)
 }
+
+const footer = () => h('footer', { class: 'footer' }, h('a', { href: '#/privacy' }, `🔒 ${t('nav.privacy')}`))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -103,7 +108,7 @@ function themeToggle() {
 
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
-function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
+function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' = 'servers') {
   const u = m.user
   const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
   return h(
@@ -148,6 +153,7 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
 // The public landing page: what HappyX is, with buttons to add the bot and to log in. A logged-in
 // user reaches it at #/about, where "Log in" becomes "Open dashboard".
 function renderLanding(m: api.Me | null) {
+  if (!m) me = null // logged out, or the session is gone
   const failed = new URLSearchParams(location.search).get('login') === 'failed'
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
   const add = (extra = '') => h('a', { class: `btn btn-discord ${extra}`, href: api.inviteURL }, discordLogo(), t('landing.add'))
@@ -547,6 +553,7 @@ function renderSettings(m: api.Me, guildID: string) {
         },
         () => renderLanding(null),
       ),
+      guildExport(g, () => renderLanding(null)),
       dangerZone(
         g,
         () => {
@@ -571,6 +578,36 @@ function renderDeleted(m: api.Me, name: string) {
         h('h1', {}, t('danger.done.title')),
         h('p', {}, t('danger.done.body', { name })),
         h('a', { class: 'btn', href: '#/' }, t('nav.servers')),
+      ),
+    ),
+  )
+}
+
+function renderPrivacy(m: api.Me) {
+  page(
+    header(m, 'privacy'),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h('div', {}, h('h1', {}, t('privacy.title')), h('p', { class: 'muted' }, t('privacy.subtitle'))),
+      ...privacyPage(m, () => renderErased(m), () => renderLanding(null)),
+    ),
+  )
+}
+
+function renderErased(m: api.Me) {
+  m.games = []
+  page(
+    header(m, 'privacy'),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h(
+        'div',
+        { class: 'card empty' },
+        h('h1', {}, t('privacy.erased.title')),
+        h('p', {}, t('privacy.erased.body')),
+        h('a', { class: 'btn', href: '#/me' }, t('nav.me')),
       ),
     ),
   )
