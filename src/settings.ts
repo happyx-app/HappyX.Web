@@ -4,6 +4,7 @@
 import * as api from './api'
 import { h } from './dom'
 import { formatDay, t } from './i18n'
+import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
@@ -210,7 +211,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
   const preview = h(
     'div',
     { class: 'dc-preview', 'aria-live': 'polite' },
-    h('div', { class: 'dc-avatar', 'aria-hidden': 'true' }, '💙'),
+    h('img', { class: 'dc-avatar', src: logoURL, alt: '' }),
     h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), content, moodRow, stopRow),
   )
 

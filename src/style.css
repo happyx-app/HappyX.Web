@@ -353,7 +353,7 @@ a { color: var(--accent); }
   display: flex; gap: 14px; padding: 14px 16px; border-radius: 10px; background: #313338; color: #dbdee1;
   font-size: 0.9375rem; line-height: 1.375; overflow-wrap: anywhere;
 }
-.dc-avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--primary); display: grid; place-items: center; font-size: 1.25rem; }
+.dc-avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; }
 .dc-body { display: grid; gap: 4px; min-width: 0; }
 .dc-head { display: flex; align-items: center; gap: 6px; color: #f2f3f5; }
 .dc-app { background: #5865f2; color: #fff; font-size: 0.625rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; }
