@@ -10,6 +10,7 @@ import { accessCard } from './access'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
+import logoURL from './logo.svg'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none); the landing page when logged out
@@ -107,7 +108,7 @@ function themeToggle() {
   return btn
 }
 
-const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
+const brand = () => h('a', { class: 'brand', href: '#/' }, h('img', { class: 'brand-mark', src: logoURL, alt: '' }), h('span', { class: 'brand-text' }, 'HappyX'))
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' = 'servers') {
   const u = m.user
@@ -242,7 +243,7 @@ function surveyMock() {
   return h(
     'figure',
     { class: 'card dm-mock', 'aria-hidden': 'true' },
-    h('span', { class: 'dm-avatar' }, '🙂'),
+    h('img', { class: 'dm-avatar', src: logoURL, alt: '' }),
     h(
       'div',
       { class: 'dm-body' },
