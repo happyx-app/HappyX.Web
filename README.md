@@ -15,6 +15,8 @@ so the browser only talks to one origin and the API doesn't need to be public.
 src/main.ts      routes (#/ servers, #/g/<id>?p=<period>, #/me?p=<week|month|year>&g=<id>) and screens
 src/settings.ts  server settings form (#/g/<id>/settings): same options as /happyx config, plus the
                  danger zone to delete the server from HappyX (type its name to confirm)
+src/access.ts    «Admins and permissions»: main admin and view/manage grants to members or roles,
+                 picked from search lists (combobox) of the server's members and roles
 src/evolution.ts My evolution: periods, per-server points (by day, or by week for a year), colours
 src/api.ts       client for the API's /web routes
 src/charts.ts    mood line chart, one or more series (hover tooltip + table view), answers-by-mood bars
@@ -26,9 +28,11 @@ nginx.conf.template  production server: static files, /api/web proxy, CSP
 
 ## Who sees what
 
-Everyone sees their own answers in every server. A user sees a server's charts, and can change its
-settings, if they are the admin who gets the reports, or the owner or an Administrator
-of the server on Discord. The same people can delete the server from HappyX in its settings.
+Everyone sees their own answers in every server. In a server, a user is an **owner** if they are
+the admin who gets the reports, or the owner or an Administrator of the server on Discord: they
+see and change everything, choose the main admin and who else has access, and can delete the
+server from HappyX. Owners can give members or Discord roles **view** (charts and reports) or
+**manage** (also the survey settings) access.
 Servers the bot was removed from don't show up. The API enforces this; the web only shows what it
 gets back.
 
