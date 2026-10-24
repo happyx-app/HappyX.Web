@@ -6,6 +6,7 @@ import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLa
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { dangerZone, settingsForm } from './settings'
+import { accessCard } from './access'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
@@ -277,7 +278,8 @@ function renderGuilds(m: api.Me) {
                 h('span', { class: 'muted small' }, [
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
-                ].join(' · ')),
+                  g.access === 'view' || g.access === 'manage' ? t(`guilds.access.${g.access}`) : '',
+                ].filter(Boolean).join(' · ')),
               ),
             ),
           ),
@@ -315,7 +317,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
         'div',
         { class: 'title-row' },
         h('div', {}, h('h1', {}, g.name), h('p', { class: 'muted' }, `${formatDay(range.from, { day: 'numeric', month: 'long', year: 'numeric' })} – ${formatDay(range.to, { day: 'numeric', month: 'long', year: 'numeric' })}`)),
-        h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, `⚙️ ${t('settings.link')}`),
+        api.canManage(g) ? h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, `⚙️ ${t('settings.link')}`) : null,
       ),
       picker,
       body,
@@ -539,31 +541,55 @@ function renderSettings(m: api.Me, guildID: string) {
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
     return
   }
+  const back = h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`)
+  if (!api.canManage(g)) {
+    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
+    return
+  }
+  // Who has access, the server export and deleting it are for owners only.
+  const owner = api.isOwner(g)
   page(
     header(m),
     h(
       'main',
       { class: 'container narrow' },
-      h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`),
+      back,
       h('h1', {}, g.name),
       settingsForm(
         g,
         (updated) => {
-          m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? updated : x))
+          m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
         },
         () => renderLanding(null),
       ),
-      guildExport(g, () => renderLanding(null)),
-      dangerZone(
-        g,
-        () => {
-          m.guilds = m.guilds.filter((x) => x.discord_guild_id !== guildID)
-          renderDeleted(m, g.name)
-        },
-        () => renderLanding(null),
-      ),
+      owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null,
+      owner ? guildExport(g, () => renderLanding(null)) : null,
+      owner
+        ? dangerZone(
+            g,
+            () => {
+              m.guilds = m.guilds.filter((x) => x.discord_guild_id !== guildID)
+              renderDeleted(m, g.name)
+            },
+            () => renderLanding(null),
+          )
+        : null,
     ),
   )
+}
+
+// refreshAfterHandover reloads what the user can do once they gave the main admin to someone
+// else, and leaves the page if they can no longer manage the server.
+async function refreshAfterHandover(guildID: string) {
+  try {
+    me = await api.me()
+  } catch (err) {
+    if (err instanceof api.Unauthorized) return renderLanding(null)
+    return
+  }
+  const g = me.guilds.find((x) => x.discord_guild_id === guildID)
+  if (!g) location.hash = '#/'
+  else if (!api.isOwner(g)) route()
 }
 
 function renderDeleted(m: api.Me, name: string) {
