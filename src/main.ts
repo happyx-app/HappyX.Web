@@ -2,21 +2,24 @@ import './style.css'
 import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
 import { h, s } from './dom'
-import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
+import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { dangerZone, settingsForm } from './settings'
 import { accessCard } from './access'
 import { gamePage } from './game'
+import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 
 // Routes live in the hash so nginx only has to serve index.html:
-//   #/                       servers (or my evolution for someone who manages none)
+//   #/                       servers (or my evolution for someone who manages none); the landing page when logged out
+//   #/about                  the landing page
 //   #/g/<guildID>?p=<preset> one server's dashboard
 //   #/g/<guildID>/settings   its settings
 //   #/me?p=<period>&g=<id>   my own answers, optionally one server only
 //   #/games                  servers where I can play «Who's who?»
 //   #/game/<guildID>         the game in one server (the bot links here)
+//   #/privacy                the user's own data: download or erase it
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
@@ -28,16 +31,18 @@ async function route() {
     me ??= await api.me()
     me.games ??= []
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.Unauthorized) return renderLanding(null)
     return renderError(err)
   }
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
+  if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
   if (gameID) return renderGame(me, gameID)
   if (path === '/games') {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
   }
+  if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
   if (settingsID) return renderSettings(me, settingsID)
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
@@ -58,9 +63,11 @@ async function route() {
 }
 
 function page(...children: (Node | null)[]) {
-  app.replaceChildren(...children.filter((c): c is Node => c !== null))
+  app.replaceChildren(...children.filter((c): c is Node => c !== null), ...(me ? [footer()] : []))
   window.scrollTo(0, 0)
 }
+
+const footer = () => h('footer', { class: 'footer' }, h('a', { href: '#/privacy' }, `🔒 ${t('nav.privacy')}`))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -102,7 +109,7 @@ function themeToggle() {
 
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-mark', 'aria-hidden': 'true' }, '🙂'), h('span', { class: 'brand-text' }, 'HappyX'))
 
-function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
+function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' = 'servers') {
   const u = m.user
   const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
   return h(
@@ -144,37 +151,112 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' = 'servers') {
   )
 }
 
-function renderLogin() {
+// The public landing page: what HappyX is, with buttons to add the bot and to log in. A logged-in
+// user reaches it at #/about, where "Log in" becomes "Open dashboard".
+function renderLanding(m: api.Me | null) {
+  if (!m) me = null // logged out, or the session is gone
   const failed = new URLSearchParams(location.search).get('login') === 'failed'
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
+  const add = (extra = '') => h('a', { class: `btn btn-discord ${extra}`, href: api.inviteURL }, discordLogo(), t('landing.add'))
+  const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
+  const step = (n: number, title: string, body: string) =>
+    h('li', { class: 'how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
   const feature = (icon: string, title: string, body: string) =>
-    h('li', { class: 'feature' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('span', {}, h('strong', {}, title), h('span', { class: 'secondary' }, body)))
+    h('li', { class: 'card feature-card' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('h3', {}, title), h('p', { class: 'secondary' }, body))
   page(
     h(
+      'header',
+      { class: 'topbar' },
+      brand(),
+      h('div', { class: 'user' }, themeToggle(), languagePicker(true), enter('btn btn-ghost')),
+    ),
+    h(
       'main',
-      { class: 'login' },
-      h('div', { class: 'login-top' }, themeToggle(), languagePicker()),
+      { class: 'landing' },
       h(
         'section',
-        { class: 'card login-card' },
-        brand(),
-        h('h1', {}, t('login.title')),
-        h('p', { class: 'secondary' }, t('login.body')),
+        { class: 'hero' },
+        h(
+          'div',
+          { class: 'hero-text' },
+          h('h1', {}, t('landing.title')),
+          h('p', { class: 'lead secondary' }, t('landing.body')),
+          failed ? h('p', { class: 'alert', role: 'alert' }, t('landing.failed')) : null,
+          h('div', { class: 'actions' }, add(), enter()),
+          h('p', { class: 'muted small' }, t('landing.note')),
+        ),
+        surveyMock(),
+      ),
+      h(
+        'section',
+        { class: 'landing-section' },
+        h('h2', {}, t('landing.how.title')),
+        h(
+          'ol',
+          { class: 'how' },
+          step(1, t('landing.how.1.title'), t('landing.how.1.body')),
+          step(2, t('landing.how.2.title'), t('landing.how.2.body')),
+          step(3, t('landing.how.3.title'), t('landing.how.3.body')),
+        ),
+      ),
+      h(
+        'section',
+        { class: 'landing-section' },
+        h('h2', {}, t('landing.features.title')),
         h(
           'ul',
-          { class: 'features' },
-          feature('📈', t('login.me.title'), t('login.me.body')),
-          feature('📊', t('login.servers.title'), t('login.servers.body')),
-          feature('⚙️', t('login.settings.title'), t('login.settings.body')),
-          feature('🎲', t('login.game.title'), t('login.game.body')),
+          { class: 'feature-grid' },
+          feature('🕶️', t('landing.f.anonymous.title'), t('landing.f.anonymous.body')),
+          feature('🖼️', t('landing.f.reports.title'), t('landing.f.reports.body')),
+          feature('🙌', t('landing.f.kudos.title'), t('landing.f.kudos.body')),
+          feature('🎲', t('landing.f.game.title'), t('landing.f.game.body')),
+          feature('📈', t('landing.f.web.title'), t('landing.f.web.body')),
+          feature('⚙️', t('landing.f.settings.title'), t('landing.f.settings.body')),
         ),
-        failed ? h('p', { class: 'alert', role: 'alert' }, t('login.failed')) : null,
-        h('a', { class: 'btn btn-discord', href: api.loginURL }, discordLogo(), t('login.button')),
-        h('p', { class: 'muted small' }, t('login.privacy')),
       ),
+      h(
+        'section',
+        { class: 'card privacy' },
+        h('h2', {}, t('landing.privacy.title')),
+        h(
+          'ul',
+          { class: 'checks' },
+          ...(['landing.privacy.1', 'landing.privacy.2', 'landing.privacy.3'] as const).map((k) => h('li', {}, t(k))),
+        ),
+      ),
+      h(
+        'section',
+        { class: 'cta' },
+        h('h2', {}, t('landing.cta.title')),
+        h('p', { class: 'secondary' }, t('landing.cta.body')),
+        h('div', { class: 'actions' }, add(), enter()),
+      ),
+    ),
+    h('footer', { class: 'landing-footer muted small' }, brand(), h('span', {}, '© ', new Date().getFullYear())),
+  )
+}
+
+// What a member sees in their DMs each day, drawn with the page's own styles rather than a
+// screenshot so it follows the language and the theme.
+function surveyMock() {
+  return h(
+    'figure',
+    { class: 'card dm-mock', 'aria-hidden': 'true' },
+    h('span', { class: 'dm-avatar' }, '🙂'),
+    h(
+      'div',
+      { class: 'dm-body' },
+      h('p', { class: 'dm-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dm-bot' }, 'BOT'), h('span', { class: 'muted small' }, t('landing.mock.time'))),
+      h('p', {}, ...bold(t('landing.mock.question'))),
+      h('p', { class: 'secondary small' }, ...bold(t('landing.mock.anonymous'))),
+      h('div', { class: 'dm-moods' }, ...moodEmojis.map((e, i) => h('span', { class: i === 3 ? 'dm-mood dm-picked' : 'dm-mood' }, e))),
+      h('span', { class: 'dm-stop small' }, t('landing.mock.stop')),
     ),
   )
 }
+
+// **bold** in the bot's wording, as Discord shows it.
+const bold = (text: string) => text.split('**').map((part, i) => (i % 2 ? h('strong', {}, part) : part))
 
 function renderGuilds(m: api.Me) {
   const list = m.guilds.length
@@ -246,7 +328,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   try {
     r = await api.report(guildID, range.from, range.to)
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
     return
   }
@@ -312,7 +394,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   try {
     data = await api.myMoods(range.from, range.to)
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
     return
   }
@@ -464,6 +546,7 @@ function renderSettings(m: api.Me, guildID: string) {
     page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
     return
   }
+  // Who has access, the server export and deleting it are for owners only.
   const owner = api.isOwner(g)
   page(
     header(m),
@@ -477,9 +560,10 @@ function renderSettings(m: api.Me, guildID: string) {
         (updated) => {
           m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
         },
-        () => renderLogin(),
+        () => renderLanding(null),
       ),
-      owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLogin()) : null,
+      owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null,
+      owner ? guildExport(g, () => renderLanding(null)) : null,
       owner
         ? dangerZone(
             g,
@@ -487,7 +571,7 @@ function renderSettings(m: api.Me, guildID: string) {
               m.guilds = m.guilds.filter((x) => x.discord_guild_id !== guildID)
               renderDeleted(m, g.name)
             },
-            () => renderLogin(),
+            () => renderLanding(null),
           )
         : null,
     ),
@@ -500,7 +584,7 @@ async function refreshAfterHandover(guildID: string) {
   try {
     me = await api.me()
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.Unauthorized) return renderLanding(null)
     return
   }
   const g = me.guilds.find((x) => x.discord_guild_id === guildID)
@@ -520,6 +604,36 @@ function renderDeleted(m: api.Me, name: string) {
         h('h1', {}, t('danger.done.title')),
         h('p', {}, t('danger.done.body', { name })),
         h('a', { class: 'btn', href: '#/' }, t('nav.servers')),
+      ),
+    ),
+  )
+}
+
+function renderPrivacy(m: api.Me) {
+  page(
+    header(m, 'privacy'),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h('div', {}, h('h1', {}, t('privacy.title')), h('p', { class: 'muted' }, t('privacy.subtitle'))),
+      ...privacyPage(m, () => renderErased(m), () => renderLanding(null)),
+    ),
+  )
+}
+
+function renderErased(m: api.Me) {
+  m.games = []
+  page(
+    header(m, 'privacy'),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h(
+        'div',
+        { class: 'card empty' },
+        h('h1', {}, t('privacy.erased.title')),
+        h('p', {}, t('privacy.erased.body')),
+        h('a', { class: 'btn', href: '#/me' }, t('nav.me')),
       ),
     ),
   )
@@ -565,7 +679,7 @@ async function renderGame(m: api.Me, guildID: string) {
   try {
     board = await api.game(guildID)
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLogin()
+    if (err instanceof api.Unauthorized) return renderLanding(null)
     if (err instanceof api.NotFound) {
       body.replaceChildren(h('div', { class: 'card empty' }, h('p', {}, t('game.notFound')), h('a', { class: 'btn', href: '#/me' }, t('nav.me'))))
       body.removeAttribute('aria-busy')
@@ -576,7 +690,7 @@ async function renderGame(m: api.Me, guildID: string) {
   }
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
-  body.replaceChildren(...gamePage(board, () => renderLogin()))
+  body.replaceChildren(...gamePage(board, () => renderLanding(null)))
 }
 
 function stat(label: string, value: Node | string, note?: string) {

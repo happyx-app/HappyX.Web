@@ -1,6 +1,8 @@
 # HappyX.Web
 
-Dashboard for HappyX. Anyone logs in with Discord and sees **My evolution**: their own answers,
+Dashboard for HappyX. Visitors who aren't logged in see the landing page (also at `#/about`): what
+HappyX is, an **Add to Discord** button (`/api/web/auth/invite`, which needs HappyX.Api with the
+invite route) and the login. Anyone logs in with Discord and sees **My evolution**: their own answers,
 one line per server, by week, month or year, with each server's average, streak and latest
 comments. Server admins also see how their servers feel: the daily average mood, answers by mood
 and the (anonymous by default) messages for any period.
@@ -12,7 +14,7 @@ so the browser only talks to one origin and the API doesn't need to be public.
 ## Layout
 
 ```
-src/main.ts      routes (#/ servers, #/g/<id>?p=<period>, #/me?p=<week|month|year>&g=<id>) and screens
+src/main.ts      routes (#/ servers or the landing page when logged out, #/about, #/g/<id>?p=<period>, #/me?p=<week|month|year>&g=<id>) and screens
 src/settings.ts  server settings form (#/g/<id>/settings): same options as /happyx config, plus the
                  danger zone to delete the server from HappyX (type its name to confirm)
 src/access.ts    «Admins and permissions»: main admin and view/manage grants to members or roles,

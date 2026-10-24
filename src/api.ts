@@ -190,6 +190,7 @@ export function avatarURL(userID: string, avatar: string | undefined, size = 64)
 const base = '/api/web'
 
 export const loginURL = `${base}/auth/login`
+export const inviteURL = `${base}/auth/invite`
 
 export class Unauthorized extends Error {}
 export class NotFound extends Error {}
@@ -257,6 +258,34 @@ export const access = (guildID: string) => getJSON<Access>(`/guilds/${encodeURIC
 
 export const setAccess = (guildID: string, adminID: string, grants: Grant[]) =>
   sendJSON<Access>('PUT', `/guilds/${encodeURIComponent(guildID)}/access`, { admin_discord_user_id: adminID, grants })
+
+// download fetches an export and hands it to the browser as a file, named as the API says.
+async function download(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(base + path, { credentials: 'same-origin' })
+  if (res.status === 401) throw new Unauthorized()
+  if (res.status === 404) throw new NotFound()
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  const name = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? fallbackName
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+// downloadMyData saves everything HappyX keeps about the user, in every server, as JSON.
+export const downloadMyData = () => download('/me/data', 'happyx-my-data.json')
+
+// eraseMyData deletes the user's answers, kudos and game activity everywhere and pauses the survey
+// for them. confirmName must be their username, as they typed it.
+export const eraseMyData = (confirmName: string) => sendJSON<void>('DELETE', '/me/data', { confirm_name: confirmName })
+
+// downloadGuildData saves the server's data as JSON, with the dashboard's anonymity.
+export const downloadGuildData = (guildID: string) =>
+  download(`/guilds/${encodeURIComponent(guildID)}/export`, `happyx-${guildID}.json`)
 
 export const answerGame = (guildID: string, answer: string) =>
   sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })
