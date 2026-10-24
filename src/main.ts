@@ -578,9 +578,13 @@ function renderSettings(m: api.Me, guildID: string) {
     h(
       'main',
       { class: 'container settings-page' },
-      back,
-      h('h1', {}, g.name),
-      h('div', { class: 'settings-layout' }, sectionNav(cards), h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card))),
+      h(
+        'div',
+        { class: 'settings-layout' },
+        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name)),
+        sectionNav(cards),
+        h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card)),
+      ),
     ),
   )
 }
