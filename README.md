@@ -9,7 +9,7 @@ feel every working day and turns the answers into reports.
 
 [![CI](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml/badge.svg)](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178C6?style=flat-square&logo=typescript&logoColor=white)](package.json)
-[![Self-hosted](https://img.shields.io/badge/self--hosted-nginx-8b5cf6?style=flat-square)](https://github.com/happyx-app/HappyX#self-host-with-portainer)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-nginx-8b5cf6?style=flat-square)](https://github.com/happyx-app/HappyX#self-host)
 [![Image](https://img.shields.io/badge/ghcr.io-happyx--web-fbbf24?style=flat-square&logo=docker&logoColor=white)](https://github.com/orgs/happyx-app/packages)
 
 [HappyX](https://github.com/happyx-app/HappyX) ·
@@ -25,8 +25,8 @@ feel every working day and turns the answers into reports.
 > does, screenshots, the architecture and how to self-host the whole stack.
 
 Dashboard for HappyX. Visitors who aren't logged in see the landing page (also at `#/about`): what
-HappyX is, an **Add to Discord** button (`/api/web/auth/invite`, which needs HappyX.Api with the
-invite route) and the login. Anyone logs in with Discord and sees **My evolution**: their own answers,
+HappyX is, an **Add to Discord** button (`/api/web/auth/invite`, which redirects to Discord) and the
+login. Anyone logs in with Discord and sees **My evolution**: their own answers,
 one line per server, by week, month or year, with each server's average, streak and latest
 comments. Server admins also see how their servers feel: the daily average mood, answers by mood
 and the (anonymous by default) messages for any period.
@@ -81,3 +81,7 @@ Discord application's OAuth2 redirects.
 
 `ghcr.io/happyx-app/happyx-web` (published by CI from main and `v*` tags), listening on port 8080.
 `API_URL` (default `http://api:8080`) is the API's internal URL.
+
+## License
+
+[MIT](LICENSE).
