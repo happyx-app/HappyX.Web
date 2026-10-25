@@ -7,6 +7,7 @@ import * as icons from './icons'
 import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
+import { filterOf, needsRoles, type RoleFilterEditor, roleFilterEditor, toSave } from './surveyRoles'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
 export const botLanguages: [code: string, name: string][] = [
@@ -20,7 +21,7 @@ export const botLanguages: [code: string, name: string][] = [
 ]
 
 // The survey message and its roles have their own cards (surveyMessageCard, surveyRolesCard),
-// each saved on its own.
+// each saved on its own. The game's roles are saved with the rest.
 export type Settings = Required<Omit<api.SettingsPatch, 'survey_message' | 'survey_roles'>>
 
 export const settingsOf = (g: api.Guild): Settings => ({
@@ -32,6 +33,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   report_dm: g.report_dm ?? true,
   games_enabled: g.games_enabled,
   working_days: g.working_days ?? mondayToFriday,
+  game_roles: toSave(filterOf(g.game_roles)),
 })
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
@@ -93,6 +95,22 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const anonWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.anonymous.off'))
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
+  // Who plays is chosen right under the switch, once the game is on and the roles have loaded.
+  let gameRoles: RoleFilterEditor | null = null
+  const gameRolesBox = h('div', { class: 'game-roles', hidden: !saved.games_enabled },
+    h('p', { class: 'field-label' }, t('gameRoles.title')),
+    h('p', { class: 'muted small' }, t('access.loading')),
+  )
+  api.roles(g.discord_guild_id).then(
+    (roles) => {
+      gameRoles = roleFilterEditor('game-roles', 'gameRoles', filterOf(g.game_roles, roles), roles, () => refresh())
+      gameRolesBox.replaceChildren(h('p', { class: 'field-label' }, t('gameRoles.title')), h('p', { class: 'muted small' }, t('gameRoles.help')), gameRoles.el)
+    },
+    (err) => {
+      if (err instanceof api.Unauthorized) return onLoggedOut()
+      gameRolesBox.replaceChildren(h('p', { class: 'error small' }, t('error.generic')))
+    },
+  )
 
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
@@ -106,6 +124,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     anonymous: anon.checked,
     games_enabled: games.checked,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
+    game_roles: gameRoles ? toSave(gameRoles.value()) : saved.game_roles,
   })
   const refresh = () => {
     const now = read()
@@ -113,7 +132,9 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     const tzValid = zones.length === 0 || zones.includes(now.timezone) || now.timezone === saved.timezone
     tz.setCustomValidity(tzValid ? '' : t('settings.timezone.invalid'))
     daysError.hidden = now.working_days.length > 0
-    save.disabled = !dirty || !tzValid || now.working_days.length === 0
+    gameRolesBox.hidden = !now.games_enabled
+    const gameRolesMissing = now.games_enabled && gameRoles !== null && needsRoles(gameRoles.value())
+    save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     if (dirty) status.textContent = ''
   }
@@ -165,6 +186,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('p', { class: 'muted small' }, icons.inline(icons.eye), t('settings.games.privacy')),
       ),
     ),
+    gameRolesBox,
     h('p', { class: 'muted small' }, icons.inline(icons.info), t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')),
     h('div', { class: 'form-actions' }, save, status),
   )
