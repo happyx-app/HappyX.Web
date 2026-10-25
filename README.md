@@ -9,7 +9,7 @@ feel every working day and turns the answers into reports.
 
 [![CI](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml/badge.svg)](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178C6?style=flat-square&logo=typescript&logoColor=white)](package.json)
-[![Live](https://img.shields.io/badge/live-happyx.joanbe.net-8b5cf6?style=flat-square)](https://happyx.joanbe.net)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-nginx-8b5cf6?style=flat-square)](https://github.com/happyx-app/HappyX#self-host-with-portainer)
 [![Image](https://img.shields.io/badge/ghcr.io-happyx--web-fbbf24?style=flat-square&logo=docker&logoColor=white)](https://github.com/orgs/happyx-app/packages)
 
 [HappyX](https://github.com/happyx-app/HappyX) ·
