@@ -470,7 +470,7 @@ a { color: var(--accent); }
 
 /* Admins and permissions */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.access-form { display: grid; gap: 20px; }
+.access-form, .survey-roles-form { display: grid; gap: 20px; }
 .combo { position: relative; }
 .settings .combo-input { font: inherit; color: var(--ink); background: var(--surface); width: 100%; border: 1px solid var(--axis); border-radius: 10px; padding: 9px 12px; }
 .combo-list {
@@ -500,6 +500,9 @@ a { color: var(--accent); }
 .btn-icon { padding: 6px 8px; line-height: 1; color: var(--muted); }
 .btn-icon:hover { color: var(--danger); }
 .grant-empty[hidden] { display: none; }
+.radios.stacked { flex-direction: column; align-items: flex-start; }
+.survey-roles .grant { grid-template-columns: minmax(0, 1fr) auto; }
+.survey-roles fieldset[hidden], .survey-roles .error[hidden] { display: none; }
 .levels { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--ink-2); }
 .levels dt { font-weight: 600; color: var(--ink); }
 .levels dd { margin: 0; }
