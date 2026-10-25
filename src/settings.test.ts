@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { changes, confirmed, type Settings, settingsOf, weekdayName } from './settings'
 
-const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, working_days: [1, 2, 3, 4, 5] }
+const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] } }
 
 it('sends only what changed', () => {
   expect(changes(base, base)).toEqual({})
@@ -34,4 +34,9 @@ it('treats a missing report_dm as on', () => {
   const g = { discord_guild_id: '1', name: 'x', anonymous: true, timezone: 'UTC', language: 'en', report_frequency: 'weekly', survey_hour: 13, games_enabled: false, active: true } as const
   expect(settingsOf(g).report_dm).toBe(true)
   expect(settingsOf({ ...g, report_dm: false }).report_dm).toBe(false)
+})
+
+it('sends the game roles only when they change', () => {
+  expect(changes(base, { ...base, game_roles: { mode: 'all', role_ids: [] } })).toEqual({})
+  expect(changes(base, { ...base, game_roles: { mode: 'except', role_ids: ['4'] } })).toEqual({ game_roles: { mode: 'except', role_ids: ['4'] } })
 })

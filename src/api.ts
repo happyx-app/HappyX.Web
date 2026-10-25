@@ -22,8 +22,10 @@ export interface Guild {
   working_days?: number[]
   // The admin's own survey text with {{variables}}; empty or missing means the default text.
   survey_message?: string
-  // Who receives the daily survey by Discord role. Older APIs leave it out, which means everyone.
-  survey_roles?: SurveyRoles
+  // Who receives the daily survey, and who plays the game, by Discord role. Older APIs leave them
+  // out, which means everyone.
+  survey_roles?: RoleFilter
+  game_roles?: RoleFilter
   active: boolean
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
@@ -37,10 +39,10 @@ export const canManage = (g: Guild) => g.access !== 'view'
 export const isOwner = (g: Guild) => g.access === undefined || g.access === 'owner'
 
 // all: everyone. except: everyone but members with one of the roles. only: just members with one.
-export type SurveyRolesMode = 'all' | 'except' | 'only'
+export type RoleFilterMode = 'all' | 'except' | 'only'
 
-export interface SurveyRoles {
-  mode: SurveyRolesMode
+export interface RoleFilter {
+  mode: RoleFilterMode
   role_ids: string[]
 }
 
@@ -245,7 +247,8 @@ export interface SettingsPatch {
   report_dm?: boolean
   working_days?: number[]
   survey_message?: string // "" goes back to the default text
-  survey_roles?: SurveyRoles
+  survey_roles?: RoleFilter
+  game_roles?: RoleFilter
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.

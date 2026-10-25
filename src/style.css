@@ -501,8 +501,12 @@ a { color: var(--accent); }
 .btn-icon:hover { color: var(--danger); }
 .grant-empty[hidden] { display: none; }
 .radios.stacked { flex-direction: column; align-items: flex-start; }
-.survey-roles .grant { grid-template-columns: minmax(0, 1fr) auto; }
-.survey-roles fieldset[hidden], .survey-roles .error[hidden] { display: none; }
+.role-filter { display: grid; gap: 16px; }
+.role-filter .grant { grid-template-columns: minmax(0, 1fr) auto; }
+.role-filter fieldset[hidden], .role-filter .error[hidden], .game-roles[hidden] { display: none; }
+.game-roles { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.game-roles > .field-label { margin: 0; font-weight: 600; }
+.game-roles > .muted { margin: 0; }
 .levels { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--ink-2); }
 .levels dt { font-weight: 600; color: var(--ink); }
 .levels dd { margin: 0; }
