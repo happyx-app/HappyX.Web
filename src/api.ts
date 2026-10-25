@@ -14,6 +14,8 @@ export interface Guild {
   timezone: string
   language: string
   report_frequency: 'weekly' | 'monthly'
+  // Whether the main admin gets the report by DM. Older APIs leave it out, which means yes.
+  report_dm?: boolean
   survey_hour: number
   games_enabled: boolean
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
@@ -230,6 +232,7 @@ export interface SettingsPatch {
   language?: string
   survey_hour?: number
   report_frequency?: 'weekly' | 'monthly'
+  report_dm?: boolean
   working_days?: number[]
   survey_message?: string // "" goes back to the default text
 }

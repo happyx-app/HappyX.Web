@@ -28,6 +28,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   language: g.language,
   survey_hour: g.survey_hour,
   report_frequency: g.report_frequency,
+  report_dm: g.report_dm ?? true,
   games_enabled: g.games_enabled,
   working_days: g.working_days ?? mondayToFriday,
 })
@@ -75,6 +76,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency }), t(`guilds.${f}`)),
   )
 
+  const reportDM = h('input', { id: 'report-dm', type: 'checkbox', role: 'switch', checked: saved.report_dm })
+
   const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
     h(
       'label',
@@ -98,6 +101,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     survey_hour: Number(hour.value),
     timezone: tz.value.trim(),
     report_frequency: (freq.map((l) => l.querySelector('input')!).find((i) => i.checked)?.value ?? saved.report_frequency) as Settings['report_frequency'],
+    report_dm: reportDM.checked,
     anonymous: anon.checked,
     games_enabled: games.checked,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
@@ -131,7 +135,19 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       daysError,
       h('p', { class: 'muted small' }, t('settings.days.help')),
     ),
-    h('fieldset', { class: 'field' }, h('legend', {}, t('settings.frequency')), h('div', { class: 'radios' }, ...freq), h('p', { class: 'muted small' }, t('settings.frequency.help'))),
+    h(
+      'fieldset',
+      { class: 'field' },
+      h('legend', {}, t('settings.frequency')),
+      h('div', { class: 'radios' }, ...freq),
+      h('p', { class: 'muted small' }, t('settings.frequency.help')),
+      h(
+        'div',
+        { class: 'field report-dm' },
+        h('label', { class: 'switch', for: 'report-dm' }, reportDM, h('span', {}, t('settings.reportDM'))),
+        h('p', { class: 'muted small' }, t('settings.reportDM.help')),
+      ),
+    ),
     h('div', { class: 'field-row' },
       h(
         'div',
