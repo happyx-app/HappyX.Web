@@ -1,4 +1,28 @@
+<div align="center">
+
+<a href="https://github.com/happyx-app/HappyX"><img src="https://raw.githubusercontent.com/happyx-app/HappyX/main/docs/images/logo.svg" alt="HappyX logo" width="72" height="72"></a>
+
 # HappyX.Web
+
+The web dashboard of **[HappyX](https://github.com/happyx-app/HappyX)**, the Discord bot that asks your team how they
+feel every working day and turns the answers into reports.
+
+[![CI](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml/badge.svg)](https://github.com/happyx-app/HappyX.Web/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Vite-3178C6?style=flat-square&logo=typescript&logoColor=white)](package.json)
+[![Live](https://img.shields.io/badge/live-happyx.joanbe.net-8b5cf6?style=flat-square)](https://happyx.joanbe.net)
+[![Image](https://img.shields.io/badge/ghcr.io-happyx--web-fbbf24?style=flat-square&logo=docker&logoColor=white)](https://github.com/orgs/happyx-app/packages)
+
+[HappyX](https://github.com/happyx-app/HappyX) ·
+[Api](https://github.com/happyx-app/HappyX.Api) ·
+[Bot](https://github.com/happyx-app/HappyX.Bot) ·
+**Web** ·
+[Bruno](https://github.com/happyx-app/HappyX.Bruno)
+
+</div>
+
+> [!TIP]
+> New here? Start with the [main HappyX README](https://github.com/happyx-app/HappyX): what HappyX
+> does, screenshots, the architecture and how to self-host the whole stack.
 
 Dashboard for HappyX. Visitors who aren't logged in see the landing page (also at `#/about`): what
 HappyX is, an **Add to Discord** button (`/api/web/auth/invite`, which needs HappyX.Api with the
