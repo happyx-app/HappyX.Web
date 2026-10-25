@@ -47,11 +47,20 @@ server {
         return 404;
     }
 
+    # The dashboard is a single document served at "/"; every in-app route lives in the URL
+    # fragment (#/about, #/privacy, ...), which the browser never sends to the server, and all
+    # built files are under /assets/. So "/" returns the app shell, /assets/ serves real files,
+    # and any other path is genuinely not found: we return a 404 instead of silently answering
+    # with the app shell and a 200 (which only confuses scanners and hides typos).
+    location = / {
+        try_files /index.html =404;
+        expires -1;
+    }
     location /assets/ {
+        try_files $uri =404;
         expires 1y;
     }
     location / {
-        try_files $uri /index.html;
-        expires -1;
+        return 404;
     }
 }
