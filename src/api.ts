@@ -22,6 +22,8 @@ export interface Guild {
   working_days?: number[]
   // The admin's own survey text with {{variables}}; empty or missing means the default text.
   survey_message?: string
+  // Who receives the daily survey by Discord role. Older APIs leave it out, which means everyone.
+  survey_roles?: SurveyRoles
   active: boolean
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
@@ -33,6 +35,14 @@ export type GrantLevel = 'view' | 'manage'
 
 export const canManage = (g: Guild) => g.access !== 'view'
 export const isOwner = (g: Guild) => g.access === undefined || g.access === 'owner'
+
+// all: everyone. except: everyone but members with one of the roles. only: just members with one.
+export type SurveyRolesMode = 'all' | 'except' | 'only'
+
+export interface SurveyRoles {
+  mode: SurveyRolesMode
+  role_ids: string[]
+}
 
 export interface Grant {
   kind: 'user' | 'role'
@@ -235,6 +245,7 @@ export interface SettingsPatch {
   report_dm?: boolean
   working_days?: number[]
   survey_message?: string // "" goes back to the default text
+  survey_roles?: SurveyRoles
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.
@@ -259,6 +270,9 @@ export const updateSettings = (guildID: string, patch: SettingsPatch) =>
 // must be the server's name, as the user typed it.
 export const deleteGuild = (guildID: string, confirmName: string) =>
   sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}`, { confirm_name: confirmName })
+
+// roles lists the server's Discord roles, highest first, for the settings' pickers.
+export const roles = (guildID: string) => getJSON<Role[]>(`/guilds/${encodeURIComponent(guildID)}/roles`)
 
 export const access = (guildID: string) => getJSON<Access>(`/guilds/${encodeURIComponent(guildID)}/access`)
 

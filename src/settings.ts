@@ -19,8 +19,9 @@ export const botLanguages: [code: string, name: string][] = [
   ['pt-BR', 'Português (Brasil)'],
 ]
 
-// The survey message has its own card (surveyMessageCard), saved on its own.
-export type Settings = Required<Omit<api.SettingsPatch, 'survey_message'>>
+// The survey message and its roles have their own cards (surveyMessageCard, surveyRolesCard),
+// each saved on its own.
+export type Settings = Required<Omit<api.SettingsPatch, 'survey_message' | 'survey_roles'>>
 
 export const settingsOf = (g: api.Guild): Settings => ({
   anonymous: g.anonymous,

@@ -19,6 +19,8 @@ src/settings.ts  server settings form (#/g/<id>/settings): same options as /happ
                  danger zone to delete the server from HappyX (type its name to confirm)
 src/access.ts    «Admins and permissions»: main admin and view/manage grants to members or roles,
                  picked from search lists (combobox) of the server's members and roles
+src/surveyRoles.ts «Who gets the survey»: everyone, everyone except some roles, or only some roles,
+                 picked with the same combobox
 src/evolution.ts My evolution: periods, per-server points (by day, or by week for a year), colours
 src/api.ts       client for the API's /web routes
 src/charts.ts    mood line chart, one or more series (hover tooltip + table view), answers-by-mood bars

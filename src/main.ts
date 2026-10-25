@@ -8,6 +8,7 @@ import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, se
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
+import { surveyRolesCard } from './surveyRoles'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
@@ -544,6 +545,7 @@ function renderSettings(m: api.Me, guildID: string) {
   const sections: [label: string, card: HTMLElement | null][] = [
     [t('settings.title'), settingsForm(g, onSaved, () => renderLanding(null))],
     [t('survey.title'), surveyMessageCard(g, onSaved, () => renderLanding(null), m.user)],
+    [t('surveyRoles.title'), surveyRolesCard(g, onSaved, () => renderLanding(null))],
     [t('access.title'), owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null],
     [t('export.title'), owner ? guildExport(g, () => renderLanding(null)) : null],
     [

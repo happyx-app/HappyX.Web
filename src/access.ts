@@ -58,6 +58,8 @@ interface ComboOptions {
   // each pick (for adding to a list).
   selected?: () => Option | undefined
   onPick: (o: Option) => void
+  // noMatch is shown when nothing matches; by default it speaks of roles and members.
+  noMatch?: string
 }
 
 // combobox is a text box that only accepts one of its options: typing filters the list, and
@@ -128,7 +130,7 @@ export function combobox(c: ComboOptions): HTMLElement {
     }
     // Keep the visual order and the keyboard order the same.
     shown = groups.flatMap(([kind]) => shown.filter((o) => o.kind === kind))
-    if (items.length === 0) items.push(h('li', { class: 'combo-empty muted small', role: 'presentation' }, t('access.noMatch')))
+    if (items.length === 0) items.push(h('li', { class: 'combo-empty muted small', role: 'presentation' }, c.noMatch ?? t('access.noMatch')))
     list.replaceChildren(...items)
     list.hidden = false
     input.setAttribute('aria-expanded', 'true')
