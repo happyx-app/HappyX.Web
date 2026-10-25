@@ -355,6 +355,8 @@ a { color: var(--accent); }
 .settings select:disabled, .settings input:disabled { opacity: 0.6; }
 .settings input:invalid { border-color: var(--danger); }
 .radios { display: flex; gap: 8px; flex-wrap: wrap; }
+/* The DM switch belongs to «Reports» but reads as its own setting. */
+.report-dm { margin-top: 10px; }
 .radio { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--axis); border-radius: 10px; cursor: pointer; }
 .radio:has(input:checked) { border-color: var(--accent); background: var(--surface-2); }
 .radio input { accent-color: var(--accent); margin: 0; }
