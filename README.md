@@ -8,7 +8,7 @@ comments. Server admins also see how their servers feel: the daily average mood,
 and the (anonymous by default) messages for any period.
 
 TypeScript without a framework, built with Vite. Charts are plain SVG, no chart library.
-Served by nginx, which also forwards `/api/web/*` to [HappyX.Api](https://github.com/moixblau/HappyX.Api),
+Served by nginx, which also forwards `/api/web/*` to [HappyX.Api](https://github.com/happyx-app/HappyX.Api),
 so the browser only talks to one origin and the API doesn't need to be public.
 
 ## Layout
@@ -55,5 +55,5 @@ Discord application's OAuth2 redirects.
 
 ## Image
 
-`ghcr.io/moixblau/happyx-web` (published by CI from main and `v*` tags), listening on port 8080.
+`ghcr.io/happyx-app/happyx-web` (published by CI from main and `v*` tags), listening on port 8080.
 `API_URL` (default `http://api:8080`) is the API's internal URL.
