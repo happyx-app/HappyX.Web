@@ -34,7 +34,13 @@ export const isValid = (p: Problems) => !p.tooLong && !p.unknown.length && !p.un
 
 // What the bot says around the admin's text, in each language it speaks (its locales/*.json).
 interface BotStrings {
+  title: string
+  greeting: string
   question: string
+  today: string
+  streak: string
+  streakOne: string
+  streakMany: string
   anonymous: string
   named: string
   stop: string
@@ -46,9 +52,15 @@ interface BotStrings {
 
 export const botStrings: Record<string, BotStrings> = {
   ca: {
-    question: "👋 Com et trobes avui? (**{guild}**)",
-    anonymous: "La teva resposta és **anònima**: l'administrador només veu els resultats agregats.",
-    named: "En aquest servidor l'administrador **pot veure qui respon**.",
+    title: "{guild} · Enquesta diària",
+    greeting: "👋 Hola, {name}!",
+    question: "Com et trobes avui?",
+    today: "📅 Avui",
+    streak: "🔥 Ratxa",
+    streakOne: "1 dia",
+    streakMany: "{n} dies",
+    anonymous: "🔒 La teva resposta és anònima: l'administrador només veu els resultats agregats.",
+    named: "👁 En aquest servidor l'administrador pot veure qui respon.",
     stop: "No m'ho tornis a preguntar",
     date: "{weekday}, {day} {month}",
     moods: ["Molt malament", "Malament", "Normal", "Bé", "Genial"],
@@ -56,9 +68,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["de gener", "de febrer", "de març", "d'abril", "de maig", "de juny", "de juliol", "d'agost", "de setembre", "d'octubre", "de novembre", "de desembre"],
   },
   de: {
-    question: "👋 Wie geht es dir heute? (**{guild}**)",
-    anonymous: "Deine Antwort ist **anonym**: Der Admin sieht nur die Gesamtergebnisse.",
-    named: "Auf diesem Server **kann der Admin sehen, wer antwortet**.",
+    title: "{guild} · Tägliche Umfrage",
+    greeting: "👋 Hallo, {name}!",
+    question: "Wie geht es dir heute?",
+    today: "📅 Heute",
+    streak: "🔥 Serie",
+    streakOne: "1 Tag",
+    streakMany: "{n} Tage",
+    anonymous: "🔒 Deine Antwort ist anonym: Der Admin sieht nur die Gesamtergebnisse.",
+    named: "👁 Auf diesem Server kann der Admin sehen, wer antwortet.",
     stop: "Nicht mehr fragen",
     date: "{weekday}, {day}. {month}",
     moods: ["Sehr schlecht", "Schlecht", "Okay", "Gut", "Super"],
@@ -66,9 +84,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
   },
   en: {
-    question: "👋 How are you feeling today? (**{guild}**)",
-    anonymous: "Your answer is **anonymous**: the admin only sees the overall results.",
-    named: "In this server the admin **can see who answers**.",
+    title: "{guild} · Daily survey",
+    greeting: "👋 Hi, {name}!",
+    question: "How are you feeling today?",
+    today: "📅 Today",
+    streak: "🔥 Streak",
+    streakOne: "1 day",
+    streakMany: "{n} days",
+    anonymous: "🔒 Your answer is anonymous: the admin only sees the overall results.",
+    named: "👁 In this server the admin can see who answers.",
     stop: "Don't ask me again",
     date: "{weekday}, {month} {day}",
     moods: ["Awful", "Bad", "Okay", "Good", "Great"],
@@ -76,9 +100,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   },
   es: {
-    question: "👋 ¿Cómo te encuentras hoy? (**{guild}**)",
-    anonymous: "Tu respuesta es **anónima**: el administrador solo ve los resultados agregados.",
-    named: "En este servidor el administrador **puede ver quién responde**.",
+    title: "{guild} · Encuesta diaria",
+    greeting: "👋 ¡Hola, {name}!",
+    question: "¿Cómo te encuentras hoy?",
+    today: "📅 Hoy",
+    streak: "🔥 Racha",
+    streakOne: "1 día",
+    streakMany: "{n} días",
+    anonymous: "🔒 Tu respuesta es anónima: el administrador solo ve los resultados agregados.",
+    named: "👁 En este servidor el administrador puede ver quién responde.",
     stop: "No volver a preguntar",
     date: "{weekday}, {day} de {month}",
     moods: ["Muy mal", "Mal", "Normal", "Bien", "Genial"],
@@ -86,9 +116,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
   },
   fr: {
-    question: "👋 Comment te sens-tu aujourd'hui ? (**{guild}**)",
-    anonymous: "Ta réponse est **anonyme** : l'admin ne voit que les résultats globaux.",
-    named: "Sur ce serveur, l'admin **peut voir qui répond**.",
+    title: "{guild} · Sondage du jour",
+    greeting: "👋 Salut, {name} !",
+    question: "Comment te sens-tu aujourd'hui ?",
+    today: "📅 Aujourd'hui",
+    streak: "🔥 Série",
+    streakOne: "1 jour",
+    streakMany: "{n} jours",
+    anonymous: "🔒 Ta réponse est anonyme : l'admin ne voit que les résultats globaux.",
+    named: "👁 Sur ce serveur, l'admin peut voir qui répond.",
     stop: "Ne plus me demander",
     date: "{weekday} {day} {month}",
     moods: ["Très mal", "Mal", "Bof", "Bien", "Super"],
@@ -96,9 +132,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
   },
   it: {
-    question: "👋 Come ti senti oggi? (**{guild}**)",
-    anonymous: "La tua risposta è **anonima**: l'admin vede solo i risultati complessivi.",
-    named: "In questo server l'admin **può vedere chi risponde**.",
+    title: "{guild} · Sondaggio del giorno",
+    greeting: "👋 Ciao, {name}!",
+    question: "Come ti senti oggi?",
+    today: "📅 Oggi",
+    streak: "🔥 Serie",
+    streakOne: "1 giorno",
+    streakMany: "{n} giorni",
+    anonymous: "🔒 La tua risposta è anonima: l'admin vede solo i risultati complessivi.",
+    named: "👁 In questo server l'admin può vedere chi risponde.",
     stop: "Non chiedermelo più",
     date: "{weekday} {day} {month}",
     moods: ["Malissimo", "Male", "Così così", "Bene", "Benissimo"],
@@ -106,9 +148,15 @@ export const botStrings: Record<string, BotStrings> = {
     months: ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"],
   },
   'pt-BR': {
-    question: "👋 Como você está hoje? (**{guild}**)",
-    anonymous: "Sua resposta é **anônima**: o admin só vê os resultados gerais.",
-    named: "Neste servidor o admin **pode ver quem responde**.",
+    title: "{guild} · Pesquisa diária",
+    greeting: "👋 Oi, {name}!",
+    question: "Como você está hoje?",
+    today: "📅 Hoje",
+    streak: "🔥 Sequência",
+    streakOne: "1 dia",
+    streakMany: "{n} dias",
+    anonymous: "🔒 Sua resposta é anônima: o admin só vê os resultados gerais.",
+    named: "👁 Neste servidor o admin pode ver quem responde.",
     stop: "Não perguntar mais",
     date: "{weekday}, {day} de {month}",
     moods: ["Muito mal", "Mal", "Normal", "Bem", "Ótimo"],
@@ -147,12 +195,28 @@ export function fill(text: string, guildName: string, language: string, to: Reci
   return text.replace(placeholder, (m, name: string) => vars[name] ?? m)
 }
 
-// surveyContent is the whole DM text: the admin's message (or the default) and the notice the
-// service always adds.
-export function surveyContent(text: string, guildName: string, language: string, anonymous: boolean, to: Recipient, day: Date): string {
+// SurveyCard is the survey DM's card, like the bot's embed: the server, then a greeting by name
+// and the question (or the admin's own message instead), the day and streak, and the notice.
+export interface SurveyCard {
+  author: string
+  greeting?: string // only with the default text, shown as a heading
+  text: string
+  fields: { name: string; value: string }[]
+  footer: string
+}
+
+export function surveyCard(text: string, guildName: string, language: string, anonymous: boolean, to: Recipient, day: Date): SurveyCard {
   const b = stringsFor(language)
-  const question = text.trim() === '' ? fillIn(b.question, { guild: guildName }) : fill(text.trim(), guildName, language, to, day)
-  return `${question}\n${anonymous ? b.anonymous : b.named}`
+  const own = text.trim() !== ''
+  const fields = [{ name: b.today, value: longDate(language, day) }]
+  if (to.streak > 0) fields.push({ name: b.streak, value: to.streak === 1 ? b.streakOne : fillIn(b.streakMany, { n: to.streak }) })
+  return {
+    author: fillIn(b.title, { guild: guildName }),
+    greeting: own ? undefined : fillIn(b.greeting, { name: to.name }),
+    text: own ? fill(text.trim(), guildName, language, to, day) : b.question,
+    fields,
+    footer: anonymous ? b.anonymous : b.named,
+  }
 }
 
 // Discord markdown the preview understands. Nesting isn't needed for a preview.

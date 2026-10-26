@@ -234,7 +234,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
   const problem = h('p', { class: 'error small', role: 'alert', hidden: true })
   const reset = h('button', { class: 'btn btn-ghost', type: 'button' }, icons.inline(icons.undo), t('survey.reset'))
   const previewTitle = h('p', { class: 'field-label small' })
-  const content = h('div', { class: 'dc-content' })
+  const card = h('div', { class: 'dc-embed' })
   const b = () => survey.botStrings[current().language] ?? survey.botStrings.en
 
   const vars = survey.surveyVars.map((v) => {
@@ -255,7 +255,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     'div',
     { class: 'dc-preview', 'aria-live': 'polite' },
     h('img', { class: 'dc-avatar', src: logoURL, alt: '' }),
-    h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), content, moodRow, stopRow),
+    h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), card, moodRow, stopRow),
   )
 
   const refresh = () => {
@@ -274,9 +274,17 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     input.setAttribute('aria-invalid', String(!survey.isValid(p)))
     reset.hidden = text.trim() === ''
     const { language, anonymous } = current()
-    input.placeholder = t('survey.placeholder', { text: survey.surveyContent('', g.name, language, true, me, today).split('\n')[0].replaceAll('**', '') })
+    const def = survey.surveyCard('', g.name, language, true, me, today)
+    input.placeholder = t('survey.placeholder', { text: `${def.greeting} ${def.text}` })
     previewTitle.textContent = t(text.trim() === '' ? 'survey.preview.default' : 'survey.preview')
-    content.replaceChildren(...survey.markdown(survey.surveyContent(text, g.name, language, anonymous, me, today), () => me.name))
+    const c = survey.surveyCard(text, g.name, language, anonymous, me, today)
+    card.replaceChildren(
+      h('div', { class: 'dc-embed-author' }, c.author),
+      ...(c.greeting ? [h('div', { class: 'dc-embed-heading' }, c.greeting)] : []),
+      h('div', { class: 'dc-content' }, ...survey.markdown(c.text, () => me.name)),
+      h('div', { class: 'dc-fields' }, ...c.fields.map((f) => h('div', {}, h('strong', {}, f.name), h('span', {}, f.value)))),
+      h('div', { class: 'dc-embed-footer' }, c.footer),
+    )
     moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button' }, `${survey.moodEmojis[i]} ${m}`)))
     stopRow.replaceChildren(h('span', { class: 'dc-button' }, `🔕 ${b().stop}`))
     const dirty = text.trim() !== saved

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { check, fill, isValid, longDate, maxSurveyMessage, surveyContent } from './surveyMessage'
+import { check, fill, isValid, longDate, maxSurveyMessage, surveyCard } from './surveyMessage'
 
 const ana = { id: '2', name: 'Ana', streak: 5 }
 const friday = new Date(2026, 9, 23)
@@ -23,9 +23,21 @@ it('fills the variables like the bot', () => {
   expect(longDate('xx', friday)).toBe('Friday, October 23')
 })
 
-it('always adds the anonymity notice', () => {
-  expect(surveyContent('  ', 'Equipo', 'es', true, ana, friday)).toBe(
-    '👋 ¿Cómo te encuentras hoy? (**Equipo**)\nTu respuesta es **anónima**: el administrador solo ve los resultados agregados.',
-  )
-  expect(surveyContent('Hola {{user.name}}', 'Equipo', 'es', false, ana, friday)).toBe('Hola Ana\nEn este servidor el administrador **puede ver quién responde**.')
+it('builds the card like the bot, always with the day and the anonymity notice', () => {
+  expect(surveyCard('  ', 'Equipo', 'es', true, ana, friday)).toEqual({
+    author: 'Equipo · Encuesta diaria',
+    greeting: '👋 ¡Hola, Ana!',
+    text: '¿Cómo te encuentras hoy?',
+    fields: [
+      { name: '📅 Hoy', value: 'viernes, 23 de octubre' },
+      { name: '🔥 Racha', value: '5 días' },
+    ],
+    footer: '🔒 Tu respuesta es anónima: el administrador solo ve los resultados agregados.',
+  })
+  const own = surveyCard('Hola {{user.name}}', 'Equipo', 'es', false, { ...ana, streak: 1 }, friday)
+  expect(own.greeting).toBeUndefined()
+  expect(own.text).toBe('Hola Ana')
+  expect(own.fields[1].value).toBe('1 día')
+  expect(own.footer).toBe('👁 En este servidor el administrador puede ver quién responde.')
+  expect(surveyCard('', 'Equipo', 'es', true, { ...ana, streak: 0 }, friday).fields).toHaveLength(1)
 })
