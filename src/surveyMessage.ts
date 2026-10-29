@@ -37,10 +37,6 @@ interface BotStrings {
   title: string
   greeting: string
   question: string
-  today: string
-  streak: string
-  streakOne: string
-  streakMany: string
   anonymous: string
   named: string
   stop: string
@@ -55,12 +51,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Enquesta diària",
     greeting: "👋 Hola, {name}!",
     question: "Com et trobes avui?",
-    today: "📅 Avui",
-    streak: "🔥 Ratxa",
-    streakOne: "1 dia",
-    streakMany: "{n} dies",
-    anonymous: "🔒 La teva resposta és anònima: l'administrador només veu els resultats agregats.",
-    named: "👁 En aquest servidor l'administrador pot veure qui respon.",
+    anonymous: "🔒 Resposta anònima",
+    named: "👁 L'admin veu qui respon",
     stop: "No m'ho tornis a preguntar",
     date: "{weekday}, {day} {month}",
     moods: ["Molt malament", "Malament", "Normal", "Bé", "Genial"],
@@ -71,12 +63,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Tägliche Umfrage",
     greeting: "👋 Hallo, {name}!",
     question: "Wie geht es dir heute?",
-    today: "📅 Heute",
-    streak: "🔥 Serie",
-    streakOne: "1 Tag",
-    streakMany: "{n} Tage",
-    anonymous: "🔒 Deine Antwort ist anonym: Der Admin sieht nur die Gesamtergebnisse.",
-    named: "👁 Auf diesem Server kann der Admin sehen, wer antwortet.",
+    anonymous: "🔒 Anonyme Antwort",
+    named: "👁 Der Admin sieht, wer antwortet",
     stop: "Nicht mehr fragen",
     date: "{weekday}, {day}. {month}",
     moods: ["Sehr schlecht", "Schlecht", "Okay", "Gut", "Super"],
@@ -87,12 +75,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Daily survey",
     greeting: "👋 Hi, {name}!",
     question: "How are you feeling today?",
-    today: "📅 Today",
-    streak: "🔥 Streak",
-    streakOne: "1 day",
-    streakMany: "{n} days",
-    anonymous: "🔒 Your answer is anonymous: the admin only sees the overall results.",
-    named: "👁 In this server the admin can see who answers.",
+    anonymous: "🔒 Anonymous answer",
+    named: "👁 The admin sees who answers",
     stop: "Don't ask me again",
     date: "{weekday}, {month} {day}",
     moods: ["Awful", "Bad", "Okay", "Good", "Great"],
@@ -103,12 +87,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Encuesta diaria",
     greeting: "👋 ¡Hola, {name}!",
     question: "¿Cómo te encuentras hoy?",
-    today: "📅 Hoy",
-    streak: "🔥 Racha",
-    streakOne: "1 día",
-    streakMany: "{n} días",
-    anonymous: "🔒 Tu respuesta es anónima: el administrador solo ve los resultados agregados.",
-    named: "👁 En este servidor el administrador puede ver quién responde.",
+    anonymous: "🔒 Respuesta anónima",
+    named: "👁 El admin ve quién responde",
     stop: "No volver a preguntar",
     date: "{weekday}, {day} de {month}",
     moods: ["Muy mal", "Mal", "Normal", "Bien", "Genial"],
@@ -119,12 +99,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Sondage du jour",
     greeting: "👋 Salut, {name} !",
     question: "Comment te sens-tu aujourd'hui ?",
-    today: "📅 Aujourd'hui",
-    streak: "🔥 Série",
-    streakOne: "1 jour",
-    streakMany: "{n} jours",
-    anonymous: "🔒 Ta réponse est anonyme : l'admin ne voit que les résultats globaux.",
-    named: "👁 Sur ce serveur, l'admin peut voir qui répond.",
+    anonymous: "🔒 Réponse anonyme",
+    named: "👁 L'admin voit qui répond",
     stop: "Ne plus me demander",
     date: "{weekday} {day} {month}",
     moods: ["Très mal", "Mal", "Bof", "Bien", "Super"],
@@ -135,12 +111,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Sondaggio del giorno",
     greeting: "👋 Ciao, {name}!",
     question: "Come ti senti oggi?",
-    today: "📅 Oggi",
-    streak: "🔥 Serie",
-    streakOne: "1 giorno",
-    streakMany: "{n} giorni",
-    anonymous: "🔒 La tua risposta è anonima: l'admin vede solo i risultati complessivi.",
-    named: "👁 In questo server l'admin può vedere chi risponde.",
+    anonymous: "🔒 Risposta anonima",
+    named: "👁 L'admin vede chi risponde",
     stop: "Non chiedermelo più",
     date: "{weekday} {day} {month}",
     moods: ["Malissimo", "Male", "Così così", "Bene", "Benissimo"],
@@ -151,12 +123,8 @@ export const botStrings: Record<string, BotStrings> = {
     title: "{guild} · Pesquisa diária",
     greeting: "👋 Oi, {name}!",
     question: "Como você está hoje?",
-    today: "📅 Hoje",
-    streak: "🔥 Sequência",
-    streakOne: "1 dia",
-    streakMany: "{n} dias",
-    anonymous: "🔒 Sua resposta é anônima: o admin só vê os resultados gerais.",
-    named: "👁 Neste servidor o admin pode ver quem responde.",
+    anonymous: "🔒 Resposta anônima",
+    named: "👁 O admin vê quem responde",
     stop: "Não perguntar mais",
     date: "{weekday}, {day} de {month}",
     moods: ["Muito mal", "Mal", "Normal", "Bem", "Ótimo"],
@@ -196,25 +164,21 @@ export function fill(text: string, guildName: string, language: string, to: Reci
 }
 
 // SurveyCard is the survey DM's card, like the bot's embed: the server, then a greeting by name
-// and the question (or the admin's own message instead), the day and streak, and the notice.
+// and the question (or the admin's own message instead), and the anonymity notice.
 export interface SurveyCard {
   author: string
   greeting?: string // only with the default text, shown as a heading
   text: string
-  fields: { name: string; value: string }[]
   footer: string
 }
 
 export function surveyCard(text: string, guildName: string, language: string, anonymous: boolean, to: Recipient, day: Date): SurveyCard {
   const b = stringsFor(language)
   const own = text.trim() !== ''
-  const fields = [{ name: b.today, value: longDate(language, day) }]
-  if (to.streak > 0) fields.push({ name: b.streak, value: to.streak === 1 ? b.streakOne : fillIn(b.streakMany, { n: to.streak }) })
   return {
     author: fillIn(b.title, { guild: guildName }),
     greeting: own ? undefined : fillIn(b.greeting, { name: to.name }),
     text: own ? fill(text.trim(), guildName, language, to, day) : b.question,
-    fields,
     footer: anonymous ? b.anonymous : b.named,
   }
 }

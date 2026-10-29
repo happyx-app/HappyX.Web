@@ -23,21 +23,15 @@ it('fills the variables like the bot', () => {
   expect(longDate('xx', friday)).toBe('Friday, October 23')
 })
 
-it('builds the card like the bot, always with the day and the anonymity notice', () => {
+it('builds the card like the bot, always with the anonymity notice', () => {
   expect(surveyCard('  ', 'Equipo', 'es', true, ana, friday)).toEqual({
     author: 'Equipo · Encuesta diaria',
     greeting: '👋 ¡Hola, Ana!',
     text: '¿Cómo te encuentras hoy?',
-    fields: [
-      { name: '📅 Hoy', value: 'viernes, 23 de octubre' },
-      { name: '🔥 Racha', value: '5 días' },
-    ],
-    footer: '🔒 Tu respuesta es anónima: el administrador solo ve los resultados agregados.',
+    footer: '🔒 Respuesta anónima',
   })
-  const own = surveyCard('Hola {{user.name}}', 'Equipo', 'es', false, { ...ana, streak: 1 }, friday)
+  const own = surveyCard('Hola {{user.name}}', 'Equipo', 'es', false, ana, friday)
   expect(own.greeting).toBeUndefined()
   expect(own.text).toBe('Hola Ana')
-  expect(own.fields[1].value).toBe('1 día')
-  expect(own.footer).toBe('👁 En este servidor el administrador puede ver quién responde.')
-  expect(surveyCard('', 'Equipo', 'es', true, { ...ana, streak: 0 }, friday).fields).toHaveLength(1)
+  expect(own.footer).toBe('👁 El admin ve quién responde')
 })

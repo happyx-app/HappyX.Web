@@ -282,10 +282,9 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       h('div', { class: 'dc-embed-author' }, c.author),
       ...(c.greeting ? [h('div', { class: 'dc-embed-heading' }, c.greeting)] : []),
       h('div', { class: 'dc-content' }, ...survey.markdown(c.text, () => me.name)),
-      h('div', { class: 'dc-fields' }, ...c.fields.map((f) => h('div', {}, h('strong', {}, f.name), h('span', {}, f.value)))),
       h('div', { class: 'dc-embed-footer' }, c.footer),
     )
-    moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button' }, `${survey.moodEmojis[i]} ${m}`)))
+    moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button dc-emoji', title: m, 'aria-label': m }, survey.moodEmojis[i])))
     stopRow.replaceChildren(h('span', { class: 'dc-button' }, `🔕 ${b().stop}`))
     const dirty = text.trim() !== saved
     save.disabled = !dirty || !survey.isValid(p)
