@@ -6,6 +6,7 @@ import * as icons from './icons'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { comparable, delta, filterMessages, lowestWeekday, moodFilters, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
@@ -315,9 +316,12 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     ),
   )
 
+  const before = previousRange(range)
   let r: api.Report
+  let prev: api.Report | null
   try {
-    r = await api.report(guildID, range.from, range.to)
+    // The period before only adds comparisons, so the dashboard still shows without it.
+    ;[r, prev] = await Promise.all([api.report(guildID, range.from, range.to), api.report(guildID, before.from, before.to).catch(() => null)])
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
@@ -328,6 +332,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('empty.title')), h('p', { class: 'secondary' }, t('empty.body'))))
     return
   }
+  const old = comparable(prev) ? prev : null
 
   const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
@@ -336,26 +341,117 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     toggle.setAttribute('aria-expanded', String(!tableWrap.hidden))
     toggle.textContent = t(tableWrap.hidden ? 'chart.table.show' : 'chart.table.hide')
   })
+  const weekdays = weekdayAverages(r.days)
+  const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
 
   body.replaceChildren(
+    summaryCard(r, old, weekdays),
     h(
       'div',
       { class: 'stats' },
-      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), moodLabel(r.average)),
-      stat(t('stat.responses'), formatNumber(r.responses)),
-      stat(t('stat.respondents'), formatNumber(r.respondents)),
+      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average)),
+      stat(t('stat.responses'), formatNumber(r.responses), old ? deltaNote(r.responses, old.responses) : undefined),
+      stat(t('stat.respondents'), formatNumber(r.respondents), old ? deltaNote(r.respondents, old.respondents) : undefined),
+      stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
     ),
     h(
       'section',
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
       h('p', { class: 'muted small' }, t('chart.trend.desc')),
-      trendChart(r.days),
+      old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), t('stat.average')), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), t('chart.previous'))) : null,
+      trendChart(r.days, old?.days),
       tableWrap,
     ),
     h('div', { class: 'grid-2' },
+      weekdayCard(weekdays),
       h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), distributionChart(r)),
+    ),
+    h('div', { class: 'grid-2' },
       messagesCard(r),
+      kudosCard(kudos),
+    ),
+  )
+}
+
+// One sentence that reads the period for you: how it went, how it moved, the day that costs
+// the most and the kudos.
+function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[]) {
+  const parts: string[] = [t(`summary.tone.${tone(r.average)}`)]
+  const avg = formatNumber(r.average, 1)
+  if (old) {
+    const d = delta(r.average, old.average, 1)
+    parts.push(d.trend === 'flat' ? t('summary.avg.same', { avg }) : t(d.trend === 'up' ? 'summary.avg.up' : 'summary.avg.down', { avg, delta: formatNumber(Math.abs(d.value), 1) }))
+  } else {
+    parts.push(t('summary.avg', { avg }))
+  }
+  const low = lowestWeekday(weekdays)
+  if (low) parts.push(t('summary.lowDay', { day: formatDay(low.day, { weekday: 'long' }) }))
+  const k = r.kudos?.count ?? 0
+  if (k > 0) parts.push(k === 1 ? t('summary.kudos.one') : t('summary.kudos', { n: formatNumber(k) }))
+  return h(
+    'section',
+    { class: 'card summary' },
+    h('span', { class: 'summary-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)),
+    h('p', {}, h('strong', {}, parts[0]), ' ', parts.slice(1).join(' ')),
+  )
+}
+
+// «▲ +0,3 vs. the period before», coloured by direction.
+function deltaNote(now: number, before: number, digits = 0) {
+  const d = delta(now, before, digits)
+  const sign = d.value > 0 ? '+' : d.value < 0 ? '−' : ''
+  const arrow = d.trend === 'up' ? '▲ ' : d.trend === 'down' ? '▼ ' : '= '
+  return h('span', { class: `delta delta-${d.trend}` }, arrow, d.trend === 'flat' ? t('delta.same') : t('delta.vs', { value: `${sign}${formatNumber(Math.abs(d.value), digits)}` }))
+}
+
+function weekdayCard(stats: WeekdayStat[]) {
+  const low = lowestWeekday(stats)
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', {}, t('weekday.title')),
+    h('p', { class: 'muted small' }, t('weekday.desc')),
+    stats.length < 2
+      ? h('p', { class: 'muted' }, t('weekday.few'))
+      : h(
+          'div',
+          { class: 'bars', role: 'list' },
+          ...stats.map((w) =>
+            h(
+              'div',
+              { class: 'bar-row', role: 'listitem', title: `${formatDay(w.day, { weekday: 'long' })}: ${formatNumber(w.average, 1)} · ${answers(w.responses)}` },
+              h('span', { class: 'bar-label' }, formatDay(w.day, { weekday: 'long' })),
+              h('span', { class: 'bar-track' }, fill(((w.average - 1) / 4) * 100, w === low)),
+              h('span', { class: 'bar-value' }, `${moodEmoji(w.average)} ${formatNumber(w.average, 1)}`),
+            ),
+          ),
+        ),
+  )
+}
+
+// Widths go through CSSOM: the CSP forbids inline style attributes.
+function fill(pct: number, warm = false) {
+  const el = h('span', { class: warm ? 'bar bar-warm' : 'bar' })
+  el.style.width = `${Math.max(2, pct)}%`
+  return el
+}
+
+function kudosCard(k: api.KudosSummary) {
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', {}, t('kudos.title')),
+    k.count === 0
+      ? h('p', { class: 'muted' }, t('kudos.empty'))
+      : h('p', { class: 'muted small' }, t('kudos.counts', { n: formatNumber(k.count), givers: formatNumber(k.givers), receivers: formatNumber(k.receivers) })),
+    ...k.highlights.map((x) =>
+      h(
+        'figure',
+        { class: 'kudo' },
+        h('blockquote', {}, `«${x.message}»`),
+        h('figcaption', { class: 'muted small' }, `${x.from_username || '?'} → ${x.to_username || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
+      ),
     ),
   )
 }
@@ -720,30 +816,46 @@ async function renderGame(m: api.Me, guildID: string) {
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
 }
 
-function stat(label: string, value: Node | string, note?: string) {
+function stat(label: string, value: Node | string, note?: Node | string) {
   return h('div', { class: 'card stat' }, h('span', { class: 'stat-label' }, label), h('span', { class: 'stat-value' }, value), note ? h('span', { class: 'muted small' }, note) : null)
 }
 
 function messagesCard(r: api.Report) {
-  const list = r.messages.length
-    ? h(
-        'ul',
-        { class: 'messages' },
-        ...[...r.messages].reverse().map((msg) =>
-          h(
-            'li',
-            {},
-            h('span', { class: 'msg-mood', title: moodLabel(msg.mood) }, moodEmoji(msg.mood)),
+  const list = h('ul', { class: 'messages' })
+  let current: MoodFilter = 'all'
+  const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
+  const chips = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': t('messages.filter') })
+  const draw = () => {
+    const shown = [...filterMessages(r.messages, current)].reverse()
+    list.replaceChildren(
+      ...(shown.length
+        ? shown.map((msg) =>
             h(
-              'div',
+              'li',
               {},
-              h('p', { class: 'msg-text' }, msg.message),
-              h('span', { class: 'muted small' }, [msg.username, formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
+              h('span', { class: 'msg-mood', title: moodLabel(msg.mood) }, moodEmoji(msg.mood)),
+              h(
+                'div',
+                {},
+                h('p', { class: 'msg-text' }, msg.message),
+                h('span', { class: 'muted small' }, [msg.username, formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
+              ),
             ),
-          ),
-        ),
-      )
-    : h('p', { class: 'muted' }, t('messages.empty'))
+          )
+        : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
+    )
+    chips.replaceChildren(
+      ...moodFilters.map((f) => {
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
+        b.addEventListener('click', () => {
+          current = f
+          draw()
+        })
+        return b
+      }),
+    )
+  }
+  draw()
   return h(
     'section',
     { class: 'card' },
@@ -753,6 +865,7 @@ function messagesCard(r: api.Report) {
       : r.messages.some((m) => !m.username)
         ? h('p', { class: 'muted small' }, `🔒 ${t('messages.earlier_anonymous')}`)
         : null,
+    r.messages.length > 0 ? chips : null,
     list,
   )
 }

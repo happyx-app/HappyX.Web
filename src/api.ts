@@ -106,6 +106,22 @@ export interface Report {
   distribution: Record<string, number>
   days: DayStat[]
   messages: ReportMessage[]
+  // Kudos are public, so they keep their names even on anonymous servers.
+  kudos?: KudosSummary
+}
+
+export interface Kudos {
+  day: string
+  from_username: string
+  to_username: string
+  message: string
+}
+
+export interface KudosSummary {
+  count: number
+  givers: number
+  receivers: number
+  highlights: Kudos[] // the latest, newest first
 }
 
 export interface MyMood {
