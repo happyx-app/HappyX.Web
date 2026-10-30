@@ -32,6 +32,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   report_frequency: g.report_frequency,
   report_dm: g.report_dm ?? true,
   games_enabled: g.games_enabled,
+  kudos_channel_id: g.kudos_channel_id ?? '',
   working_days: g.working_days ?? mondayToFriday,
   game_roles: toSave(filterOf(g.game_roles)),
 })
@@ -49,6 +50,18 @@ export function changes(before: Settings, after: Settings): api.SettingsPatch {
     if (JSON.stringify(after[k]) !== JSON.stringify(before[k])) (out as Record<string, unknown>)[k] = after[k]
   }
   return out
+}
+
+// channelGroups groups the channels by category, keeping Discord's order: those outside a
+// category come first, under an empty name.
+export function channelGroups(channels: api.Channel[]): { category: string; channels: api.Channel[] }[] {
+  const groups: { category: string; channels: api.Channel[] }[] = []
+  for (const c of [...channels].sort((a, b) => a.position - b.position)) {
+    const last = groups[groups.length - 1]
+    if (last && last.category === c.category) last.channels.push(c)
+    else groups.push({ category: c.category, channels: [c] })
+  }
+  return groups
 }
 
 export function timezones(): string[] {
@@ -112,6 +125,41 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     },
   )
 
+  // The kudos channel is picked from the server's channels, which the bot keeps in sync. Until
+  // they load, only the saved choice is offered.
+  const kudosChannel = h('select', { id: 'kudos-channel', disabled: true },
+    h('option', { value: '' }, t('settings.kudos.here')),
+    ...(saved.kudos_channel_id ? [h('option', { value: saved.kudos_channel_id, selected: true }, t('access.loading'))] : []),
+  )
+  const kudosWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.kudos.noPermission.help'))
+  const kudosNote = h('p', { class: 'muted small', hidden: true }, t('settings.kudos.empty'))
+  let postable = new Set<string>()
+  api.channels(g.discord_guild_id).then(
+    (channels) => {
+      postable = new Set(channels.filter((c) => c.can_post).map((c) => c.id))
+      const current = kudosChannel.value
+      const option = (c: api.Channel) =>
+        h('option', { value: c.id, selected: c.id === current, disabled: !c.can_post && c.id !== current },
+          `#${c.name}${c.can_post ? '' : ` (${t('settings.kudos.noPermission')})`}`)
+      kudosChannel.replaceChildren(
+        h('option', { value: '', selected: current === '' }, t('settings.kudos.here')),
+        ...(current && !channels.some((c) => c.id === current) ? [h('option', { value: current, selected: true }, t('settings.kudos.unknown'))] : []),
+        ...channelGroups(channels).flatMap((grp) => (grp.category ? [h('optgroup', { label: grp.category }, ...grp.channels.map(option))] : grp.channels.map(option))),
+      )
+      kudosChannel.disabled = false
+      kudosNote.hidden = channels.length > 0
+      // The bot never sent the channels (an older bot): any choice it hasn't vetted gets no warning.
+      if (channels.length === 0) postable = new Set([current])
+      refresh()
+    },
+    (err) => {
+      if (err instanceof api.Unauthorized) return onLoggedOut()
+      kudosNote.hidden = false
+      kudosNote.className = 'error small'
+      kudosNote.textContent = t('error.generic')
+    },
+  )
+
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
 
@@ -123,6 +171,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     report_dm: reportDM.checked,
     anonymous: anon.checked,
     games_enabled: games.checked,
+    kudos_channel_id: kudosChannel.value,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
     game_roles: gameRoles ? toSave(gameRoles.value()) : saved.game_roles,
   })
@@ -136,6 +185,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     const gameRolesMissing = now.games_enabled && gameRoles !== null && needsRoles(gameRoles.value())
     save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing
     anonWarning.hidden = now.anonymous || saved.anonymous === false
+    kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     if (dirty) status.textContent = ''
   }
 
@@ -187,6 +237,13 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       ),
     ),
     gameRolesBox,
+    h('div', { class: 'field' },
+      h('label', { for: 'kudos-channel' }, t('settings.kudos')),
+      kudosChannel,
+      kudosWarning,
+      kudosNote,
+      h('p', { class: 'muted small' }, t('settings.kudos.help')),
+    ),
     h('p', { class: 'muted small' }, icons.inline(icons.info), t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')),
     h('div', { class: 'form-actions' }, save, status),
   )
@@ -234,7 +291,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
   const problem = h('p', { class: 'error small', role: 'alert', hidden: true })
   const reset = h('button', { class: 'btn btn-ghost', type: 'button' }, icons.inline(icons.undo), t('survey.reset'))
   const previewTitle = h('p', { class: 'field-label small' })
-  const content = h('div', { class: 'dc-content' })
+  const card = h('div', { class: 'dc-embed' })
   const b = () => survey.botStrings[current().language] ?? survey.botStrings.en
 
   const vars = survey.surveyVars.map((v) => {
@@ -255,7 +312,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     'div',
     { class: 'dc-preview', 'aria-live': 'polite' },
     h('img', { class: 'dc-avatar', src: logoURL, alt: '' }),
-    h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), content, moodRow, stopRow),
+    h('div', { class: 'dc-body' }, h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP')), card, moodRow, stopRow),
   )
 
   const refresh = () => {
@@ -274,10 +331,17 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     input.setAttribute('aria-invalid', String(!survey.isValid(p)))
     reset.hidden = text.trim() === ''
     const { language, anonymous } = current()
-    input.placeholder = t('survey.placeholder', { text: survey.surveyContent('', g.name, language, true, me, today).split('\n')[0].replaceAll('**', '') })
+    const def = survey.surveyCard('', g.name, language, true, me, today)
+    input.placeholder = t('survey.placeholder', { text: `${def.greeting} ${def.text}` })
     previewTitle.textContent = t(text.trim() === '' ? 'survey.preview.default' : 'survey.preview')
-    content.replaceChildren(...survey.markdown(survey.surveyContent(text, g.name, language, anonymous, me, today), () => me.name))
-    moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button' }, `${survey.moodEmojis[i]} ${m}`)))
+    const c = survey.surveyCard(text, g.name, language, anonymous, me, today)
+    card.replaceChildren(
+      h('div', { class: 'dc-embed-author' }, c.author),
+      ...(c.greeting ? [h('div', { class: 'dc-embed-heading' }, c.greeting)] : []),
+      h('div', { class: 'dc-content' }, ...survey.markdown(c.text, () => me.name)),
+      h('div', { class: 'dc-embed-footer' }, c.footer),
+    )
+    moodRow.replaceChildren(...b().moods.map((m, i) => h('span', { class: 'dc-button dc-emoji', title: m, 'aria-label': m }, survey.moodEmojis[i])))
     stopRow.replaceChildren(h('span', { class: 'dc-button' }, `🔕 ${b().stop}`))
     const dirty = text.trim() !== saved
     save.disabled = !dirty || !survey.isValid(p)
