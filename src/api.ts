@@ -18,6 +18,8 @@ export interface Guild {
   report_dm?: boolean
   survey_hour: number
   games_enabled: boolean
+  // Where kudos cards are posted; empty or missing means the channel where /happyx kudos is used.
+  kudos_channel_id?: string
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
   // The admin's own survey text with {{variables}}; empty or missing means the default text.
@@ -87,6 +89,8 @@ export interface DayStat {
   day: string
   responses: number
   average: number
+  // How many people got that day's survey; missing when the bot didn't report it.
+  recipients?: number
 }
 
 export interface ReportMessage {
@@ -106,6 +110,32 @@ export interface Report {
   distribution: Record<string, number>
   days: DayStat[]
   messages: ReportMessage[]
+  // Kudos are public, so they keep their names even on anonymous servers.
+  kudos?: KudosSummary
+  // Surveys sent and answered on the days with known recipients; missing when there are none.
+  participation?: { recipients: number; answered: number }
+}
+
+export interface Kudos {
+  day: string
+  from_username: string
+  to_username: string
+  message: string
+}
+
+export interface KudosSummary {
+  count: number
+  givers: number
+  receivers: number
+  highlights: Kudos[] // the latest, newest first
+  top_receivers?: { username: string; count: number }[] // most first; older APIs leave it out
+}
+
+// Who the survey reaches now and how the last one went.
+export interface Health {
+  audience: number
+  opted_out: number
+  last_survey: { day: string; recipients: number; failed: number } | null
 }
 
 export interface MyMood {
@@ -246,6 +276,7 @@ export interface SettingsPatch {
   report_frequency?: 'weekly' | 'monthly'
   report_dm?: boolean
   working_days?: number[]
+  kudos_channel_id?: string // "" posts where the command is used
   survey_message?: string // "" goes back to the default text
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
@@ -266,6 +297,8 @@ async function sendJSON<T>(method: string, path: string, payload: unknown): Prom
   return body as T
 }
 
+export const health = (guildID: string) => getJSON<Health>(`/guilds/${encodeURIComponent(guildID)}/health`)
+
 export const updateSettings = (guildID: string, patch: SettingsPatch) =>
   sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)
 
@@ -276,6 +309,18 @@ export const deleteGuild = (guildID: string, confirmName: string) =>
 
 // roles lists the server's Discord roles, highest first, for the settings' pickers.
 export const roles = (guildID: string) => getJSON<Role[]>(`/guilds/${encodeURIComponent(guildID)}/roles`)
+
+// A text or announcement channel of the server, in the order of Discord's channel list.
+export interface Channel {
+  id: string
+  name: string
+  category: string // empty when it isn't in a category
+  position: number
+  can_post: boolean // whether the bot may post the kudos card there
+}
+
+// channels lists the server's channels, in Discord's order, for the kudos channel picker.
+export const channels = (guildID: string) => getJSON<Channel[]>(`/guilds/${encodeURIComponent(guildID)}/channels`)
 
 export const access = (guildID: string) => getJSON<Access>(`/guilds/${encodeURIComponent(guildID)}/access`)
 
