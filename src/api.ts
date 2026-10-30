@@ -87,6 +87,8 @@ export interface DayStat {
   day: string
   responses: number
   average: number
+  // How many people got that day's survey; missing when the bot didn't report it.
+  recipients?: number
 }
 
 export interface ReportMessage {
@@ -108,6 +110,8 @@ export interface Report {
   messages: ReportMessage[]
   // Kudos are public, so they keep their names even on anonymous servers.
   kudos?: KudosSummary
+  // Surveys sent and answered on the days with known recipients; missing when there are none.
+  participation?: { recipients: number; answered: number }
 }
 
 export interface Kudos {
@@ -122,6 +126,23 @@ export interface KudosSummary {
   givers: number
   receivers: number
   highlights: Kudos[] // the latest, newest first
+  top_receivers?: { username: string; count: number }[] // most first; older APIs leave it out
+}
+
+// Who the survey reaches now and how the last one went.
+export interface Health {
+  audience: number
+  opted_out: number
+  last_survey: { day: string; recipients: number; failed: number } | null
+}
+
+export const proPrices = ['0', '5', '9', '29'] as const
+export type ProPrice = (typeof proPrices)[number]
+
+// The server's answer to the Pro waitlist.
+export interface ProInterest {
+  interested: boolean
+  price: ProPrice | ''
 }
 
 export interface MyMood {
@@ -281,6 +302,13 @@ async function sendJSON<T>(method: string, path: string, payload: unknown): Prom
   if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : res.statusText)
   return body as T
 }
+
+export const health = (guildID: string) => getJSON<Health>(`/guilds/${encodeURIComponent(guildID)}/health`)
+
+export const proInterest = (guildID: string) => getJSON<ProInterest>(`/guilds/${encodeURIComponent(guildID)}/pro-interest`)
+
+export const setProInterest = (guildID: string, p: ProInterest) =>
+  sendJSON<ProInterest>('PUT', `/guilds/${encodeURIComponent(guildID)}/pro-interest`, p)
 
 export const updateSettings = (guildID: string, patch: SettingsPatch) =>
   sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)

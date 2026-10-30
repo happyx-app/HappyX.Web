@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReportMessage } from './api'
-import { delta, filterMessages, lowestWeekday, moodGroup, previousRange, tone, weekdayAverages } from './insights'
+import { delta, filterMessages, lowestWeekday, moodGroup, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages } from './insights'
 
 describe('previousRange', () => {
   it('takes the same number of days just before', () => {
@@ -51,5 +51,30 @@ describe('mood filter', () => {
 describe('tone', () => {
   it.each([[4.5, 'great'], [3.9, 'good'], [3, 'mixed'], [2, 'tough']] as const)('%s', (avg, want) => {
     expect(tone(avg)).toBe(want)
+  })
+})
+
+describe('participationRate', () => {
+  it('is a whole percentage, or null without surveys', () => {
+    expect(participationRate({ recipients: 18, answered: 14 })).toBe(78)
+    expect(participationRate({ recipients: 0, answered: 0 })).toBeNull()
+    expect(participationRate(undefined)).toBeNull()
+  })
+})
+
+describe('schedule', () => {
+  // Friday 2026-10-30, 12:00 UTC is 13:00 in Madrid.
+  const fri = new Date('2026-10-30T12:00:00Z')
+  it('finds the next survey day', () => {
+    expect(nextSurveyDay('Europe/Madrid', 14, [1, 2, 3, 4, 5], fri)).toBe('2026-10-30')
+    expect(nextSurveyDay('Europe/Madrid', 13, [1, 2, 3, 4, 5], fri)).toBe('2026-11-02')
+    expect(nextSurveyDay('Europe/Madrid', 9, [6], fri)).toBe('2026-10-31')
+    expect(nextSurveyDay('Europe/Madrid', 9, [], fri)).toBeNull()
+  })
+  it('finds the next report day', () => {
+    expect(nextReportDay('weekly', 'Europe/Madrid', fri)).toBe('2026-11-02')
+    expect(nextReportDay('weekly', 'Europe/Madrid', new Date('2026-11-02T12:00:00Z'))).toBe('2026-11-09')
+    expect(nextReportDay('monthly', 'Europe/Madrid', fri)).toBe('2026-11-01')
+    expect(nextReportDay('monthly', 'Europe/Madrid', new Date('2026-12-15T12:00:00Z'))).toBe('2027-01-01')
   })
 })

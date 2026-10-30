@@ -6,7 +6,7 @@ import * as icons from './icons'
 import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { comparable, delta, filterMessages, lowestWeekday, moodFilters, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
+import { comparable, delta, filterMessages, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
@@ -319,20 +319,31 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const before = previousRange(range)
   let r: api.Report
   let prev: api.Report | null
+  // Older APIs have neither; the dashboard just leaves those cards out.
+  let health: api.Health | null
+  let pro: api.ProInterest | null
   try {
     // The period before only adds comparisons, so the dashboard still shows without it.
-    ;[r, prev] = await Promise.all([api.report(guildID, range.from, range.to), api.report(guildID, before.from, before.to).catch(() => null)])
+    ;[r, prev, health, pro] = await Promise.all([
+      api.report(guildID, range.from, range.to),
+      api.report(guildID, before.from, before.to).catch(() => null),
+      api.health(guildID).catch(() => null),
+      api.canManage(g) ? api.proInterest(guildID).catch(() => null) : Promise.resolve(null),
+    ])
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
     return
   }
   body.removeAttribute('aria-busy')
+  const extra = [health ? healthCard(g, health) : null, pro ? proCard(g, pro) : null].filter((c): c is HTMLElement => c !== null)
   if (r.responses === 0) {
-    body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('empty.title')), h('p', { class: 'secondary' }, t('empty.body'))))
+    body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('empty.title')), h('p', { class: 'secondary' }, t('empty.body'))), ...extra)
     return
   }
   const old = comparable(prev) ? prev : null
+  const rate = participationRate(r.participation)
+  const oldRate = participationRate(old?.participation)
 
   const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
@@ -350,8 +361,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       'div',
       { class: 'stats' },
       stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average)),
-      stat(t('stat.responses'), formatNumber(r.responses), old ? deltaNote(r.responses, old.responses) : undefined),
-      stat(t('stat.respondents'), formatNumber(r.respondents), old ? deltaNote(r.respondents, old.respondents) : undefined),
+      rate !== null
+        ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), oldRate !== null ? deltaNote(rate, oldRate, 0, 'delta.points') : t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }))
+        : stat(t('stat.responses'), formatNumber(r.responses), old ? deltaNote(r.responses, old.responses) : undefined),
+      stat(
+        t('stat.respondents'),
+        h('span', {}, formatNumber(r.respondents), health && health.audience > 0 ? h('span', { class: 'stat-unit' }, ` ${t('stat.of', { n: formatNumber(health.audience) })}`) : null),
+        old ? deltaNote(r.respondents, old.respondents) : undefined,
+      ),
       stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
     ),
     h(
@@ -371,6 +388,83 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       messagesCard(r),
       kudosCard(kudos),
     ),
+    ...extra,
+  )
+}
+
+// When the next survey and report go out, how the last survey went, and what is left to set up.
+function healthCard(g: api.Guild, x: api.Health) {
+  const days = g.working_days ?? [1, 2, 3, 4, 5]
+  const next = nextSurveyDay(g.timezone, g.survey_hour, days)
+  const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
+  const long = { weekday: 'long', day: 'numeric', month: 'short' } as const
+  const tile = (label: string, value: string, note: string) =>
+    h('div', { class: 'health-tile' }, h('span', { class: 'muted small' }, label), h('strong', {}, value), h('span', { class: 'muted small' }, note))
+  const last = x.last_survey
+  const todo: HTMLElement[] = []
+  const item = (done: boolean, text: string, link?: [string, string]) =>
+    h('li', {}, h('span', { class: done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
+  const settings = `#/g/${g.discord_guild_id}/settings`
+  todo.push(item(x.audience > 0, x.audience > 0 ? t('health.audience', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
+  if (x.opted_out > 0) todo.push(item(false, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
+  todo.push(item(g.games_enabled, t(g.games_enabled ? 'health.game.on' : 'health.game.off'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', {}, t('health.title')),
+    h(
+      'div',
+      { class: 'health' },
+      tile(t('health.nextSurvey'), next ? `${formatDay(next, long)}, ${hour}` : t('health.noDays'), g.timezone),
+      tile(
+        t('health.lastSurvey'),
+        last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),
+        last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : t('health.none.note'),
+      ),
+      tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm')),
+    ),
+    h('ul', { class: 'todo' }, ...todo),
+  )
+}
+
+// The Pro waitlist (the market study's Phase 0): nothing is paid yet, it only measures interest.
+function proCard(g: api.Guild, p: api.ProInterest) {
+  let state = { ...p }
+  const note = h('p', { class: 'muted small', role: 'status' })
+  const join = h('button', { type: 'button', class: 'btn btn-primary' })
+  const prices = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': t('pro.price') })
+  const save = async (next: api.ProInterest) => {
+    try {
+      state = await api.setProInterest(g.discord_guild_id, next)
+      note.textContent = t('pro.saved')
+    } catch {
+      note.textContent = t('pro.error')
+    }
+    draw()
+  }
+  const draw = () => {
+    join.textContent = t(state.interested ? 'pro.joined' : 'pro.join')
+    join.className = state.interested ? 'btn' : 'btn btn-primary'
+    join.setAttribute('aria-pressed', String(state.interested))
+    prices.replaceChildren(
+      ...api.proPrices.map((v) => {
+        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(state.price === v), class: state.price === v ? 'chip chip-on' : 'chip' }, t(`pro.price.${v}`))
+        b.addEventListener('click', () => save({ ...state, price: v }))
+        return b
+      }),
+    )
+  }
+  join.addEventListener('click', () => save({ ...state, interested: !state.interested }))
+  draw()
+  return h(
+    'section',
+    { class: 'card pro' },
+    h('div', { class: 'card-head' }, h('h2', {}, t('pro.title'), ' ', h('span', { class: 'badge-pro' }, 'PRO')), h('span', { class: 'muted small' }, t('pro.soon'))),
+    h('p', { class: 'secondary' }, t('pro.body')),
+    h('div', { class: 'pro-actions' }, join),
+    h('p', { class: 'small' }, t('pro.price')),
+    prices,
+    note,
   )
 }
 
@@ -398,11 +492,11 @@ function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdaySta
 }
 
 // «▲ +0,3 vs. the period before», coloured by direction.
-function deltaNote(now: number, before: number, digits = 0) {
+function deltaNote(now: number, before: number, digits = 0, unit: 'delta.vs' | 'delta.points' = 'delta.vs') {
   const d = delta(now, before, digits)
   const sign = d.value > 0 ? '+' : d.value < 0 ? '−' : ''
   const arrow = d.trend === 'up' ? '▲ ' : d.trend === 'down' ? '▼ ' : '= '
-  return h('span', { class: `delta delta-${d.trend}` }, arrow, d.trend === 'flat' ? t('delta.same') : t('delta.vs', { value: `${sign}${formatNumber(Math.abs(d.value), digits)}` }))
+  return h('span', { class: `delta delta-${d.trend}` }, arrow, d.trend === 'flat' ? t('delta.same') : t(unit, { value: `${sign}${formatNumber(Math.abs(d.value), digits)}` }))
 }
 
 function weekdayCard(stats: WeekdayStat[]) {
@@ -445,6 +539,21 @@ function kudosCard(k: api.KudosSummary) {
     k.count === 0
       ? h('p', { class: 'muted' }, t('kudos.empty'))
       : h('p', { class: 'muted small' }, t('kudos.counts', { n: formatNumber(k.count), givers: formatNumber(k.givers), receivers: formatNumber(k.receivers) })),
+    k.top_receivers?.length
+      ? h(
+          'div',
+          { class: 'bars', role: 'list', 'aria-label': t('kudos.top') },
+          ...k.top_receivers.map((x) =>
+            h(
+              'div',
+              { class: 'bar-row', role: 'listitem' },
+              h('span', { class: 'bar-label' }, x.username || '?'),
+              h('span', { class: 'bar-track' }, fill((x.count / k.top_receivers![0].count) * 100, true)),
+              h('span', { class: 'bar-value' }, formatNumber(x.count)),
+            ),
+          ),
+        )
+      : null,
     ...k.highlights.map((x) =>
       h(
         'figure',

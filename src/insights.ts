@@ -1,9 +1,51 @@
 // Small calculations for the server dashboard: the period before the chosen one, how much
-// a number moved, the average per weekday and which comments a mood filter keeps. All of
-// them work on the report the API already sends, so the dashboard needs no extra endpoint.
+// a number moved, the average per weekday, which comments a mood filter keeps, the response
+// rate and when the next survey and report go out.
 
 import type { DayStat, Report, ReportMessage } from './api'
 import { addDays, type Range } from './periods'
+
+// The rate as a whole percentage, or null without surveys sent.
+export function participationRate(p: { recipients: number; answered: number } | undefined): number | null {
+  return p && p.recipients > 0 ? Math.round((p.answered / p.recipients) * 100) : null
+}
+
+// The date and hour it is now in timeZone.
+function nowIn(timeZone: string, now: Date): { day: string; hour: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(now)
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
+    return { day: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) }
+  } catch {
+    return { day: now.toISOString().slice(0, 10), hour: now.getUTCHours() }
+  }
+}
+
+const isoWeekday = (day: string) => ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1
+
+// The day of the next daily survey: today if its hour hasn't come yet, else the next working day.
+export function nextSurveyDay(timeZone: string, hour: number, workingDays: number[], now = new Date()): string | null {
+  if (workingDays.length === 0) return null
+  const here = nowIn(timeZone, now)
+  for (let i = 0; i <= 7; i++) {
+    const day = addDays(here.day, i)
+    if (!workingDays.includes(isoWeekday(day))) continue
+    if (i === 0 && here.hour >= hour) continue
+    return day
+  }
+  return null
+}
+
+// The day the next report goes out: next Monday for weekly ones, the 1st of next month for monthly.
+export function nextReportDay(frequency: 'weekly' | 'monthly', timeZone: string, now = new Date()): string {
+  const today = nowIn(timeZone, now).day
+  if (frequency === 'monthly') {
+    const d = new Date(`${today.slice(0, 8)}01T00:00:00Z`)
+    d.setUTCMonth(d.getUTCMonth() + 1)
+    return d.toISOString().slice(0, 10)
+  }
+  return addDays(today, 8 - isoWeekday(today))
+}
 
 // The range of the same length that ends the day before this one starts.
 export function previousRange(r: Range): Range {

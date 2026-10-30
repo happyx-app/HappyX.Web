@@ -546,3 +546,14 @@ a { color: var(--accent); }
 .chip-on, .chip-on:hover { background: var(--series); color: #fff; }
 .kudo { margin: 0; border-left: 3px solid var(--sun); padding: 2px 0 2px 10px; display: grid; gap: 2px; }
 .kudo blockquote { margin: 0; overflow-wrap: anywhere; }
+.health { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.health-tile { background: var(--surface-2); border-radius: 10px; padding: 12px; display: grid; gap: 2px; }
+.todo { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.todo li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.todo a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; }
+.todo-done { color: var(--up); font-weight: 700; }
+.todo-open { color: var(--muted); }
+.pro { border: 1px dashed var(--series); }
+.badge-pro { background: var(--sun); color: var(--sun-ink); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; vertical-align: middle; }
+.pro-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.top-receivers { display: grid; gap: 8px; }
