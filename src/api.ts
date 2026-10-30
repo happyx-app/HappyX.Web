@@ -136,15 +136,6 @@ export interface Health {
   last_survey: { day: string; recipients: number; failed: number } | null
 }
 
-export const proPrices = ['0', '5', '9', '29'] as const
-export type ProPrice = (typeof proPrices)[number]
-
-// The server's answer to the Pro waitlist.
-export interface ProInterest {
-  interested: boolean
-  price: ProPrice | ''
-}
-
 export interface MyMood {
   day: string
   mood: number
@@ -304,11 +295,6 @@ async function sendJSON<T>(method: string, path: string, payload: unknown): Prom
 }
 
 export const health = (guildID: string) => getJSON<Health>(`/guilds/${encodeURIComponent(guildID)}/health`)
-
-export const proInterest = (guildID: string) => getJSON<ProInterest>(`/guilds/${encodeURIComponent(guildID)}/pro-interest`)
-
-export const setProInterest = (guildID: string, p: ProInterest) =>
-  sendJSON<ProInterest>('PUT', `/guilds/${encodeURIComponent(guildID)}/pro-interest`, p)
 
 export const updateSettings = (guildID: string, patch: SettingsPatch) =>
   sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)

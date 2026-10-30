@@ -553,7 +553,3 @@ a { color: var(--accent); }
 .todo a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; }
 .todo-done { color: var(--up); font-weight: 700; }
 .todo-open { color: var(--muted); }
-.pro { border: 1px dashed var(--series); }
-.badge-pro { background: var(--sun); color: var(--sun-ink); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 6px; vertical-align: middle; }
-.pro-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.top-receivers { display: grid; gap: 8px; }

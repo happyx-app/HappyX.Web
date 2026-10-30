@@ -319,16 +319,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const before = previousRange(range)
   let r: api.Report
   let prev: api.Report | null
-  // Older APIs have neither; the dashboard just leaves those cards out.
+  // Older APIs don't have it; the dashboard just leaves that card out.
   let health: api.Health | null
-  let pro: api.ProInterest | null
   try {
     // The period before only adds comparisons, so the dashboard still shows without it.
-    ;[r, prev, health, pro] = await Promise.all([
+    ;[r, prev, health] = await Promise.all([
       api.report(guildID, range.from, range.to),
       api.report(guildID, before.from, before.to).catch(() => null),
       api.health(guildID).catch(() => null),
-      api.canManage(g) ? api.proInterest(guildID).catch(() => null) : Promise.resolve(null),
     ])
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
@@ -336,7 +334,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     return
   }
   body.removeAttribute('aria-busy')
-  const extra = [health ? healthCard(g, health) : null, pro ? proCard(g, pro) : null].filter((c): c is HTMLElement => c !== null)
+  const extra = health ? [healthCard(g, health)] : []
   if (r.responses === 0) {
     body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('empty.title')), h('p', { class: 'secondary' }, t('empty.body'))), ...extra)
     return
@@ -424,47 +422,6 @@ function healthCard(g: api.Guild, x: api.Health) {
       tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm')),
     ),
     h('ul', { class: 'todo' }, ...todo),
-  )
-}
-
-// The Pro waitlist (the market study's Phase 0): nothing is paid yet, it only measures interest.
-function proCard(g: api.Guild, p: api.ProInterest) {
-  let state = { ...p }
-  const note = h('p', { class: 'muted small', role: 'status' })
-  const join = h('button', { type: 'button', class: 'btn btn-primary' })
-  const prices = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': t('pro.price') })
-  const save = async (next: api.ProInterest) => {
-    try {
-      state = await api.setProInterest(g.discord_guild_id, next)
-      note.textContent = t('pro.saved')
-    } catch {
-      note.textContent = t('pro.error')
-    }
-    draw()
-  }
-  const draw = () => {
-    join.textContent = t(state.interested ? 'pro.joined' : 'pro.join')
-    join.className = state.interested ? 'btn' : 'btn btn-primary'
-    join.setAttribute('aria-pressed', String(state.interested))
-    prices.replaceChildren(
-      ...api.proPrices.map((v) => {
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(state.price === v), class: state.price === v ? 'chip chip-on' : 'chip' }, t(`pro.price.${v}`))
-        b.addEventListener('click', () => save({ ...state, price: v }))
-        return b
-      }),
-    )
-  }
-  join.addEventListener('click', () => save({ ...state, interested: !state.interested }))
-  draw()
-  return h(
-    'section',
-    { class: 'card pro' },
-    h('div', { class: 'card-head' }, h('h2', {}, t('pro.title'), ' ', h('span', { class: 'badge-pro' }, 'PRO')), h('span', { class: 'muted small' }, t('pro.soon'))),
-    h('p', { class: 'secondary' }, t('pro.body')),
-    h('div', { class: 'pro-actions' }, join),
-    h('p', { class: 'small' }, t('pro.price')),
-    prices,
-    note,
   )
 }
 
