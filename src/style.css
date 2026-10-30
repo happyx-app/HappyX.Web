@@ -400,8 +400,14 @@ a { color: var(--accent); }
 .dc-content strong { color: #f2f3f5; }
 .dc-content code { background: #2b2d31; padding: 1px 4px; border-radius: 4px; font-size: 0.85em; }
 .dc-mention { background: rgba(88, 101, 242, 0.3); color: #c9cdfb; border-radius: 3px; padding: 0 2px; font-weight: 500; }
+/* The bot's survey card (a Discord embed) in HappyX's violet. */
+.dc-embed { background: #2b2d31; border-left: 4px solid #8b5cf6; border-radius: 4px; padding: 10px 16px 14px 12px; margin-top: 2px; display: grid; gap: 4px; max-width: 520px; font-size: 0.875rem; }
+.dc-embed-author { color: #f2f3f5; font-weight: 600; font-size: 0.8125rem; }
+.dc-embed-heading { color: #f2f3f5; font-weight: 700; font-size: 1.0625rem; margin-top: 4px; }
+.dc-embed-footer { color: #949ba4; font-size: 0.75rem; margin-top: 6px; }
 .dc-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .dc-button { background: #4e5058; color: #fff; border-radius: 4px; padding: 6px 12px; font-size: 0.875rem; font-weight: 500; }
+.dc-button.dc-emoji { font-size: 1.25rem; padding: 2px 14px; }
 .btn-primary { background: var(--primary); color: #fff; border-color: transparent; }
 .btn-primary:disabled { opacity: 0.45; cursor: default; filter: none; }
 .success { color: #006300; }
