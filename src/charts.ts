@@ -9,6 +9,7 @@ export interface Series {
   name: string
   color: string // a CSS colour, e.g. var(--cat-1)
   values: (number | null)[] // one per x point; null leaves a gap
+  dashed?: boolean // a reference line, e.g. the period before: no dots, drawn under the rest
 }
 
 interface LineChartOptions {
@@ -35,21 +36,32 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
   return wrap
 }
 
-// Average mood per day of a server, with gaps on days without answers.
-export function trendChart(days: DayStat[]): HTMLElement {
+// Average mood per day of a server, with gaps on days without answers. With previous (the
+// days of the period before), the n-th day of that period is drawn under the n-th day of this
+// one as a dashed line: matching by position keeps both lines on working days.
+export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLElement {
+  const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
+  const series: Series[] = []
+  if (days.some((_, i) => prevOf(i))) {
+    series.push({ name: t('chart.previous'), color: 'var(--axis)', dashed: true, values: days.map((_, i) => prevOf(i)?.average ?? null) })
+  }
+  series.push({ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (d.responses > 0 ? d.average : null)) })
   return lineChart(
     days.map((d) => d.day),
-    [{ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (d.responses > 0 ? d.average : null)) }],
+    series,
     {
       label: t('chart.trend'),
       tooltip: (i) => {
         const d = days[i]
+        const p = prevOf(i)
         return [
           h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
           d.responses > 0
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
-        ]
+          d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
+          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
+        ].filter((n): n is HTMLDivElement => n !== null)
       },
     },
   )
@@ -106,9 +118,10 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       if (v === null) return
       path += `${i > 0 && se.values[i - 1] !== null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`
     })
-    const line = s('path', { d: path, class: 'line' })
+    const line = s('path', { d: path, class: se.dashed ? 'line line-dashed' : 'line' })
     line.style.stroke = se.color
     svg.append(line)
+    if (se.dashed) continue
     se.values.forEach((v, i) => {
       if (v === null) return
       const dot = s('circle', { cx: x(i), cy: y(v), r: 4, class: 'dot' })

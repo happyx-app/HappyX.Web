@@ -89,6 +89,8 @@ export interface DayStat {
   day: string
   responses: number
   average: number
+  // How many people got that day's survey; missing when the bot didn't report it.
+  recipients?: number
 }
 
 export interface ReportMessage {
@@ -108,6 +110,32 @@ export interface Report {
   distribution: Record<string, number>
   days: DayStat[]
   messages: ReportMessage[]
+  // Kudos are public, so they keep their names even on anonymous servers.
+  kudos?: KudosSummary
+  // Surveys sent and answered on the days with known recipients; missing when there are none.
+  participation?: { recipients: number; answered: number }
+}
+
+export interface Kudos {
+  day: string
+  from_username: string
+  to_username: string
+  message: string
+}
+
+export interface KudosSummary {
+  count: number
+  givers: number
+  receivers: number
+  highlights: Kudos[] // the latest, newest first
+  top_receivers?: { username: string; count: number }[] // most first; older APIs leave it out
+}
+
+// Who the survey reaches now and how the last one went.
+export interface Health {
+  audience: number
+  opted_out: number
+  last_survey: { day: string; recipients: number; failed: number } | null
 }
 
 export interface MyMood {
@@ -268,6 +296,8 @@ async function sendJSON<T>(method: string, path: string, payload: unknown): Prom
   if (!res.ok) throw new ApiError(res.status, typeof body.error === 'string' ? body.error : res.statusText)
   return body as T
 }
+
+export const health = (guildID: string) => getJSON<Health>(`/guilds/${encodeURIComponent(guildID)}/health`)
 
 export const updateSettings = (guildID: string, patch: SettingsPatch) =>
   sendJSON<Guild>('PATCH', `/guilds/${encodeURIComponent(guildID)}/settings`, patch)
