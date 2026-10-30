@@ -18,6 +18,8 @@ export interface Guild {
   report_dm?: boolean
   survey_hour: number
   games_enabled: boolean
+  // Where kudos cards are posted; empty or missing means the channel where /happyx kudos is used.
+  kudos_channel_id?: string
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
   // The admin's own survey text with {{variables}}; empty or missing means the default text.
@@ -246,6 +248,7 @@ export interface SettingsPatch {
   report_frequency?: 'weekly' | 'monthly'
   report_dm?: boolean
   working_days?: number[]
+  kudos_channel_id?: string // "" posts where the command is used
   survey_message?: string // "" goes back to the default text
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
@@ -276,6 +279,18 @@ export const deleteGuild = (guildID: string, confirmName: string) =>
 
 // roles lists the server's Discord roles, highest first, for the settings' pickers.
 export const roles = (guildID: string) => getJSON<Role[]>(`/guilds/${encodeURIComponent(guildID)}/roles`)
+
+// A text or announcement channel of the server, in the order of Discord's channel list.
+export interface Channel {
+  id: string
+  name: string
+  category: string // empty when it isn't in a category
+  position: number
+  can_post: boolean // whether the bot may post the kudos card there
+}
+
+// channels lists the server's channels, in Discord's order, for the kudos channel picker.
+export const channels = (guildID: string) => getJSON<Channel[]>(`/guilds/${encodeURIComponent(guildID)}/channels`)
 
 export const access = (guildID: string) => getJSON<Access>(`/guilds/${encodeURIComponent(guildID)}/access`)
 
