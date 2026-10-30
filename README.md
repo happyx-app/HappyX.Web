@@ -82,6 +82,10 @@ Discord application's OAuth2 redirects.
 `ghcr.io/happyx-app/happyx-web` (published by CI from main and `v*` tags), listening on port 8080.
 `API_URL` (default `http://api:8080`) is the API's internal URL.
 
+## How it's built
+
+HappyX is developed with AI assistance. Every change is reviewed and approved by the maintainer before it's merged.
+
 ## License
 
-[MIT](LICENSE).
+[AGPL-3.0](LICENSE). Versions published before 30 October 2026 (up to commit [`d416b50`](https://github.com/happyx-app/HappyX.Web/tree/d416b50595f870b3967f18f24faa950a7bae41ff)) remain available under the MIT License.
