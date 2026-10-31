@@ -4,6 +4,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import { showSaveError } from './errors'
 import * as icons from './icons'
 import { t } from './i18n'
 
@@ -312,8 +313,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       if (adminChanged) onAdminChanged()
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
-      status.className = 'small error'
-      status.textContent = err instanceof api.ApiError && err.status === 400 ? `${t('settings.error')}: ${err.message}` : t('error.generic')
+      showSaveError(status, err)
       save.disabled = false
     }
   })

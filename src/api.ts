@@ -1,6 +1,8 @@
 // Client for the API's dashboard routes. nginx forwards /api/web/* to the API, so requests
 // are same-origin and carry the HttpOnly session cookie.
 
+import { lang } from './i18n'
+
 export interface User {
   discord_user_id: string
   username: string
@@ -233,10 +235,17 @@ export function avatarURL(userID: string, avatar: string | undefined, size = 64)
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`
 }
 
-const base = '/api/web'
+// The public demo at /demo shows a made-up server to anyone, without logging in. It reads the
+// API's /web/demo/<lang> routes, which answer like the real ones, and saves nothing.
+export const isDemo = isDemoPath(typeof location === 'undefined' ? '' : location.pathname)
+export function isDemoPath(path: string): boolean {
+  return path.replace(/\/+$/, '') === '/demo'
+}
 
-export const loginURL = `${base}/auth/login`
-export const inviteURL = `${base}/auth/invite`
+const base = isDemo ? `/api/web/demo/${lang}` : '/api/web'
+
+export const loginURL = '/api/web/auth/login'
+export const inviteURL = '/api/web/auth/invite'
 
 export class Unauthorized extends Error {}
 export class NotFound extends Error {}
@@ -247,6 +256,12 @@ export class ApiError extends Error {
     message: string,
   ) {
     super(message)
+  }
+}
+// DemoReadOnly is what every save gets in the demo, without asking the API.
+export class DemoReadOnly extends ApiError {
+  constructor() {
+    super(403, 'the demo saves nothing')
   }
 }
 
@@ -284,6 +299,7 @@ export interface SettingsPatch {
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.
 async function sendJSON<T>(method: string, path: string, payload: unknown): Promise<T> {
+  if (isDemo) throw new DemoReadOnly()
   const res = await fetch(base + path, {
     method,
     credentials: 'same-origin',
@@ -329,6 +345,7 @@ export const setAccess = (guildID: string, adminID: string, grants: Grant[]) =>
 
 // download fetches an export and hands it to the browser as a file, named as the API says.
 async function download(path: string, fallbackName: string): Promise<void> {
+  if (isDemo) throw new DemoReadOnly()
   const res = await fetch(base + path, { credentials: 'same-origin' })
   if (res.status === 401) throw new Unauthorized()
   if (res.status === 404) throw new NotFound()
@@ -365,5 +382,6 @@ export const guessGame = (guildID: string, guesses: Record<string, string>) =>
   sendJSON<void>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/guesses`, { guesses })
 
 export async function logout(): Promise<void> {
+  if (isDemo) return
   await fetch(`${base}/auth/logout`, { method: 'POST', credentials: 'same-origin' })
 }

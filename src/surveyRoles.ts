@@ -6,6 +6,7 @@
 import * as api from './api'
 import { combobox, type Option, optionChip } from './access'
 import { h } from './dom'
+import { showSaveError } from './errors'
 import * as icons from './icons'
 import { t } from './i18n'
 
@@ -170,8 +171,7 @@ function surveyRolesForm(g: api.Guild, roles: api.Role[], onSaved: (g: api.Guild
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
-      status.className = 'small error'
-      status.textContent = err instanceof api.ApiError && err.status === 400 ? `${t('settings.error')}: ${err.message}` : t('error.generic')
+      showSaveError(status, err)
       save.disabled = false
     }
   })

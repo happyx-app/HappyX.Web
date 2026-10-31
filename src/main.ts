@@ -24,10 +24,12 @@ import logoURL from './logo.svg'
 //   #/games                  servers where I can play «Who's who?»
 //   #/game/<guildID>         the game in one server (the bot links here)
 //   #/privacy                the user's own data: download or erase it
+// /demo serves the same app on a made-up server, without logging in (see api.isDemo).
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
 applySavedTheme()
+if (api.isDemo) document.title = `HappyX · ${t('demo.label')}`
 let me: api.Me | null = null
 
 async function route() {
@@ -35,10 +37,12 @@ async function route() {
     me ??= await api.me()
     me.games ??= []
   } catch (err) {
-    if (err instanceof api.Unauthorized) return renderLanding(null)
+    if (err instanceof api.Unauthorized && !api.isDemo) return renderLanding(null)
     return renderError(err)
   }
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
+  // The demo's made-up admin has no landing page or personal data of their own.
+  if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
   if (gameID) return renderGame(me, gameID)
@@ -67,8 +71,33 @@ async function route() {
 }
 
 function page(...children: (Node | null)[]) {
-  app.replaceChildren(...children.filter((c): c is Node => c !== null), ...(me ? [footer()] : []))
+  const nodes = children.filter((c): c is Node => c !== null)
+  // In the demo the notice stays on top, together with the top bar.
+  if (api.isDemo && nodes[0] instanceof HTMLElement && nodes[0].classList.contains('topbar')) {
+    nodes[0] = h('div', { class: 'demo-head' }, demoBanner(), nodes[0])
+  }
+  app.replaceChildren(...nodes, ...(me && !api.isDemo ? [footer()] : []))
   window.scrollTo(0, 0)
+}
+
+// The demo's notice: what this is, and how to get it for real.
+function demoBanner() {
+  return h(
+    'div',
+    { class: 'demo-banner', role: 'note' },
+    h(
+      'p',
+      {},
+      h('span', { class: 'demo-badge' }, t('demo.label')),
+      h('span', {}, h('strong', {}, t('demo.title')), ' ', h('span', { class: 'demo-more' }, t('demo.body'))),
+    ),
+    h(
+      'div',
+      { class: 'demo-actions' },
+      h('a', { class: 'btn btn-sun', href: api.inviteURL }, discordLogo(), t('landing.add')),
+      h('a', { class: 'demo-home', href: '/' }, t('demo.home')),
+    ),
+  )
 }
 
 const footer = () => h('footer', { class: 'footer' }, h('a', { href: '#/privacy' }, icons.inline(icons.lock), t('nav.privacy')))
@@ -130,15 +159,17 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' = 'ser
       languagePicker(true),
       avatar,
       h('span', { class: 'user-name' }, u.username),
-      h('button', {
-        class: 'btn btn-ghost', type: 'button',
-        onclick: async () => {
-          await api.logout()
-          me = null
-          location.hash = ''
-          route()
-        },
-      }, t('nav.logout')),
+      api.isDemo
+        ? null
+        : h('button', {
+            class: 'btn btn-ghost', type: 'button',
+            onclick: async () => {
+              await api.logout()
+              me = null
+              location.hash = ''
+              route()
+            },
+          }, t('nav.logout')),
     ),
   )
 }
@@ -150,6 +181,7 @@ function renderLanding(m: api.Me | null) {
   const failed = new URLSearchParams(location.search).get('login') === 'failed'
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
   const add = (extra = '') => h('a', { class: `btn btn-discord ${extra}`, href: api.inviteURL }, discordLogo(), t('landing.add'))
+  const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
   const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
   const step = (n: number, title: string, body: string) =>
     h('li', { class: 'how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
@@ -174,7 +206,7 @@ function renderLanding(m: api.Me | null) {
           h('h1', {}, t('landing.title')),
           h('p', { class: 'lead secondary' }, t('landing.body')),
           failed ? h('p', { class: 'alert', role: 'alert' }, t('landing.failed')) : null,
-          h('div', { class: 'actions' }, add(), enter()),
+          h('div', { class: 'actions' }, add(), demo()),
           h('p', { class: 'muted small' }, t('landing.note')),
         ),
         surveyMock(),
@@ -221,7 +253,7 @@ function renderLanding(m: api.Me | null) {
         { class: 'cta' },
         h('h2', {}, t('landing.cta.title')),
         h('p', { class: 'secondary' }, t('landing.cta.body')),
-        h('div', { class: 'actions' }, add(), enter()),
+        h('div', { class: 'actions' }, add(), demo(), enter()),
       ),
     ),
     h('footer', { class: 'landing-footer muted small' }, brand(), h('span', {}, '© ', new Date().getFullYear())),
@@ -699,8 +731,10 @@ function renderSettings(m: api.Me, guildID: string) {
     page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
     return
   }
-  // Who has access, the server export and deleting it are for owners only.
+  // Who has access, the server export and deleting it are for owners only. The demo can show who
+  // has access, but has nothing to export or delete.
   const owner = api.isOwner(g)
+  const real = owner && !api.isDemo
   const onSaved = (updated: api.Guild) => {
     m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
   }
@@ -709,10 +743,10 @@ function renderSettings(m: api.Me, guildID: string) {
     [t('survey.title'), surveyMessageCard(g, onSaved, () => renderLanding(null), m.user)],
     [t('surveyRoles.title'), surveyRolesCard(g, onSaved, () => renderLanding(null))],
     [t('access.title'), owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null],
-    [t('export.title'), owner ? guildExport(g, () => renderLanding(null)) : null],
+    [t('export.title'), real ? guildExport(g, () => renderLanding(null)) : null],
     [
       t('danger.title'),
-      owner
+      real
         ? dangerZone(
             g,
             () => {
@@ -747,7 +781,8 @@ function renderSettings(m: api.Me, guildID: string) {
 // is highlighted as the page scrolls.
 function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement {
   const links = cards.map(({ label, card }) =>
-    h('button', { class: 'section-link', type: 'button', onclick: () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, label),
+    // Only the danger zone's link is red; owners alone have it, and the demo doesn't.
+    h('button', { class: label === t('danger.title') ? 'section-link section-danger' : 'section-link', type: 'button', onclick: () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, label),
   )
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
   const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))

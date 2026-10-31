@@ -3,6 +3,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import { showSaveError } from './errors'
 import * as icons from './icons'
 import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
@@ -264,8 +265,9 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
-      status.className = 'small error'
-      status.textContent = err instanceof api.ApiError && err.status === 400 ? `${t('settings.error')}: ${err.message}` : t('error.generic')
+      // The form is still changed, so refresh first: it clears the message of a changed form.
+      refresh()
+      return showSaveError(status, err)
     }
     refresh()
   })
@@ -399,8 +401,9 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
-      status.className = 'small error'
-      status.textContent = err instanceof api.ApiError && err.status === 400 ? `${t('settings.error')}: ${err.message}` : t('error.generic')
+      // The form is still changed, so refresh first: it clears the message of a changed form.
+      refresh()
+      return showSaveError(status, err)
     }
     refresh()
   })

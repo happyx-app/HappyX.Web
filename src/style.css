@@ -338,7 +338,7 @@ a { color: var(--accent); }
 }
 .section-link:hover { color: var(--ink); }
 .section-link[aria-current] { color: var(--ink); border-left-color: var(--series); font-weight: 600; }
-.section-link:last-child { color: var(--danger); }
+.section-danger { color: var(--danger); }
 @media (max-width: 860px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'nav' 'body'; gap: 16px; }
   .settings-nav { max-width: none; }
@@ -559,3 +559,29 @@ a { color: var(--accent); }
 .todo a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; }
 .todo-done { color: var(--up); font-weight: 700; }
 .todo-open { color: var(--muted); }
+
+/* The public demo: a notice above the top bar that stays with it while scrolling. */
+.demo-head { position: sticky; top: 0; z-index: 10; }
+.demo-head .topbar { position: static; }
+.demo-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
+  padding: 8px max(16px, calc((100% - 1040px) / 2 + 16px));
+  background: var(--primary); color: #fff; font-size: 0.9375rem;
+}
+.demo-banner p { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.demo-badge {
+  flex: none; background: var(--sun); color: var(--sun-ink); font-weight: 700; font-size: 0.75rem;
+  letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px;
+}
+.demo-more { opacity: 0.9; }
+.demo-actions { display: flex; align-items: center; gap: 14px; flex: none; }
+.demo-home { color: #fff; font-weight: 500; font-size: 0.875rem; }
+.btn-sun { background: var(--sun); color: var(--sun-ink); border-color: transparent; padding: 6px 12px; font-size: 0.875rem; }
+.btn-sun .discord-logo { width: 18px; height: 18px; }
+.demo-note { color: var(--accent); }
+@media (max-width: 640px) {
+  .demo-more, .demo-home { display: none; }
+  .demo-banner { padding-top: 6px; padding-bottom: 6px; font-size: 0.8125rem; flex-wrap: nowrap; }
+  .demo-banner p { gap: 8px; line-height: 1.3; }
+  .btn-sun { padding: 5px 10px; font-size: 0.8125rem; }
+}
