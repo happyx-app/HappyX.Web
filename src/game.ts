@@ -4,6 +4,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import { showSaveError } from './errors'
 import { formatDay, formatNumber, t } from './i18n'
 
 export const maxAnswer = 200
@@ -296,6 +297,7 @@ function resultsCard(r: api.GameRound) {
 }
 
 function showError(status: HTMLElement, err: unknown) {
+  if (err instanceof api.DemoReadOnly) return showSaveError(status, err)
   status.className = 'small error'
   if (err instanceof api.ApiError && err.status === 409) status.textContent = t('game.closed')
   else if (err instanceof api.ApiError && err.status === 400) status.textContent = `${t('settings.error')}: ${err.message}`

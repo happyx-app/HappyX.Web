@@ -65,6 +65,15 @@ server from HappyX. Owners can give members or Discord roles **view** (charts an
 Servers the bot was removed from don't show up. The API enforces this; the web only shows what it
 gets back.
 
+## Public demo
+
+`/demo` is the same app on a made-up server, «Demo Team» («Equipo Demo» in Spanish), with six
+months of answers, messages, kudos and «Who's who?» rounds. Anyone can open it without logging in;
+the landing page links to it with «See the demo». It reads the API's `/web/demo/<lang>/...`
+routes, which only ever answer with that server. Every page works except saving: forms say it's a
+demo instead, and the export, deleting the server and the privacy page are left out. A notice with
+«Add to Discord» stays on top.
+
 ## Development
 
 ```sh

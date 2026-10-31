@@ -56,6 +56,15 @@ server {
         try_files /index.html =404;
         expires -1;
     }
+    # The public demo is the same app shell, which reads the API's demo routes when the path is
+    # /demo.
+    location = /demo {
+        try_files /index.html =404;
+        expires -1;
+    }
+    location = /demo/ {
+        return 301 /demo$is_args$args;
+    }
     location /assets/ {
         try_files $uri =404;
         expires 1y;
