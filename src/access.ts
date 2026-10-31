@@ -212,7 +212,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
   const adminWarning = h('p', { class: 'warning small', hidden: true })
   const rows = h('ul', { class: 'grant-list' })
   const empty = h('p', { class: 'muted small grant-empty' }, t('access.none'))
-  const droppedNote = known.dropped ? h('p', { class: 'muted small' }, t('access.dropped', { n: known.dropped })) : null
+  const droppedNote = known.dropped ? h('p', { class: 'muted small' }, (known.dropped === 1 ? t('access.dropped.one') : t('access.dropped', { n: known.dropped }))) : null
 
   const refresh = () => {
     const dirty = !sameAccess(saved, state) || known.dropped > 0
@@ -318,5 +318,5 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
     }
   })
   refresh()
-  return [h('h2', { id: 'access-title' }, t('access.title')), h('p', { class: 'muted small' }, t('access.help')), form]
+  return [h('h2', { id: 'access-title' }, t('access.title')), form]
 }

@@ -20,6 +20,11 @@ interface LineChartOptions {
   tick?: (x: string) => string
   // Which points may get a label (default: all, thinned evenly).
   tickAt?: (i: number) => boolean
+  // Short notes on single points of the last series, e.g. «Highest: 4.4», each with a dot.
+  // Left out on narrow charts.
+  notes?: { index: number; text: string; below?: boolean }[]
+  // A dot on every point (default). Without, only lone points get one.
+  dots?: boolean
 }
 
 // Mood over time, one line per series, redrawn to fit its container.
@@ -39,11 +44,11 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 // Average mood per day of a server, with gaps on days without answers. With previous (the
 // days of the period before), the n-th day of that period is drawn under the n-th day of this
 // one as a dashed line: matching by position keeps both lines on working days.
-export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLElement {
+export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = []): HTMLElement {
   const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
   const series: Series[] = []
   if (days.some((_, i) => prevOf(i))) {
-    series.push({ name: t('chart.previous'), color: 'var(--axis)', dashed: true, values: days.map((_, i) => prevOf(i)?.average ?? null) })
+    series.push({ name: t('chart.previous'), color: 'var(--prev)', dashed: true, values: days.map((_, i) => prevOf(i)?.average ?? null) })
   }
   series.push({ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (d.responses > 0 ? d.average : null)) })
   return lineChart(
@@ -51,6 +56,8 @@ export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLEleme
     series,
     {
       label: t('chart.trend'),
+      notes,
+      dots: false,
       tooltip: (i) => {
         const d = days[i]
         const p = prevOf(i)
@@ -60,7 +67,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLEleme
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
           d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
-          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
+          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { weekday: 'short', day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
         ].filter((n): n is HTMLDivElement => n !== null)
       },
     },
@@ -70,6 +77,48 @@ export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLEleme
 export function answers(n: number): string {
   return n === 1 ? t('chart.answer') : t('chart.answers', { n: formatNumber(n) })
 }
+
+
+// A smooth line through the points that never bulges past them (monotone cubic, like
+// d3.curveMonotoneX), so the curve between two days never shows a value nobody gave.
+// Returns the segments after the first point: «C…C…».
+function monotone(pts: [number, number][]): string {
+  const n = pts.length
+  if (n < 2) return ''
+  const dx = pts.slice(1).map((p, i) => p[0] - pts[i][0])
+  const slope = pts.slice(1).map((p, i) => (p[1] - pts[i][1]) / dx[i])
+  const m = pts.map((_, i) => {
+    if (i === 0) return slope[0]
+    if (i === n - 1) return slope[n - 2]
+    const a = slope[i - 1]
+    const b = slope[i]
+    return a * b <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / a + (dx[i] + 2 * dx[i - 1]) / b)
+  })
+  let d = ''
+  for (let i = 0; i < n - 1; i++) {
+    const h3 = dx[i] / 3
+    const c1 = [pts[i][0] + h3, pts[i][1] + m[i] * h3]
+    const c2 = [pts[i + 1][0] - h3, pts[i + 1][1] - m[i + 1] * h3]
+    d += `C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${pts[i + 1][0].toFixed(1)},${pts[i + 1][1].toFixed(1)}`
+  }
+  return d
+}
+
+// The runs of consecutive points that have a value; gaps split them.
+function runs(values: (number | null)[]): number[][] {
+  const out: number[][] = []
+  let run: number[] = []
+  values.forEach((v, i) => {
+    if (v === null) {
+      if (run.length) out.push(run)
+      run = []
+    } else run.push(i)
+  })
+  if (run.length) out.push(run)
+  return out
+}
+
+let areaCount = 0
 
 function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): SVGSVGElement {
   const height = 260
@@ -111,23 +160,62 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     })
   }
 
+  // A single solid line gets a soft fill under it, fading to the bottom; each run of
+  // consecutive days is its own shape, so gaps stay empty.
+  const solid = series.filter((se) => !se.dashed)
+  if (solid.length === 1) {
+    const se = solid[0]
+    const id = `area-${++areaCount}`
+    const stops = [0, 1].map((o) => {
+      const stop = s('stop', { offset: o })
+      stop.style.stopColor = se.color
+      stop.style.stopOpacity = o ? '0' : '0.22'
+      return stop
+    })
+    svg.append(s('defs', {}, s('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, ...stops)))
+    const bottom = m.top + ih
+    let d = ''
+    for (const run of runs(se.values)) {
+      if (run.length < 2) continue
+      const pts = run.map((i): [number, number] => [x(i), y(se.values[i]!)])
+      d += `M${pts[0][0].toFixed(1)},${bottom}L${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}${monotone(pts)}L${pts[pts.length - 1][0].toFixed(1)},${bottom}Z`
+    }
+    if (d) svg.append(s('path', { d, class: 'area', fill: `url(#${id})` }))
+  }
+
   // Lines are joined only between consecutive points that both have a value.
   for (const se of series) {
     let path = ''
-    se.values.forEach((v, i) => {
-      if (v === null) return
-      path += `${i > 0 && se.values[i - 1] !== null ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`
-    })
+    for (const run of runs(se.values)) {
+      const pts = run.map((i): [number, number] => [x(i), y(se.values[i]!)])
+      path += `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}${monotone(pts)}`
+    }
     const line = s('path', { d: path, class: se.dashed ? 'line line-dashed' : 'line' })
     line.style.stroke = se.color
     svg.append(line)
     if (se.dashed) continue
     se.values.forEach((v, i) => {
-      if (v === null) return
+      // Without a dot on every day, a lone day between gaps still needs one to be seen.
+      const lone = (se.values[i - 1] ?? null) === null && (se.values[i + 1] ?? null) === null
+      if (v === null || (opts.dots === false && !lone)) return
       const dot = s('circle', { cx: x(i), cy: y(v), r: 4, class: 'dot' })
       dot.style.fill = se.color
       svg.append(dot)
     })
+  }
+
+  // Notes sit above (or below) their point, kept inside the chart.
+  const last = series[series.length - 1]
+  if (width >= 560) {
+    for (const note of opts.notes ?? []) {
+      const v = last?.values[note.index]
+      if (v === null || v === undefined) continue
+      const dot = s('circle', { cx: x(note.index), cy: y(v), r: 5, class: 'dot' })
+      dot.style.fill = last.color
+      svg.append(dot)
+      const label = s('text', { x: Math.min(Math.max(x(note.index), m.left + 40), width - m.right - 40), y: y(v) + (note.below ? 22 : -14), class: 'note', 'text-anchor': 'middle' }, note.text)
+      svg.append(label)
+    }
   }
 
   // Hover: crosshair on the nearest point + tooltip.
