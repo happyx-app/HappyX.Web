@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReportMessage } from './api'
-import { delta, filterMessages, lowestWeekday, moodGroup, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages } from './insights'
+import { delta, extremeDays, filterMessages, lowestWeekday, moodGroup, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages } from './insights'
 
 describe('previousRange', () => {
   it('takes the same number of days just before', () => {
@@ -76,5 +76,24 @@ describe('schedule', () => {
     expect(nextReportDay('weekly', 'Europe/Madrid', new Date('2026-11-02T12:00:00Z'))).toBe('2026-11-09')
     expect(nextReportDay('monthly', 'Europe/Madrid', fri)).toBe('2026-11-01')
     expect(nextReportDay('monthly', 'Europe/Madrid', new Date('2026-12-15T12:00:00Z'))).toBe('2027-01-01')
+  })
+})
+
+describe('extremeDays', () => {
+  const day = (n: number, average: number, responses = 8) => ({ day: `2026-10-${String(n).padStart(2, '0')}`, responses, average })
+  const week = [day(1, 3.5), day(2, 3.6), day(3, 3.4), day(4, 3.5), day(5, 3.5), day(6, 3.5), day(7, 3.5)]
+
+  it('needs 7 days with answers', () => {
+    expect(extremeDays([day(1, 4.5), day(2, 2.5), day(3, 3.5)], 3.5)).toEqual({ high: null, low: null })
+  })
+  it('marks days at least 0.5 from the average', () => {
+    expect(extremeDays([...week, day(8, 4.1), day(9, 2.9)], 3.5)).toEqual({ high: 7, low: 8 })
+    expect(extremeDays([...week, day(8, 3.9)], 3.5)).toEqual({ high: null, low: null })
+  })
+  it('ignores days with few answers', () => {
+    expect(extremeDays([...week, day(8, 5, 2), day(9, 1, 3)], 3.5)).toEqual({ high: null, low: null })
+  })
+  it('prefers the most recent day on a tie', () => {
+    expect(extremeDays([...week, day(8, 4.4), day(9, 4.4)], 3.5).high).toBe(8)
   })
 })
