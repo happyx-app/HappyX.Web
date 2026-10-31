@@ -3,10 +3,10 @@ import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
-import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
+import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { comparable, delta, filterMessages, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
+import { comparable, delta, extremeDays, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
@@ -335,6 +335,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   }
   const range = rangeFor(preset, todayIn(g.timezone))
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const dates = h('p', { class: 'muted' }, formatRange(range.from, range.to))
   const picker = h(
     'div',
     { class: 'segmented', role: 'radiogroup', 'aria-label': t('period.label') },
@@ -354,7 +355,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       h(
         'div',
         { class: 'title-row' },
-        h('div', {}, h('h1', {}, g.name), h('p', { class: 'muted' }, `${formatDay(range.from, { day: 'numeric', month: 'long', year: 'numeric' })} – ${formatDay(range.to, { day: 'numeric', month: 'long', year: 'numeric' })}`)),
+        h('div', {}, h('h1', {}, g.name), dates),
         api.canManage(g) ? h('a', { class: 'btn btn-ghost icon-btn', href: `#/g/${guildID}/settings`, 'aria-label': t('settings.link'), title: t('settings.link') }, icons.gear()) : null,
       ),
       picker,
@@ -382,10 +383,28 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   body.removeAttribute('aria-busy')
   const extra = health ? [healthCard(g, health)] : []
   if (r.responses === 0) {
-    body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('empty.title')), h('p', { class: 'secondary' }, t('empty.body'))), ...extra)
+    const next = nextSurveyDay(g.timezone, g.survey_hour, g.working_days ?? [1, 2, 3, 4, 5])
+    const longer = preset !== 'last-30' && preset !== 'last-90'
+    body.replaceChildren(
+      h(
+        'div',
+        { class: 'card empty' },
+        h('h2', {}, t('empty.title')),
+        next ? h('p', { class: 'secondary' }, t('empty.body', { day: formatDay(next, { weekday: 'long', day: 'numeric', month: 'long' }), time: `${String(g.survey_hour).padStart(2, '0')}:00` })) : null,
+        longer ? h('a', { class: 'btn', href: `#/g/${guildID}?p=last-30` }, t('empty.longer')) : null,
+      ),
+      ...extra,
+    )
     return
   }
   const old = comparable(prev) ? prev : null
+  // The comparison is said once, here; the deltas below don't repeat it.
+  if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
+  const peaks = preset === 'this-week' || preset === 'last-week' ? { high: null, low: null } : extremeDays(r.days, r.average)
+  const notes = [
+    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
+    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
+  ]
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
@@ -420,13 +439,13 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
       h('p', { class: 'muted small' }, t('chart.trend.desc')),
-      old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), t('stat.average')), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), t('chart.previous'))) : null,
-      trendChart(r.days, old?.days),
+      old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
+      trendChart(r.days, old?.days, notes),
       tableWrap,
     ),
     h('div', { class: 'grid-2' },
       weekdayCard(weekdays),
-      h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), distributionChart(r)),
+      h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r)),
     ),
     h('div', { class: 'grid-2' },
       messagesCard(r),
@@ -446,11 +465,12 @@ function healthCard(g: api.Guild, x: api.Health) {
     h('div', { class: 'health-tile' }, h('span', { class: 'muted small' }, label), h('strong', {}, value), h('span', { class: 'muted small' }, note))
   const last = x.last_survey
   const todo: HTMLElement[] = []
-  const item = (done: boolean, text: string, link?: [string, string]) =>
-    h('li', {}, h('span', { class: done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
+  // done: ✓, false: ○ (something to do), null: · (just a fact, nothing to do).
+  const item = (done: boolean | null, text: string, link?: [string, string]) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? '·' : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   todo.push(item(x.audience > 0, x.audience > 0 ? t('health.audience', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
-  if (x.opted_out > 0) todo.push(item(false, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
+  if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   todo.push(item(g.games_enabled, t(g.games_enabled ? 'health.game.on' : 'health.game.off'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
   return h(
     'section',
@@ -463,7 +483,7 @@ function healthCard(g: api.Guild, x: api.Health) {
       tile(
         t('health.lastSurvey'),
         last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),
-        last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : t('health.none.note'),
+        last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : '',
       ),
       tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm')),
     ),
@@ -471,30 +491,25 @@ function healthCard(g: api.Guild, x: api.Health) {
   )
 }
 
-// One sentence that reads the period for you: how it went, how it moved, the day that costs
-// the most and the kudos.
+// The period in a few words: the tone as the title, then only what the numbers below don't
+// say (how the average moved, and the weekday that costs the most).
 function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[]) {
-  const parts: string[] = [t(`summary.tone.${tone(r.average)}`)]
-  const avg = formatNumber(r.average, 1)
+  const parts: string[] = []
   if (old) {
     const d = delta(r.average, old.average, 1)
-    parts.push(d.trend === 'flat' ? t('summary.avg.same', { avg }) : t(d.trend === 'up' ? 'summary.avg.up' : 'summary.avg.down', { avg, delta: formatNumber(Math.abs(d.value), 1) }))
-  } else {
-    parts.push(t('summary.avg', { avg }))
+    parts.push(d.trend === 'flat' ? t('summary.avg.same') : t(d.trend === 'up' ? 'summary.avg.up' : 'summary.avg.down', { delta: formatNumber(Math.abs(d.value), 1) }))
   }
   const low = lowestWeekday(weekdays)
-  if (low) parts.push(t('summary.lowDay', { day: formatDay(low.day, { weekday: 'long' }) }))
-  const k = r.kudos?.count ?? 0
-  if (k > 0) parts.push(k === 1 ? t('summary.kudos.one') : t('summary.kudos', { n: formatNumber(k) }))
+  if (low) parts.push(t('summary.lowDay', { day: weekdayPlural(low.day), avg: formatNumber(low.average, 1) }))
   return h(
     'section',
     { class: 'card summary' },
     h('span', { class: 'summary-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)),
-    h('p', {}, h('strong', {}, parts[0]), ' ', parts.slice(1).join(' ')),
+    h('div', {}, h('h2', {}, t(`summary.tone.${tone(r.average)}`)), parts.length ? h('p', { class: 'secondary' }, parts.join(' ')) : null),
   )
 }
 
-// «▲ +0,3 vs. the period before», coloured by direction.
+// «▲ +0,3», coloured by direction. The header says what it compares with.
 function deltaNote(now: number, before: number, digits = 0, unit: 'delta.vs' | 'delta.points' = 'delta.vs') {
   const d = delta(now, before, digits)
   const sign = d.value > 0 ? '+' : d.value < 0 ? '−' : ''
@@ -504,11 +519,15 @@ function deltaNote(now: number, before: number, digits = 0, unit: 'delta.vs' | '
 
 function weekdayCard(stats: WeekdayStat[]) {
   const low = lowestWeekday(stats)
+  const high = highestWeekday(stats)
+  const desc = low && high
+    ? t('weekday.desc', { low: weekdayPlural(low.day), lowAvg: formatNumber(low.average, 1), high: weekdayPlural(high.day), highAvg: formatNumber(high.average, 1) })
+    : t('weekday.flat')
   return h(
     'section',
     { class: 'card' },
     h('h2', {}, t('weekday.title')),
-    h('p', { class: 'muted small' }, t('weekday.desc')),
+    stats.length < 2 ? null : h('p', { class: 'muted small' }, desc),
     stats.length < 2
       ? h('p', { class: 'muted' }, t('weekday.few'))
       : h(
@@ -541,7 +560,7 @@ function kudosCard(k: api.KudosSummary) {
     h('h2', {}, t('kudos.title')),
     k.count === 0
       ? h('p', { class: 'muted' }, t('kudos.empty'))
-      : h('p', { class: 'muted small' }, t('kudos.counts', { n: formatNumber(k.count), givers: formatNumber(k.givers), receivers: formatNumber(k.receivers) })),
+      : h('p', { class: 'muted small' }, t('kudos.counts', { givers: formatNumber(k.givers), receivers: formatNumber(k.receivers) })),
     k.top_receivers?.length
       ? h(
           'div',

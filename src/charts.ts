@@ -20,6 +20,9 @@ interface LineChartOptions {
   tick?: (x: string) => string
   // Which points may get a label (default: all, thinned evenly).
   tickAt?: (i: number) => boolean
+  // Short notes on single points of the last series, e.g. «Highest: 4.4», each with a dot.
+  // Left out on narrow charts.
+  notes?: { index: number; text: string; below?: boolean }[]
   // A dot on every point (default). Without, only lone points get one.
   dots?: boolean
 }
@@ -41,7 +44,7 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 // Average mood per day of a server, with gaps on days without answers. With previous (the
 // days of the period before), the n-th day of that period is drawn under the n-th day of this
 // one as a dashed line: matching by position keeps both lines on working days.
-export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLElement {
+export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = []): HTMLElement {
   const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
   const series: Series[] = []
   if (days.some((_, i) => prevOf(i))) {
@@ -53,6 +56,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLEleme
     series,
     {
       label: t('chart.trend'),
+      notes,
       dots: false,
       tooltip: (i) => {
         const d = days[i]
@@ -63,7 +67,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = []): HTMLEleme
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
           d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
-          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
+          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { weekday: 'short', day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
         ].filter((n): n is HTMLDivElement => n !== null)
       },
     },
@@ -198,6 +202,20 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       dot.style.fill = se.color
       svg.append(dot)
     })
+  }
+
+  // Notes sit above (or below) their point, kept inside the chart.
+  const last = series[series.length - 1]
+  if (width >= 560) {
+    for (const note of opts.notes ?? []) {
+      const v = last?.values[note.index]
+      if (v === null || v === undefined) continue
+      const dot = s('circle', { cx: x(note.index), cy: y(v), r: 5, class: 'dot' })
+      dot.style.fill = last.color
+      svg.append(dot)
+      const label = s('text', { x: Math.min(Math.max(x(note.index), m.left + 40), width - m.right - 40), y: y(v) + (note.below ? 22 : -14), class: 'note', 'text-anchor': 'middle' }, note.text)
+      svg.append(label)
+    }
   }
 
   // Hover: crosshair on the nearest point + tooltip.

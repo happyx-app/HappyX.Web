@@ -1,7 +1,8 @@
 // Date ranges for the period picker. Days are 'YYYY-MM-DD' strings, like the API's, and
 // "today" is taken in the server's timezone so the dashboard matches the bot's reports.
 
-export const presets = ['last-30', 'this-week', 'last-week', 'this-month', 'last-month', 'last-90'] as const
+// Shortest first. The dashboard opens on last-30.
+export const presets = ['this-week', 'last-week', 'this-month', 'last-month', 'last-30', 'last-90'] as const
 export type Preset = (typeof presets)[number]
 
 export interface Range {

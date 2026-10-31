@@ -245,7 +245,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       kudosNote,
       h('p', { class: 'muted small' }, t('settings.kudos.help')),
     ),
-    h('p', { class: 'muted small' }, icons.inline(icons.info), t(api.isOwner(g) ? 'settings.admin.help' : 'settings.admin.help.manage')),
+    api.isOwner(g) ? null : h('p', { class: 'muted small' }, icons.inline(icons.info), t('settings.admin.help.manage')),
     h('div', { class: 'form-actions' }, save, status),
   )
   form.addEventListener('input', refresh)

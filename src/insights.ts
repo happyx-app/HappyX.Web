@@ -116,3 +116,29 @@ export function tone(average: number): Tone {
 export function comparable(prev: Report | null): prev is Report {
   return prev !== null && prev.responses > 0
 }
+
+// The days worth pointing out on the trend chart: the highest and the lowest, each only when
+// there are at least 7 days with answers, it had at least 3 answers and half the usual daily
+// count (so one person can't decide it), and it sits at least 0.5 from the period's average.
+// On a tie the most recent day wins. Returns indexes into days.
+export function extremeDays(days: DayStat[], average: number): { high: number | null; low: number | null } {
+  const answered = days.map((d, i) => ({ d, i })).filter(({ d }) => d.responses > 0)
+  if (answered.length < 7) return { high: null, low: null }
+  const counts = answered.map(({ d }) => d.responses).sort((a, b) => a - b)
+  const mid = Math.floor(counts.length / 2)
+  const median = counts.length % 2 ? counts[mid] : (counts[mid - 1] + counts[mid]) / 2
+  const solid = answered.filter(({ d }) => d.responses >= 3 && d.responses >= median / 2)
+  const round = (v: number) => Math.round(v * 10) / 10
+  let high: number | null = null
+  let low: number | null = null
+  for (const { d, i } of solid) {
+    if (round(d.average) >= round(average + 0.5) && (high === null || round(d.average) >= round(days[high].average))) high = i
+    if (round(d.average) <= round(average - 0.5) && (low === null || round(d.average) <= round(days[low].average))) low = i
+  }
+  return { high, low }
+}
+
+// The best weekday, to set the lowest one against.
+export function highestWeekday(stats: WeekdayStat[]): WeekdayStat | null {
+  return stats.length < 2 ? null : stats.reduce((a, b) => (b.average > a.average ? b : a))
+}
