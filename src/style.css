@@ -29,6 +29,7 @@
   --display: 'Nunito Variable', system-ui, sans-serif;
   --warm-soft: #fdf4d8;
   --kudo-bg: #fff8e1;
+  --prev: #c4b5fd;
   --card-border: transparent;
   --insight: linear-gradient(120deg, #ede9fe 0%, #fdf4d8 100%);
   --seg-on: var(--surface); --seg-on-ink: var(--accent); --seg-shadow: 0 2px 8px rgba(76, 52, 160, 0.12);
@@ -59,6 +60,7 @@
     --shadow: 0 0 0 1px rgba(200, 180, 255, 0.06);
     --warm-soft: #3a2f1a;
     --kudo-bg: #2f2716;
+    --prev: #5b4a92;
     --card-border: transparent;
     --insight: linear-gradient(120deg, #2e2257 0%, #3a2f1a 100%);
     --seg-on: #3a2c6b; --seg-on-ink: #ffffff; --seg-shadow: none;
@@ -87,6 +89,7 @@
   --shadow: 0 0 0 1px rgba(200, 180, 255, 0.06);
   --warm-soft: #3a2f1a;
   --kudo-bg: #2f2716;
+  --prev: #5b4a92;
   --card-border: transparent;
   --insight: linear-gradient(120deg, #2e2257 0%, #3a2f1a 100%);
   --seg-on: #3a2c6b; --seg-on-ink: #ffffff; --seg-shadow: none;
@@ -576,7 +579,7 @@ a { color: var(--accent); }
 .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.8125rem; color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .swatch-line { display: inline-block; width: 16px; height: 0; border-top: 2.5px solid var(--series); }
-.swatch-dashed { border-top: 2px dashed var(--axis); }
+.swatch-dashed { border-top: 2px dashed var(--prev); }
 .chart .line-dashed { stroke-dasharray: 5 4; stroke-width: 2; }
 .bar-warm { background: var(--sun); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
