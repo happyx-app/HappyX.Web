@@ -249,6 +249,7 @@ a { color: var(--accent); }
 .stat { gap: 4px; }
 .stat-label { color: var(--ink-2); font-size: 0.875rem; }
 .stat-value { font-family: var(--display); font-size: 2.75rem; font-weight: 900; letter-spacing: -0.02em; line-height: 1; margin: 4px 0; }
+@media (max-width: 480px) { .stat-value { font-size: 2rem; } .stat-value .stat-emoji { margin-right: 4px; } }
 .stat-emoji { margin-right: 8px; }
 .stat-unit { font-size: 1rem; color: var(--muted); font-weight: 500; }
 .grid-2 { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
