@@ -3,7 +3,7 @@ import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
-import { formatDay, formatNumber, lang, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
+import { formatDay, formatNumber, lang, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, filterMessages, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
@@ -14,6 +14,8 @@ import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 import logoURL from './logo.svg'
+import * as survey from './surveyMessage'
+import { confetti } from './confetti'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none); the landing page when logged out
@@ -180,13 +182,13 @@ function renderLanding(m: api.Me | null) {
   if (!m) me = null // logged out, or the session is gone
   const failed = new URLSearchParams(location.search).get('login') === 'failed'
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
-  const add = (extra = '') => h('a', { class: `btn btn-discord ${extra}`, href: api.inviteURL }, discordLogo(), t('landing.add'))
+  const add = () => h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add'))
   const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
   const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
   const step = (n: number, title: string, body: string) =>
-    h('li', { class: 'how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
+    h('li', { class: 'card how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
   const feature = (icon: string, title: string, body: string) =>
-    h('li', { class: 'card feature-card' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('h3', {}, title), h('p', { class: 'secondary' }, body))
+    h('li', { class: 'card feature-card' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('div', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
   page(
     h(
       'header',
@@ -203,13 +205,12 @@ function renderLanding(m: api.Me | null) {
         h(
           'div',
           { class: 'hero-text' },
-          h('h1', {}, t('landing.title')),
+          h('h1', {}, ...marked(t('landing.title'))),
           h('p', { class: 'lead secondary' }, t('landing.body')),
           failed ? h('p', { class: 'alert', role: 'alert' }, t('landing.failed')) : null,
           h('div', { class: 'actions' }, add(), demo()),
-          h('p', { class: 'muted small' }, t('landing.note')),
         ),
-        surveyMock(),
+        h('div', { class: 'hero-art' }, surveyMock()),
       ),
       h(
         'section',
@@ -230,9 +231,7 @@ function renderLanding(m: api.Me | null) {
         h(
           'ul',
           { class: 'feature-grid' },
-          feature('🕶️', t('landing.f.anonymous.title'), t('landing.f.anonymous.body')),
-          feature('🖼️', t('landing.f.reports.title'), t('landing.f.reports.body')),
-          feature('🙌', t('landing.f.kudos.title'), t('landing.f.kudos.body')),
+          feature('💛', t('landing.f.kudos.title'), t('landing.f.kudos.body')),
           feature('🎲', t('landing.f.game.title'), t('landing.f.game.body')),
           feature('📈', t('landing.f.web.title'), t('landing.f.web.body')),
           feature('⚙️', t('landing.f.settings.title'), t('landing.f.settings.body')),
@@ -240,12 +239,12 @@ function renderLanding(m: api.Me | null) {
       ),
       h(
         'section',
-        { class: 'card privacy' },
+        { class: 'landing-section' },
         h('h2', {}, t('landing.privacy.title')),
         h(
           'ul',
-          { class: 'checks' },
-          ...(['landing.privacy.1', 'landing.privacy.2', 'landing.privacy.3'] as const).map((k) => h('li', {}, t(k))),
+          { class: 'card checks privacy' },
+          ...(['landing.privacy.1', 'landing.privacy.2', 'landing.privacy.3', 'landing.privacy.4'] as const).map((k) => h('li', {}, t(k))),
         ),
       ),
       h(
@@ -260,27 +259,42 @@ function renderLanding(m: api.Me | null) {
   )
 }
 
-// What a member sees in their DMs each day, drawn with the page's own styles rather than a
-// screenshot so it follows the language and the theme.
+// *words* in a title are highlighted, like a marker pen.
+const marked = (text: string) => text.split('*').map((part, i) => (i % 2 ? h('mark', {}, part) : part))
+
+// The survey DM exactly as the bot sends it (see surveyMessage.ts), in the page's language and
+// theme, to a made-up member of a made-up server.
 function surveyMock() {
+  const language = survey.botStrings[lang] ? lang : 'en'
+  const guild = t('landing.mock.guild')
+  const c = survey.surveyCard('', guild, language, true, { id: '0', name: 'Laura', streak: 0 }, new Date())
+  const b = survey.botStrings[language]
   return h(
     'figure',
-    { class: 'card dm-mock', 'aria-hidden': 'true' },
-    h('img', { class: 'dm-avatar', src: logoURL, alt: '' }),
+    { class: 'dc-preview dc-mock', 'aria-hidden': 'true' },
+    h('img', { class: 'dc-avatar', src: logoURL, alt: '' }),
     h(
       'div',
-      { class: 'dm-body' },
-      h('p', { class: 'dm-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dm-bot' }, 'BOT'), h('span', { class: 'muted small' }, t('landing.mock.time'))),
-      h('p', {}, ...bold(t('landing.mock.question'))),
-      h('p', { class: 'secondary small' }, ...bold(t('landing.mock.anonymous'))),
-      h('div', { class: 'dm-moods' }, ...moodEmojis.map((e, i) => h('span', { class: i === 3 ? 'dm-mood dm-picked' : 'dm-mood' }, e))),
-      h('span', { class: 'dm-stop small' }, t('landing.mock.stop')),
+      { class: 'dc-body' },
+      h('div', { class: 'dc-head' }, h('strong', {}, 'HappyX'), h('span', { class: 'dc-app' }, 'APP'), h('span', { class: 'dc-time' }, t('landing.mock.time'))),
+      h(
+        'div',
+        { class: 'dc-embed dc-embed-thumb' },
+        h(
+          'div',
+          {},
+          h('div', { class: 'dc-embed-author' }, c.author),
+          h('div', { class: 'dc-embed-heading' }, c.greeting ?? ''),
+          h('div', { class: 'dc-content' }, c.text),
+          h('div', { class: 'dc-embed-footer' }, c.footer),
+        ),
+        h('span', { class: 'dc-thumb' }, [...guild][0]),
+      ),
+      h('div', { class: 'dc-buttons' }, ...survey.moodEmojis.map((e) => h('span', { class: 'dc-button dc-emoji' }, e))),
+      h('div', { class: 'dc-buttons' }, h('span', { class: 'dc-button' }, `🔕 ${b.stop}`)),
     ),
   )
 }
-
-// **bold** in the bot's wording, as Discord shows it.
-const bold = (text: string) => text.split('**').map((part, i) => (i % 2 ? h('strong', {}, part) : part))
 
 function renderGuilds(m: api.Me) {
   const list = m.guilds.length
@@ -543,14 +557,16 @@ function kudosCard(k: api.KudosSummary) {
           ),
         )
       : null,
-    ...k.highlights.map((x) =>
-      h(
+    ...k.highlights.map((x) => {
+      const kudo = h(
         'figure',
         { class: 'kudo' },
         h('blockquote', {}, `«${x.message}»`),
         h('figcaption', { class: 'muted small' }, `${x.from_username || '?'} → ${x.to_username || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
-      ),
-    ),
+      )
+      kudo.addEventListener('click', (e) => confetti(e.clientX, e.clientY))
+      return kudo
+    }),
   )
 }
 

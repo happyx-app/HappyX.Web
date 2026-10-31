@@ -71,6 +71,8 @@ export function answers(n: number): string {
   return n === 1 ? t('chart.answer') : t('chart.answers', { n: formatNumber(n) })
 }
 
+let areaCount = 0
+
 function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): SVGSVGElement {
   const height = 260
   const m = { top: 12, right: 12, bottom: 28, left: 34 }
@@ -109,6 +111,31 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       const anchor = n === 1 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'
       svg.append(s('text', { x: x(i), y: height - 8, class: 'tick', 'text-anchor': anchor }, tick(d)))
     })
+  }
+
+  // A single solid line gets a soft fill under it, fading to the bottom; each run of
+  // consecutive days is its own shape, so gaps stay empty.
+  const solid = series.filter((se) => !se.dashed)
+  if (solid.length === 1) {
+    const se = solid[0]
+    const id = `area-${++areaCount}`
+    const stops = [0, 1].map((o) => {
+      const stop = s('stop', { offset: o })
+      stop.style.stopColor = se.color
+      stop.style.stopOpacity = o ? '0' : '0.22'
+      return stop
+    })
+    svg.append(s('defs', {}, s('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, ...stops)))
+    const bottom = m.top + ih
+    let d = ''
+    let run: number[] = []
+    const close = () => {
+      if (run.length > 1) d += `M${x(run[0]).toFixed(1)},${bottom}` + run.map((i) => `L${x(i).toFixed(1)},${y(se.values[i]!).toFixed(1)}`).join('') + `L${x(run[run.length - 1]).toFixed(1)},${bottom}Z`
+      run = []
+    }
+    se.values.forEach((v, i) => (v === null ? close() : run.push(i)))
+    close()
+    if (d) svg.append(s('path', { d, class: 'area', fill: `url(#${id})` }))
   }
 
   // Lines are joined only between consecutive points that both have a value.
