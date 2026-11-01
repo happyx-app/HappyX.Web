@@ -13,6 +13,7 @@ import { surveyRolesCard } from './surveyRoles'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { policyPage } from './policy'
+import { termsPage } from './terms'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
@@ -28,6 +29,7 @@ import { confetti } from './confetti'
 //   #/game/<guildID>         the game in one server (the bot links here)
 //   #/privacy                the user's own data: download or erase it
 //   #/privacy-policy         the privacy policy, public (the URL given to Discord)
+//   #/terms                  the terms of service, public (also given to Discord)
 // /demo serves the same app on a made-up server, without logging in (see api.isDemo).
 
 const app = document.getElementById('app')!
@@ -36,18 +38,21 @@ applySavedTheme()
 if (api.isDemo) document.title = `HappyX · ${t('demo.label')}`
 let me: api.Me | null = null
 
+// The public legal pages, by route.
+const legal: Record<string, () => HTMLElement[]> = { '/privacy-policy': policyPage, '/terms': termsPage }
+
 async function route() {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
   try {
     me ??= await api.me()
     me.games ??= []
   } catch (err) {
-    // The privacy policy is public, and must stay readable even if the API is down.
-    if (path === '/privacy-policy') return renderPolicy(null)
+    // The legal pages are public, and must stay readable even if the API is down.
+    if (legal[path]) return renderLegal(null, legal[path]())
     if (err instanceof api.Unauthorized && !api.isDemo) return renderLanding(null)
     return renderError(err)
   }
-  if (path === '/privacy-policy') return renderPolicy(me)
+  if (legal[path]) return renderLegal(me, legal[path]())
   // The demo's made-up admin has no landing page or personal data of their own.
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
@@ -111,12 +116,12 @@ const footer = () =>
   h(
     'footer',
     { class: 'footer' },
-    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/privacy' }, t('privacy.title'))),
+    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('a', { href: '#/privacy' }, t('privacy.title'))),
   )
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
 const landingFooter = () =>
-  h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('span', {}, '© ', new Date().getFullYear())))
+  h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -901,15 +906,16 @@ function renderPrivacy(m: api.Me) {
   )
 }
 
-// The privacy policy: with the dashboard's top bar when logged in, the landing's otherwise.
-function renderPolicy(m: api.Me | null) {
+// A legal page (privacy policy, terms): with the dashboard's top bar when logged in, the
+// landing's otherwise.
+function renderLegal(m: api.Me | null, content: HTMLElement[]) {
   if (!m) me = null
   const enter = m
     ? h('a', { class: 'btn btn-ghost', href: '#/' }, t('landing.dashboard'))
     : h('a', { class: 'btn btn-ghost', href: api.loginURL }, t('landing.login'))
   page(
     m ? header(m, 'none') : h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true), enter)),
-    h('main', { class: 'container narrow policy' }, ...policyPage()),
+    h('main', { class: 'container narrow policy' }, ...content),
     m ? null : landingFooter(),
   )
 }

@@ -11,10 +11,11 @@ import { lang } from './i18n'
 // again, also move PrivacyPolicyDate in HappyX.Api: the survey links this page until they answer.
 export const updated = '2026-11-01'
 
-type Inline = string | { text: string; href: string }
-type Block = { p: Inline[] } | { ul: Inline[][] }
-type Section = { title: string; body: Block[] }
-type Policy = { title: string; updated: string; intro: string; sections: Section[] }
+// The shape of a legal page, shared with the terms of service (terms.ts).
+export type Inline = string | { text: string; href: string }
+export type Block = { p: Inline[] } | { ul: Inline[][] }
+export type Section = { title: string; body: Block[] }
+export type Policy = { title: string; updated: string; intro: string; sections: Section[] }
 
 const yourData = (text: string) => ({ text, href: '#/privacy' })
 const discord = (text: string) => ({ text, href: 'https://discord.com/privacy' })
@@ -227,9 +228,11 @@ const inline = (parts: Inline[]) =>
   parts.map((x) => (typeof x === 'string' ? x : h('a', x.href.startsWith('http') ? { href: x.href, rel: 'noopener', target: '_blank' } : { href: x.href }, x.text)))
 
 // policyPage is the page's content, for the current language.
-export function policyPage(): HTMLElement[] {
-  const p = policyFor(lang)
-  const date = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${updated}T00:00:00Z`))
+export const policyPage = () => legalPage(policyFor(lang), updated)
+
+// legalPage renders a legal text: title, date, intro and one card per section.
+export function legalPage(p: Policy, day: string): HTMLElement[] {
+  const date = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`))
   return [
     h('div', {}, h('h1', {}, p.title), h('p', { class: 'muted small' }, `${p.updated} ${date}`)),
     h('p', { class: 'lead secondary' }, p.intro),
