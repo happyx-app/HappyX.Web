@@ -46,8 +46,8 @@ const es = (): Policy => ({
             ['Las respuestas a la encuesta: el ánimo (de 1 a 5), el comentario si lo escribes, el día y si el servidor era anónimo en ese momento.'],
             ['Los kudos que das y recibes, con su texto.'],
             ['En «¿Quién es quién?»: tus respuestas, lo que adivinas y las preguntas que propones.'],
-            ['De cada servidor: su ID, su nombre, quién es el admin principal y sus ajustes (canales, roles, horario, idioma).'],
-            ['Al entrar en la web: una cookie de sesión con tu ID, nombre, avatar y los servidores que gestionas. Caduca a las 12 horas y no se guarda en el servidor. El idioma y el tema se guardan solo en tu navegador.'],
+            ['De cada servidor: su ID, su nombre, quién es el admin principal, a quién da acceso y sus ajustes (canales, roles, horario, idioma).'],
+            ['Al entrar en la web: una cookie de sesión con tu ID, nombre, avatar y los servidores que gestionas. Caduca a las 12 horas y HappyX no guarda una copia. El idioma y el tema se guardan solo en tu navegador.'],
           ],
         },
         { p: ['HappyX no guarda tu email ni tu contraseña o token de Discord, no lee los mensajes de los canales y no usa cookies de analítica ni de publicidad.'] },
@@ -58,10 +58,11 @@ const es = (): Policy => ({
       body: [
         {
           ul: [
-            ['Mandarte la encuesta diaria y los kudos por mensaje privado.'],
-            ['Enseñar los resultados, comentarios y reports a los admins del servidor. Por defecto es anónimo: no ven quién escribió cada respuesta. Si un admin lo cambia, ven tu nombre en las respuestas que des a partir de entonces; las anteriores siguen anónimas.'],
-            ['Enseñarte tu propia evolución, que solo ves tú.'],
-            ['Jugar a «¿Quién es quién?». Aquí las respuestas no son anónimas: al acabar la semana todos ven quién escribió cada una.'],
+            ['Mandarte la encuesta diaria por mensaje privado.'],
+            ['Publicar los kudos en el canal del servidor y avisar por mensaje privado a quien los recibe.'],
+            ['Enseñar los resultados, los comentarios y los reports a los admins del servidor y a quien ellos den acceso. Por defecto es anónimo: no ven quién escribió cada respuesta. Si un admin lo cambia, ven tu nombre en las respuestas que des a partir de entonces; las anteriores siguen anónimas.'],
+            ['Enseñarte «Mi evolución», que solo ves tú.'],
+            ['Jugar a «¿Quién es quién?». Aquí nada es anónimo: al acabar la semana todos ven quién escribió cada respuesta, quién propuso la pregunta y cuántas acertó cada uno.'],
           ],
         },
         { p: ['Los datos no se venden ni se usan para publicidad.'] },
@@ -72,10 +73,16 @@ const es = (): Policy => ({
       body: [
         {
           p: [
-            'Responder a la encuesta, dar kudos y jugar es voluntario: la base legal es tu consentimiento (artículo 6.1.a del RGPD y, como el ánimo puede considerarse un dato de salud, artículo 9.2.a). Lo retiras cuando quieras con «No volver a preguntar» o borrando tus datos.',
+            'Responder a la encuesta, dar kudos y jugar es voluntario: la base legal es tu consentimiento (artículo 6.1.a del RGPD y, como el ánimo puede considerarse un dato de salud, artículo 9.2.a). Lo retiras cuando quieras: con «No volver a preguntar» dejas de recibir la encuesta, y en ',
+            yourData('Tus datos'),
+            ' borras lo que ya respondiste.',
           ],
         },
-        { p: ['Tu ID, nombre y roles se guardan por interés legítimo (artículo 6.1.f), para saber a quién mandar la encuesta en los servidores que han añadido HappyX.'] },
+        {
+          p: [
+            'Tu ID, nombre y roles, los datos de cada servidor y los kudos que recibes se guardan por interés legítimo (artículo 6.1.f): saber a quién mandar la encuesta, quién ve los resultados y qué kudos se han dado en los servidores que han añadido HappyX.',
+          ],
+        },
       ],
     },
     {
@@ -84,10 +91,10 @@ const es = (): Policy => ({
         {
           ul: [
             ['Discord: la encuesta, los kudos y los reports viajan por Discord, que aplica su ', discord('política de privacidad'), '.'],
-            ['Cloudflare: la web pasa por Cloudflare, que la protege y la sirve con HTTPS (', cloudflare('su política'), ').'],
+            ['Cloudflare: la web pasa por Cloudflare, que ve tu dirección IP para protegerla y servirla con HTTPS (', cloudflare('su política'), ').'],
           ],
         },
-        { p: ['Los datos se guardan en un servidor propio en España. Discord y Cloudflare son empresas de EE. UU.; sus transferencias de datos se rigen por las garantías que publican en sus políticas.'] },
+        { p: ['Los datos se guardan en España, en una máquina propia. Discord y Cloudflare son empresas de EE. UU. adheridas al Marco de Privacidad de Datos UE-EE. UU.'] },
       ],
     },
     {
@@ -96,9 +103,10 @@ const es = (): Policy => ({
         {
           ul: [
             ['Mientras HappyX esté en el servidor.'],
-            ['Si borras tus datos desde ', yourData('Tus datos'), ', o un admin elimina el servidor desde su Zona de peligro, se borran al momento.'],
-            ['Si se expulsa el bot del servidor, sus datos se borran a los 30 días.'],
-            ['Las copias de seguridad nocturnas guardan lo borrado hasta 6 meses y solo se usan para recuperar el servicio tras una avería.'],
+            ['Si borras tus datos desde ', yourData('Tus datos'), ', se borran al momento. Solo se quedan tu ID de Discord y tus roles, para no volver a mandarte la encuesta, y los ajustes del servidor que te nombran (admin principal, permisos).'],
+            ['Si un admin elimina el servidor desde su Zona de peligro, sus datos se borran al momento.'],
+            ['Si se quita HappyX del servidor, los datos de ese servidor se borran a los 30 días.'],
+            ['Las copias de seguridad nocturnas guardan los datos borrados hasta 6 meses. Solo se usan para recuperar el servicio tras una avería.'],
           ],
         },
       ],
@@ -144,8 +152,8 @@ const en = (): Policy => ({
             ['Survey answers: the mood (1 to 5), the comment if you write one, the day and whether the server was anonymous at the time.'],
             ['Kudos you give and get, with their text.'],
             ["In «Who's who?»: your answers, your guesses and the questions you propose."],
-            ['For each server: its ID, its name, who the main admin is and its settings (channels, roles, schedule, language).'],
-            ['When you log in to the website: a session cookie with your ID, name, avatar and the servers you manage. It expires after 12 hours and is not stored on the server. Language and theme are saved only in your browser.'],
+            ['For each server: its ID, its name, who the main admin is, who it gives access to and its settings (channels, roles, schedule, language).'],
+            ['When you log in to the website: a session cookie with your ID, name, avatar and the servers you manage. It expires after 12 hours and HappyX keeps no copy of it. Language and theme are saved only in your browser.'],
           ],
         },
         { p: ["HappyX doesn't store your email or your Discord password or token, doesn't read channel messages and uses no analytics or advertising cookies."] },
@@ -156,10 +164,11 @@ const en = (): Policy => ({
       body: [
         {
           ul: [
-            ['Sending you the daily survey and kudos by direct message.'],
-            ["Showing results, comments and reports to the server's admins. It is anonymous by default: they don't see who wrote each answer. If an admin changes that, they see your name on answers you give from then on; earlier ones stay anonymous."],
-            ['Showing you your own evolution, which only you see.'],
-            ["Playing «Who's who?». Here answers are not anonymous: when the week ends everyone sees who wrote each one."],
+            ['Sending you the daily survey by direct message.'],
+            ['Posting kudos in the server’s channel and telling whoever gets them by direct message.'],
+            ["Showing results, comments and reports to the server's admins and to whoever they give access. It is anonymous by default: they don't see who wrote each answer. If an admin changes that, they see your name on answers you give from then on; earlier ones stay anonymous."],
+            ['Showing you «My evolution», which only you see.'],
+            ["Playing «Who's who?». Nothing here is anonymous: when the week ends everyone sees who wrote each answer, who proposed the question and how many each person got right."],
           ],
         },
         { p: ['The data is not sold or used for advertising.'] },
@@ -170,10 +179,16 @@ const en = (): Policy => ({
       body: [
         {
           p: [
-            'Answering the survey, giving kudos and playing are voluntary: the legal basis is your consent (GDPR article 6.1.a and, since mood may count as health data, article 9.2.a). You withdraw it whenever you want with «Don’t ask me again» or by erasing your data.',
+            'Answering the survey, giving kudos and playing are voluntary: the legal basis is your consent (GDPR article 6.1.a and, since mood may count as health data, article 9.2.a). You can withdraw it whenever you want: «Don’t ask me again» stops the survey, and in ',
+            yourData('Your data'),
+            ' you erase what you already answered.',
           ],
         },
-        { p: ['Your ID, name and roles are kept on the basis of legitimate interest (article 6.1.f), to know whom to send the survey to in the servers that added HappyX.'] },
+        {
+          p: [
+            'Your ID, name and roles, each server’s data and the kudos you get are kept on the basis of legitimate interest (article 6.1.f): knowing whom to send the survey to, who sees the results and which kudos were given in the servers that added HappyX.',
+          ],
+        },
       ],
     },
     {
@@ -182,10 +197,10 @@ const en = (): Policy => ({
         {
           ul: [
             ['Discord: the survey, kudos and reports travel through Discord, which applies its own ', discord('privacy policy'), '.'],
-            ['Cloudflare: the website goes through Cloudflare, which protects it and serves it over HTTPS (', cloudflare('its policy'), ').'],
+            ['Cloudflare: the website goes through Cloudflare, which sees your IP address to protect it and serve it over HTTPS (', cloudflare('its policy'), ').'],
           ],
         },
-        { p: ['The data is stored on a private server in Spain. Discord and Cloudflare are US companies; their data transfers follow the safeguards set out in their policies.'] },
+        { p: ['The data is stored in Spain, on a machine HappyX runs itself. Discord and Cloudflare are US companies that take part in the EU-US Data Privacy Framework.'] },
       ],
     },
     {
@@ -194,9 +209,10 @@ const en = (): Policy => ({
         {
           ul: [
             ['As long as HappyX is in the server.'],
-            ['If you erase your data from ', yourData('Your data'), ', or an admin deletes the server from its Danger zone, it is deleted right away.'],
-            ["If the bot is removed from the server, the server's data is deleted after 30 days."],
-            ['Nightly backups keep erased data for up to 6 months and are only used to restore the service after a failure.'],
+            ['If you erase your data from ', yourData('Your data'), ', it is deleted right away. Only your Discord ID and roles are kept, so you don’t get the survey again, and server settings that name you (main admin, permissions).'],
+            ['If an admin deletes the server from its Danger zone, its data is deleted right away.'],
+            ['If HappyX is removed from the server, that server’s data is deleted after 30 days.'],
+            ['Nightly backups keep erased data for up to 6 months. They are only used to restore the service after a failure.'],
           ],
         },
       ],

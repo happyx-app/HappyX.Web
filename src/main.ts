@@ -111,7 +111,7 @@ const footer = () =>
   h(
     'footer',
     { class: 'footer' },
-    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, icons.inline(icons.lock), t('nav.privacy')), h('a', { href: '#/privacy' }, t('privacy.title'))),
+    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/privacy' }, t('privacy.title'))),
   )
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
