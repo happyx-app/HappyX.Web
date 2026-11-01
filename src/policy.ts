@@ -7,13 +7,8 @@
 import { h } from './dom'
 import { lang } from './i18n'
 
-// Who answers for HappyX and how to reach them. Change these and the page follows.
-export const controller = {
-  name: 'Joan',
-  email: 'privacidad@joanbe.net',
-}
-
-// The day the text last changed, shown at the top.
+// The day the text last changed, shown at the top. When the change is one people should read
+// again, also move PrivacyPolicyDate in HappyX.Api: the survey links this page until they answer.
 export const updated = '2026-11-01'
 
 type Inline = string | { text: string; href: string }
@@ -21,7 +16,6 @@ type Block = { p: Inline[] } | { ul: Inline[][] }
 type Section = { title: string; body: Block[] }
 type Policy = { title: string; updated: string; intro: string; sections: Section[] }
 
-const mail = () => ({ text: controller.email, href: `mailto:${controller.email}` })
 const yourData = (text: string) => ({ text, href: '#/privacy' })
 const discord = (text: string) => ({ text, href: 'https://discord.com/privacy' })
 const cloudflare = (text: string) => ({ text, href: 'https://www.cloudflare.com/privacypolicy/' })
@@ -33,10 +27,6 @@ const es = (): Policy => ({
   intro:
     'HappyX es un bot de Discord que pregunta cada día cómo estás y enseña los resultados a quien gestiona el servidor. Esta página explica qué datos guarda, para qué y cómo controlarlos.',
   sections: [
-    {
-      title: 'Responsable',
-      body: [{ p: [`HappyX lo lleva ${controller.name} a título personal. Para cualquier duda o petición sobre tus datos: `, mail(), '.'] }],
-    },
     {
       title: 'Qué datos guarda',
       body: [
@@ -116,11 +106,9 @@ const es = (): Policy => ({
       body: [
         {
           p: [
-            'Puedes acceder a tus datos, corregirlos, borrarlos, llevártelos, oponerte a su uso o limitarlo. Descargarlos y borrarlos lo haces tú en ',
+            'Puedes descargar y borrar tus datos tú mismo en ',
             yourData('Tus datos'),
-            ', entrando con Discord. Para lo demás, escribe a ',
-            mail(),
-            '.',
+            ', entrando con Discord.',
           ],
         },
         { p: ['Si crees que no se respetan tus derechos, puedes reclamar ante la ', aepd('Agencia Española de Protección de Datos'), '.'] },
@@ -139,10 +127,6 @@ const en = (): Policy => ({
   intro:
     'HappyX is a Discord bot that asks every day how you are and shows the results to whoever runs the server. This page explains what data it keeps, what for, and how to control it.',
   sections: [
-    {
-      title: 'Controller',
-      body: [{ p: [`HappyX is run by ${controller.name} as an individual. For any question or request about your data: `, mail(), '.'] }],
-    },
     {
       title: 'What data it keeps',
       body: [
@@ -222,11 +206,9 @@ const en = (): Policy => ({
       body: [
         {
           p: [
-            'You can access, correct, erase or take your data, object to its use or restrict it. You download and erase it yourself in ',
+            'You can download and erase your data yourself in ',
             yourData('Your data'),
-            ', logged in with Discord. For anything else, write to ',
-            mail(),
-            '.',
+            ', logged in with Discord.',
           ],
         },
         { p: ['If you think your rights are not respected, you can complain to the ', aepd('Spanish Data Protection Agency (AEPD)'), '.'] },
