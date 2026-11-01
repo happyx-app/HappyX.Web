@@ -12,6 +12,7 @@ import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
+import { policyPage } from './policy'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
@@ -26,6 +27,7 @@ import { confetti } from './confetti'
 //   #/games                  servers where I can play «Who's who?»
 //   #/game/<guildID>         the game in one server (the bot links here)
 //   #/privacy                the user's own data: download or erase it
+//   #/privacy-policy         the privacy policy, public (the URL given to Discord)
 // /demo serves the same app on a made-up server, without logging in (see api.isDemo).
 
 const app = document.getElementById('app')!
@@ -35,14 +37,17 @@ if (api.isDemo) document.title = `HappyX · ${t('demo.label')}`
 let me: api.Me | null = null
 
 async function route() {
+  const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
   try {
     me ??= await api.me()
     me.games ??= []
   } catch (err) {
+    // The privacy policy is public, and must stay readable even if the API is down.
+    if (path === '/privacy-policy') return renderPolicy(null)
     if (err instanceof api.Unauthorized && !api.isDemo) return renderLanding(null)
     return renderError(err)
   }
-  const [path, query = ''] = location.hash.replace(/^#/, '').split('?')
+  if (path === '/privacy-policy') return renderPolicy(me)
   // The demo's made-up admin has no landing page or personal data of their own.
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
@@ -102,7 +107,16 @@ function demoBanner() {
   )
 }
 
-const footer = () => h('footer', { class: 'footer' }, h('a', { href: '#/privacy' }, icons.inline(icons.lock), t('nav.privacy')))
+const footer = () =>
+  h(
+    'footer',
+    { class: 'footer' },
+    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/privacy' }, t('privacy.title'))),
+  )
+
+// The landing page's footer, also under the privacy policy when nobody is logged in.
+const landingFooter = () =>
+  h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('span', {}, '© ', new Date().getFullYear())))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -132,7 +146,7 @@ function themeToggle() {
 
 const brand = () => h('a', { class: 'brand', href: '#/' }, h('img', { class: 'brand-mark', src: logoURL, alt: '' }), h('span', { class: 'brand-text' }, 'HappyX'))
 
-function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' = 'servers') {
+function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
   const u = m.user
   const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
   return h(
@@ -255,7 +269,7 @@ function renderLanding(m: api.Me | null) {
         h('div', { class: 'actions' }, add(), demo(), enter()),
       ),
     ),
-    h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy' }, t('nav.privacy')), h('span', {}, '© ', new Date().getFullYear()))),
+    landingFooter(),
   )
 }
 
@@ -884,6 +898,19 @@ function renderPrivacy(m: api.Me) {
       h('div', {}, h('h1', {}, t('privacy.title')), h('p', { class: 'muted' }, t('privacy.subtitle'))),
       ...privacyPage(m, () => renderErased(m), () => renderLanding(null)),
     ),
+  )
+}
+
+// The privacy policy: with the dashboard's top bar when logged in, the landing's otherwise.
+function renderPolicy(m: api.Me | null) {
+  if (!m) me = null
+  const enter = m
+    ? h('a', { class: 'btn btn-ghost', href: '#/' }, t('landing.dashboard'))
+    : h('a', { class: 'btn btn-ghost', href: api.loginURL }, t('landing.login'))
+  page(
+    m ? header(m, 'none') : h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true), enter)),
+    h('main', { class: 'container narrow policy' }, ...policyPage()),
+    m ? null : landingFooter(),
   )
 }
 
