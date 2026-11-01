@@ -187,7 +187,7 @@ function renderLanding(m: api.Me | null) {
   const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
   const step = (n: number, title: string, body: string) =>
     h('li', { class: 'card how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
-  const feature = (icon: string, title: string, body: string) =>
+  const feature = (icon: string | Node, title: string, body: string) =>
     h('li', { class: 'card feature-card' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('div', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
   page(
     h(
@@ -233,8 +233,8 @@ function renderLanding(m: api.Me | null) {
           { class: 'feature-grid' },
           feature('💛', t('landing.f.kudos.title'), t('landing.f.kudos.body')),
           feature('🎲', t('landing.f.game.title'), t('landing.f.game.body')),
-          feature('📈', t('landing.f.web.title'), t('landing.f.web.body')),
-          feature('⚙️', t('landing.f.settings.title'), t('landing.f.settings.body')),
+          feature(icons.chart(), t('landing.f.web.title'), t('landing.f.web.body')),
+          feature(icons.gear(), t('landing.f.settings.title'), t('landing.f.settings.body')),
         ),
       ),
       h(
@@ -255,7 +255,7 @@ function renderLanding(m: api.Me | null) {
         h('div', { class: 'actions' }, add(), demo(), enter()),
       ),
     ),
-    h('footer', { class: 'landing-footer muted small' }, brand(), h('span', {}, '© ', new Date().getFullYear())),
+    h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy' }, t('nav.privacy')), h('span', {}, '© ', new Date().getFullYear()))),
   )
 }
 
@@ -338,10 +338,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const dates = h('p', { class: 'muted' }, formatRange(range.from, range.to))
   const picker = h(
     'div',
-    { class: 'segmented', role: 'radiogroup', 'aria-label': t('period.label') },
+    { class: 'segmented', role: 'navigation', 'aria-label': t('period.label') },
     ...presets.map((p) =>
       h('a', {
-        href: `#/g/${guildID}?p=${p}`, role: 'radio', 'aria-checked': String(p === preset),
+        href: `#/g/${guildID}?p=${p}`, ...(p === preset ? { 'aria-current': 'page' } : {}),
         class: p === preset ? 'seg seg-on' : 'seg',
       }, t(`period.${p}`)),
     ),
@@ -356,7 +356,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
         'div',
         { class: 'title-row' },
         h('div', {}, h('h1', {}, g.name), dates),
-        api.canManage(g) ? h('a', { class: 'btn btn-ghost icon-btn', href: `#/g/${guildID}/settings`, 'aria-label': t('settings.link'), title: t('settings.link') }, icons.gear()) : null,
+        api.canManage(g) ? h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, icons.gear(), h('span', { class: 'gear-label' }, t('settings.link'))) : null,
       ),
       picker,
       body,
@@ -400,7 +400,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
   if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
-  const peaks = preset === 'this-week' || preset === 'last-week' ? { high: null, low: null } : extremeDays(r.days, r.average)
+  const week = preset === 'this-week' || preset === 'last-week'
+  const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
   const notes = [
     ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
     ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
@@ -419,11 +420,11 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
 
   body.replaceChildren(
-    summaryCard(r, old, weekdays),
+    summaryCard(r, old, week ? [] : weekdays),
     h(
       'div',
       { class: 'stats' },
-      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average)),
+      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(Math.round(r.average * 10) / 10)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average)),
       rate !== null
         ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), oldRate !== null ? deltaNote(rate, oldRate, 0, 'delta.points') : t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }))
         : stat(t('stat.responses'), formatNumber(r.responses), old ? deltaNote(r.responses, old.responses) : undefined),
@@ -443,10 +444,12 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       trendChart(r.days, old?.days, notes),
       tableWrap,
     ),
-    h('div', { class: 'grid-2' },
-      weekdayCard(weekdays),
-      h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r)),
-    ),
+    week
+      ? h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r))
+      : h('div', { class: 'grid-2' },
+          weekdayCard(weekdays),
+          h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r)),
+        ),
     h('div', { class: 'grid-2' },
       messagesCard(r),
       kudosCard(kudos),
@@ -467,7 +470,7 @@ function healthCard(g: api.Guild, x: api.Health) {
   const todo: HTMLElement[] = []
   // done: ✓, false: ○ (something to do), null: · (just a fact, nothing to do).
   const item = (done: boolean | null, text: string, link?: [string, string]) =>
-    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? '·' : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   todo.push(item(x.audience > 0, x.audience > 0 ? t('health.audience', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
@@ -504,7 +507,6 @@ function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdaySta
   return h(
     'section',
     { class: 'card summary' },
-    h('span', { class: 'summary-emoji', 'aria-hidden': 'true' }, moodEmoji(r.average)),
     h('div', {}, h('h2', {}, t(`summary.tone.${tone(r.average)}`)), parts.length ? h('p', { class: 'secondary' }, parts.join(' ')) : null),
   )
 }
@@ -537,7 +539,7 @@ function weekdayCard(stats: WeekdayStat[]) {
             h(
               'div',
               { class: 'bar-row', role: 'listitem', title: `${formatDay(w.day, { weekday: 'long' })}: ${formatNumber(w.average, 1)} · ${answers(w.responses)}` },
-              h('span', { class: 'bar-label' }, formatDay(w.day, { weekday: 'long' })),
+              h('span', { class: 'bar-label' }, capitalize(formatDay(w.day, { weekday: 'long' }))),
               h('span', { class: 'bar-track' }, fill(((w.average - 1) / 4) * 100, w === low)),
               h('span', { class: 'bar-value' }, `${moodEmoji(w.average)} ${formatNumber(w.average, 1)}`),
             ),
@@ -570,7 +572,7 @@ function kudosCard(k: api.KudosSummary) {
               'div',
               { class: 'bar-row', role: 'listitem' },
               h('span', { class: 'bar-label' }, x.username || '?'),
-              h('span', { class: 'bar-track' }, fill((x.count / k.top_receivers![0].count) * 100, true)),
+              h('span', { class: 'bar-track' }, fill((x.count / k.top_receivers![0].count) * 100)),
               h('span', { class: 'bar-value' }, formatNumber(x.count)),
             ),
           ),
@@ -598,12 +600,12 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     h(
       'main',
       { class: 'container' },
-      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted' }, `🔒 ${t('me.subtitle')}`)),
+      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), h('p', { class: 'me-dates' }, formatRange(range.from, range.to))),
       h(
         'div',
-        { class: 'segmented', role: 'radiogroup', 'aria-label': t('me.period.label') },
+        { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
         ...evolutionPeriods.map((p) =>
-          h('a', { href: href(p, filter), role: 'radio', 'aria-checked': String(p === period), class: p === period ? 'seg seg-on' : 'seg' }, t(`me.period.${p}`)),
+          h('a', { href: href(p, filter), ...(p === period ? { 'aria-current': 'page' } : {}), class: p === period ? 'seg seg-on' : 'seg' }, t(`me.period.${p}`)),
         ),
       ),
       body,
@@ -817,8 +819,9 @@ function renderSettings(m: api.Me, guildID: string) {
 function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement {
   const links = cards.map(({ label, card }) =>
     // Only the danger zone's link is red; owners alone have it, and the demo doesn't.
-    h('button', { class: label === t('danger.title') ? 'section-link section-danger' : 'section-link', type: 'button', onclick: () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, label),
+    h('button', { class: label === t('danger.title') ? 'section-link section-danger' : 'section-link', type: 'button', onclick: () => { card.scrollIntoView({ block: 'start' }); pinned = cards.findIndex((c) => c.card === card); mark(pinned) } }, label),
   )
+  let pinned = -1
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
   const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))
   mark(0)
@@ -827,6 +830,8 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
     (entries) => {
       if (!nav.isConnected) return spy.disconnect()
       for (const e of entries) (e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))
+      // A clicked link stays marked until the user scrolls on their own.
+      if (pinned >= 0) return
       const atBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 4
       const i = atBottom ? cards.length - 1 : cards.findIndex((c) => visible.has(c.card))
       if (i >= 0) mark(i)
@@ -834,6 +839,8 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
     { rootMargin: '-80px 0px -55% 0px' },
   )
   cards.forEach((c) => spy.observe(c.card))
+  addEventListener('wheel', () => (pinned = -1), { passive: true })
+  addEventListener('touchmove', () => (pinned = -1), { passive: true })
   return nav
 }
 
@@ -930,7 +937,7 @@ async function renderGame(m: api.Me, guildID: string) {
       'main',
       { class: 'container narrow' },
       m.games.length > 1 ? h('a', { class: 'back', href: '#/games' }, `← ${t('games.title')}`) : null,
-      h('div', {}, h('h1', {}, `🎲 ${t('game.title')}`), subtitle),
+      h('div', {}, h('h1', {}, t('game.title')), subtitle),
       body,
     ),
   )
@@ -959,10 +966,19 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
+  let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
-  const chips = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': t('messages.filter') })
+  const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
+  const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' })
+  more.addEventListener('click', () => {
+    all = true
+    draw()
+  })
   const draw = () => {
-    const shown = [...filterMessages(r.messages, current)].reverse()
+    const matching = [...filterMessages(r.messages, current)].reverse()
+    const shown = all ? matching : matching.slice(0, 8)
+    more.hidden = shown.length === matching.length
+    more.textContent = t('messages.more', { n: formatNumber(matching.length) })
     list.replaceChildren(
       ...(shown.length
         ? shown.map((msg) =>
@@ -981,10 +997,11 @@ function messagesCard(r: api.Report) {
         : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
     )
     chips.replaceChildren(
-      ...moodFilters.map((f) => {
-        const b = h('button', { type: 'button', role: 'radio', 'aria-checked': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
+      ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
+        const b = h('button', { type: 'button', 'aria-pressed': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
+          all = false
           draw()
         })
         return b
@@ -997,26 +1014,27 @@ function messagesCard(r: api.Report) {
     { class: 'card' },
     h('h2', {}, t('messages.title')),
     r.anonymous
-      ? h('p', { class: 'muted small' }, `🔒 ${t('messages.anonymous')}`)
+      ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.anonymous'))
       : r.messages.some((m) => !m.username)
-        ? h('p', { class: 'muted small' }, `🔒 ${t('messages.earlier_anonymous')}`)
+        ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.earlier_anonymous'))
         : null,
     r.messages.length > 0 ? chips : null,
     list,
+    more,
   )
 }
 
 function skeleton() {
-  return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-stats' }), h('div', { class: 'sk sk-chart' }))
+  return h('div', { class: 'skeleton' }, h('div', { class: 'sk-row' }, ...[0, 1, 2, 3].map(() => h('div', { class: 'sk sk-stats' }))), h('div', { class: 'sk sk-chart' }))
 }
 
 function errorCard(err: unknown) {
   console.error(err)
   return h(
     'div',
-    { class: 'card empty' },
-    h('p', {}, t('error.generic')),
-    h('button', { class: 'btn', type: 'button', onclick: () => route() }, t('error.retry')),
+    { class: 'card empty', role: 'alert' },
+    h('h2', {}, t('error.generic')),
+    h('button', { class: 'btn btn-primary', type: 'button', onclick: () => route() }, t('error.retry')),
   )
 }
 
@@ -1038,3 +1056,5 @@ function discordLogo() {
 
 window.addEventListener('hashchange', route)
 route()
+
+const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)
