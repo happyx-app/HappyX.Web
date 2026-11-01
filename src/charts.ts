@@ -64,7 +64,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
         return [
           h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
           d.responses > 0
-            ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), ` · ${answers(d.responses)}`)
+            ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), d.recipients ? null : ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
           d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
           p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: formatDay(p.day, { weekday: 'short', day: 'numeric', month: 'short' }), value: formatNumber(p.average, 1) })) : null,
@@ -247,6 +247,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     })
     tooltip.replaceChildren(...opts.tooltip(i))
     tooltip.hidden = false
+    svg.classList.add('hovering')
     const left = Math.min(Math.max(x(i) - tooltip.offsetWidth / 2, 0), width - tooltip.offsetWidth)
     tooltip.style.left = `${left}px`
     tooltip.style.top = `${Math.max(0, top - tooltip.offsetHeight - 14)}px`
@@ -255,6 +256,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     cross.setAttribute('visibility', 'hidden')
     focus.forEach((f) => f.setAttribute('visibility', 'hidden'))
     tooltip.hidden = true
+    svg.classList.remove('hovering')
   }
   hit.addEventListener('pointermove', (e) => show(e.clientX))
   hit.addEventListener('pointerdown', (e) => show(e.clientX))
@@ -276,7 +278,7 @@ export function trendTable(days: DayStat[]): HTMLTableElement {
           'tr',
           {},
           h('td', {}, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
-          h('td', { class: 'num' }, d.responses > 0 ? `${moodEmoji(d.average)} ${formatNumber(d.average, 2)}` : '–'),
+          h('td', { class: 'num' }, d.responses > 0 ? `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}` : '–'),
           h('td', { class: 'num' }, formatNumber(d.responses)),
         ),
       ),

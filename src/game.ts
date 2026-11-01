@@ -4,6 +4,7 @@
 
 import * as api from './api'
 import { h } from './dom'
+import * as icons from './icons'
 import { showSaveError } from './errors'
 import { formatDay, formatNumber, t } from './i18n'
 
@@ -36,7 +37,7 @@ export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLEle
   const cur = board.current
   const out: HTMLElement[] = []
   if (cur) out.push(stepper(cur.phase))
-  out.push(h('p', { class: 'muted small' }, `👀 ${t('game.privacy')}`))
+  out.push(h('p', { class: 'privacy-note' }, icons.eye(), t('game.privacy')))
   if (!cur) out.push(h('section', { class: 'card empty' }, h('span', { class: 'game-big', 'aria-hidden': 'true' }, '🎲'), h('p', { class: 'secondary' }, t('game.none'))))
   else if (cur.phase === 'answering') out.push(answerCard(board.discord_guild_id, cur, onLoggedOut))
   else out.push(guessCard(board.discord_guild_id, cur, onLoggedOut))
@@ -258,7 +259,7 @@ function resultsCard(r: api.GameRound) {
           h(
             'li',
             { class: pl[i] === 0 ? 'rank rank-top' : 'rank' },
-            h('span', { class: 'rank-medal', 'aria-hidden': 'true' }, medal(pl[i])),
+            pl[i] < 3 ? h('span', { class: 'rank-medal', 'aria-hidden': 'true' }, medal(pl[i])) : h('span', { class: 'rank-num' }, medal(pl[i])),
             h('strong', {}, s.username),
             h('span', { class: 'muted small' }, t('game.ranking.score', { correct: s.correct, guesses: s.guesses })),
           ),
@@ -292,7 +293,7 @@ function resultsCard(r: api.GameRound) {
     'section',
     { class: 'card game-card' },
     head,
-    h('div', { class: 'grid-results' }, h('div', {}, h('h3', {}, `🏆 ${t('game.ranking')}`), ranking), h('div', {}, h('h3', {}, `🎭 ${t('game.reveal')}`), reveal)),
+    h('div', { class: 'grid-results' }, h('div', {}, h('h3', {}, t('game.ranking')), ranking), h('div', {}, h('h3', {}, t('game.reveal')), reveal)),
   )
 }
 

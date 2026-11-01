@@ -90,7 +90,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const tzList = h('datalist', { id: 'timezones' }, ...zones.map((z) => h('option', { value: z })))
 
   const freq = (['weekly', 'monthly'] as const).map((f) =>
-    h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency }), t(`guilds.${f}`)),
+    h('label', { class: 'radio' }, h('input', { type: 'radio', name: 'frequency', value: f, checked: f === saved.report_frequency }), t(`settings.freq.${f}`)),
   )
 
   const reportDM = h('input', { id: 'report-dm', type: 'checkbox', role: 'switch', checked: saved.report_dm })
@@ -98,7 +98,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
     h(
       'label',
-      { class: 'radio day', title: weekdayName(d, 'long') },
+      { class: 'day-chip', title: weekdayName(d, 'long') },
       h('input', { type: 'checkbox', name: 'working_days', value: d, checked: saved.working_days.includes(d) }),
       weekdayName(d),
     ),
@@ -163,6 +163,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
 
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
+  const unsaved = h('span', { class: 'unsaved' }, t('settings.saved.none'))
 
   const read = (): Settings => ({
     language: language.value,
@@ -188,32 +189,38 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     if (dirty) status.textContent = ''
+    unsaved.textContent = t(dirty ? 'settings.unsaved' : 'settings.saved.none')
+    unsaved.className = dirty ? 'unsaved on' : 'unsaved'
   }
 
   const form = h(
     'form',
     { class: 'card settings', novalidate: true },
     h('h2', {}, t('settings.title')),
-    // Short fields sit side by side when the card is wide enough.
-    h('div', { class: 'field-row' },
-      field('language', t('settings.language'), t('settings.language.help'), language),
-      field('hour', t('settings.hour'), t('settings.hour.help'), hour),
-      field('timezone', t('settings.timezone'), t('settings.timezone.help'), h('div', {}, tz, tzList)),
+    sub('settings.sub.survey',
+      // Short fields sit side by side when the card is wide enough.
+      h('div', { class: 'field-row' },
+        field('language', t('settings.language'), t('settings.language.help'), language),
+        field('hour', t('settings.hour'), t('settings.hour.help'), hour),
+        field('timezone', t('settings.timezone'), t('settings.timezone.help'), h('div', {}, tz, tzList)),
+      ),
+      h(
+        'fieldset',
+        { class: 'field' },
+        h('legend', {}, t('settings.days')),
+        h('div', { class: 'day-chips' }, ...days),
+        daysError,
+        h('p', { class: 'muted small' }, t('settings.days.help')),
+      ),
     ),
-    h(
-      'fieldset',
-      { class: 'field' },
-      h('legend', {}, t('settings.days')),
-      h('div', { class: 'radios days' }, ...days),
-      daysError,
-      h('p', { class: 'muted small' }, t('settings.days.help')),
-    ),
-    h(
-      'fieldset',
-      { class: 'field' },
-      h('legend', {}, t('settings.frequency')),
-      h('div', { class: 'radios' }, ...freq),
-      h('p', { class: 'muted small' }, t('settings.frequency.help')),
+    sub('settings.sub.reports',
+      h(
+        'fieldset',
+        { class: 'field' },
+        h('legend', {}, t('settings.freq.label')),
+        h('div', { class: 'radios' }, ...freq),
+        h('p', { class: 'muted small' }, t('settings.frequency.help')),
+      ),
       h(
         'div',
         { class: 'field report-dm' },
@@ -221,7 +228,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('p', { class: 'muted small' }, t('settings.reportDM.help')),
       ),
     ),
-    h('div', { class: 'field-row' },
+    sub('settings.sub.anonymity',
       h(
         'div',
         { class: 'field' },
@@ -229,6 +236,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('p', { class: 'muted small' }, t('settings.anonymous.help')),
         anonWarning,
       ),
+    ),
+    sub('settings.sub.game',
       h(
         'div',
         { class: 'field' },
@@ -236,17 +245,19 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('p', { class: 'muted small' }, t('settings.games.help')),
         h('p', { class: 'muted small' }, icons.inline(icons.eye), t('settings.games.privacy')),
       ),
+      gameRolesBox,
     ),
-    gameRolesBox,
-    h('div', { class: 'field' },
-      h('label', { for: 'kudos-channel' }, t('settings.kudos')),
-      kudosChannel,
-      kudosWarning,
-      kudosNote,
-      h('p', { class: 'muted small' }, t('settings.kudos.help')),
+    sub('settings.sub.kudos',
+      h('div', { class: 'field' },
+        h('label', { for: 'kudos-channel' }, t('settings.kudos')),
+        kudosChannel,
+        kudosWarning,
+        kudosNote,
+        h('p', { class: 'muted small' }, t('settings.kudos.help')),
+      ),
     ),
     api.isOwner(g) ? null : h('p', { class: 'muted small' }, icons.inline(icons.info), t('settings.admin.help.manage')),
-    h('div', { class: 'form-actions' }, save, status),
+    h('div', { class: 'form-actions' }, save, unsaved, status),
   )
   form.addEventListener('input', refresh)
   form.addEventListener('change', refresh)
@@ -483,3 +494,6 @@ export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () 
     confirm,
   )
 }
+
+const sub = (title: 'settings.sub.survey' | 'settings.sub.reports' | 'settings.sub.anonymity' | 'settings.sub.game' | 'settings.sub.kudos', ...children: Node[]) =>
+  h('section', { class: 'subsection' }, h('h3', {}, t(title)), ...children)
