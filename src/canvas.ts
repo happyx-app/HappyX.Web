@@ -39,6 +39,12 @@ let mode: Mode = null
 let hover: string | null = null // drawing ID under the pointer
 let drawing: { stroke: api.CanvasStroke; last: [number, number] } | null = null
 let pending: api.CanvasStroke[] = [] // drawn here, not yet saved (or never, in the demo)
+// Drawings erased while some of their strokes were still being saved: those strokes are erased
+// as soon as they are. Erased drawings' IDs aren't used again, so they stay until the server
+// changes.
+const erasedWhileSaving = new Set<string>()
+// Goes up on every change made here, so a check that started before one doesn't undo it.
+let edits = 0
 // How often an open page checks for other people's drawings.
 const pollMs = 30_000
 let timer: number | undefined
@@ -141,6 +147,8 @@ export function showCanvas(guildID: string | null) {
   if (state && state.guildID !== guildID) {
     state = null
     pending = []
+    erasedWhileSaving.clear()
+    paint()
     notify()
   }
   if (!guildID) return unmount()
@@ -201,6 +209,9 @@ export function confirmClear() {
       }
       st.canvas.strokes = []
       st.etag = ''
+      edits++
+      // Strokes still being saved go too.
+      pending.forEach((x) => erasedWhileSaving.add(x.drawing_id))
       pending = []
       close()
       setMode(null)
@@ -221,10 +232,12 @@ async function load() {
   const guildID = wanted
   if (!guildID) return
   clearTimeout(timer)
+  const seen = edits
   try {
     const res = await api.canvas(guildID, state?.guildID === guildID ? state.etag : '')
     if (wanted !== guildID) return
-    if (res) {
+    // Something changed here meanwhile: this answer is older than it, the next check isn't.
+    if (res && (seen === edits || state?.guildID !== guildID)) {
       state = { guildID, canvas: res.canvas, etag: res.etag }
       hover = null
       changed()
@@ -426,8 +439,17 @@ async function save(guildID: string, st: api.CanvasStroke) {
   try {
     const res = await api.addCanvasStroke(guildID, { drawing_id: st.drawing_id, color: st.color, anchor: st.anchor, points: st.points })
     pending = pending.filter((x) => x !== st)
-    // A check that ran meanwhile may have brought it already.
-    if (state?.guildID === guildID && !state.canvas.strokes.some((x) => x.id === res.stroke.id)) {
+    edits++
+    if (erasedWhileSaving.has(st.drawing_id)) {
+      // Erased while it was being saved: erase it from the server too.
+      try {
+        const { version } = await api.deleteCanvasDrawing(guildID, st.drawing_id)
+        if (state?.guildID === guildID) state.canvas.version = version
+      } catch {
+        // Already gone, or it shows up again at the next check and can be erased then.
+      }
+    } else if (state?.guildID === guildID && !state.canvas.strokes.some((x) => x.id === res.stroke.id)) {
+      // (A check that ran meanwhile may have brought it already.)
       state.canvas.strokes.push(res.stroke)
       state.canvas.version = res.version
     }
@@ -435,10 +457,11 @@ async function save(guildID: string, st: api.CanvasStroke) {
     // The demo keeps its drawings on the page, unsaved, as it says at the top.
     if (err instanceof api.DemoReadOnly) return
     pending = pending.filter((x) => x !== st)
-    const full = err instanceof api.ApiError && err.status === 409
+    // 409 is a full canvas, or one turned off meanwhile.
+    const full = err instanceof api.ApiError && err.status === 409 && /full/.test(err.message)
     const tooMany = err instanceof api.ApiError && err.status === 429
     flash(t(full ? 'canvas.error.full' : tooMany ? 'canvas.error.tooMany' : 'canvas.error.save'))
-    if (full || err instanceof api.ApiError) reloadCanvas()
+    if (err instanceof api.ApiError) reloadCanvas()
   }
   paint()
   notify()
@@ -451,7 +474,9 @@ async function erase(st: api.CanvasStroke) {
   // Members only erase their own strokes, even of a drawing ID someone else used too.
   const goes = (x: api.CanvasStroke) => x.drawing_id === st.drawing_id && (mode === 'moderate' || x.mine)
   state.canvas.strokes = state.canvas.strokes.filter((x) => !goes(x))
+  if (!api.isDemo && pending.some(goes)) erasedWhileSaving.add(st.drawing_id)
   pending = pending.filter((x) => !goes(x))
+  edits++
   hover = null
   closePop()
   paint()
