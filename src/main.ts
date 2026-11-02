@@ -18,6 +18,7 @@ import { applySavedTheme, currentTheme, setTheme } from './theme'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
+import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
 //   #/                       servers (or my evolution for someone who manages none); the landing page when logged out
@@ -47,11 +48,14 @@ async function route() {
     me ??= await api.me()
     me.games ??= []
   } catch (err) {
+    showCanvas(null)
     // The legal pages are public, and must stay readable even if the API is down.
     if (legal[path]) return renderLegal(null, legal[path]())
     if (err instanceof api.Unauthorized && !api.isDemo) return renderLanding(null)
     return renderError(err)
   }
+  // A server's pages share its team canvas, behind them.
+  showCanvas(path.match(/^\/(?:g|game)\/(\d+)(?:\/settings)?$/)?.[1] ?? null)
   if (legal[path]) return renderLegal(me, legal[path]())
   // The demo's made-up admin has no landing page or personal data of their own.
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
@@ -792,7 +796,9 @@ function renderSettings(m: api.Me, guildID: string) {
   const owner = api.isOwner(g)
   const real = owner && !api.isDemo
   const onSaved = (updated: api.Guild) => {
+    const before = m.guilds.find((x) => x.discord_guild_id === updated.discord_guild_id)
     m.guilds = m.guilds.map((x) => (x.discord_guild_id === updated.discord_guild_id ? { ...updated, access: x.access } : x))
+    if (before?.canvas_enabled !== updated.canvas_enabled) reloadCanvas()
   }
   const sections: [label: string, card: HTMLElement | null][] = [
     [t('settings.title'), settingsForm(g, onSaved, () => renderLanding(null))],

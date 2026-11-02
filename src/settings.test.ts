@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { channelGroups, changes, confirmed, type Settings, settingsOf, weekdayName } from './settings'
 
-const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] } }
+const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false }
 
 it('sends only what changed', () => {
   expect(changes(base, base)).toEqual({})
@@ -9,6 +9,7 @@ it('sends only what changed', () => {
   expect(changes(base, { ...base, survey_hour: 0 })).toEqual({ survey_hour: 0 })
   expect(changes(base, { ...base, games_enabled: true })).toEqual({ games_enabled: true })
   expect(changes(base, { ...base, report_dm: false })).toEqual({ report_dm: false })
+  expect(changes(base, { ...base, canvas_enabled: true })).toEqual({ canvas_enabled: true })
 })
 
 it('compares working days by value', () => {
