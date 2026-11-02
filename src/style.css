@@ -503,10 +503,15 @@ a { color: var(--accent); }
 .guess-mine .badge { justify-self: end; background: var(--surface); }
 .guess-n { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--series-soft); font-weight: 600; font-size: 0.875rem; }
 @media (max-width: 560px) { .guess { grid-template-columns: auto 1fr; } .guess select, .guess .badge { grid-column: 1 / -1; } }
-.grid-results { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: start; }
+/* The game page is as wide as the dashboard, so last week's ranking and answers sit side by side
+   without squeezing; on narrow screens the answers go under the ranking. */
+.container.game-page { max-width: 1040px; }
+.grid-results { display: grid; gap: 24px 40px; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); align-items: start; }
+@media (max-width: 760px) { .grid-results { grid-template-columns: minmax(0, 1fr); } }
 .grid-results h3 { margin: 0 0 8px; font-size: 0.9375rem; font-weight: 600; }
 .ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.rank { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+.rank { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; }
+.rank-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .rank-top { background: var(--surface-2); }
 .rank-medal { font-size: 1.25rem; text-align: center; }
 .reveal { list-style: none; margin: 0; padding: 0; display: grid; }

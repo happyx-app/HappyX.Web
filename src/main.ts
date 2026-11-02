@@ -968,7 +968,7 @@ async function renderGame(m: api.Me, guildID: string) {
     header(m, 'games'),
     h(
       'main',
-      { class: 'container narrow' },
+      { class: 'container game-page' },
       m.games.length > 1 ? h('a', { class: 'back', href: '#/games' }, `← ${t('games.title')}`) : null,
       h('div', {}, h('h1', {}, t('game.title')), subtitle),
       body,
