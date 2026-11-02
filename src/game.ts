@@ -260,8 +260,12 @@ function resultsCard(r: api.GameRound) {
             'li',
             { class: pl[i] === 0 ? 'rank rank-top' : 'rank' },
             pl[i] < 3 ? h('span', { class: 'rank-medal', 'aria-hidden': 'true' }, medal(pl[i])) : h('span', { class: 'rank-num' }, medal(pl[i])),
-            h('strong', {}, s.username),
-            h('span', { class: 'muted small' }, t('game.ranking.score', { correct: s.correct, guesses: s.guesses })),
+            h(
+              'span',
+              { class: 'rank-text' },
+              h('strong', {}, s.username),
+              h('span', { class: 'muted small' }, t('game.ranking.score', { correct: s.correct, guesses: s.guesses })),
+            ),
           ),
         ),
       )
