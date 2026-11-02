@@ -9,6 +9,7 @@ import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
 import { filterOf, needsRoles, type RoleFilterEditor, roleFilterEditor, toSave } from './surveyRoles'
+import { canvasState, confirmClear, countDrawings, onCanvasChange } from './canvas'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
 export const botLanguages: [code: string, name: string][] = [
@@ -36,6 +37,7 @@ export const settingsOf = (g: api.Guild): Settings => ({
   kudos_channel_id: g.kudos_channel_id ?? '',
   working_days: g.working_days ?? mondayToFriday,
   game_roles: toSave(filterOf(g.game_roles)),
+  canvas_enabled: g.canvas_enabled ?? false,
 })
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
@@ -161,6 +163,9 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     },
   )
 
+  const canvasOn = h('input', { id: 'canvas', type: 'checkbox', role: 'switch', checked: saved.canvas_enabled })
+  const canvasCount = canvasCountRow(g.discord_guild_id)
+
   const status = h('p', { class: 'small', role: 'status' })
   const save = h('button', { class: 'btn btn-primary', type: 'submit', disabled: true }, t('settings.save'))
   const unsaved = h('span', { class: 'unsaved' }, t('settings.saved.none'))
@@ -176,6 +181,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     kudos_channel_id: kudosChannel.value,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
     game_roles: gameRoles ? toSave(gameRoles.value()) : saved.game_roles,
+    canvas_enabled: canvasOn.checked,
   })
   const refresh = () => {
     const now = read()
@@ -246,6 +252,15 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('p', { class: 'muted small' }, icons.inline(icons.eye), t('settings.games.privacy')),
       ),
       gameRolesBox,
+    ),
+    sub('settings.sub.canvas',
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { class: 'switch', for: 'canvas' }, canvasOn, h('span', {}, t('settings.canvas'))),
+        h('p', { class: 'muted small' }, t('settings.canvas.help')),
+        canvasCount,
+      ),
     ),
     sub('settings.sub.kudos',
       h('div', { class: 'field' },
@@ -495,5 +510,29 @@ export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () 
   )
 }
 
-const sub = (title: 'settings.sub.survey' | 'settings.sub.reports' | 'settings.sub.anonymity' | 'settings.sub.game' | 'settings.sub.kudos', ...children: Node[]) =>
+const sub = (title: 'settings.sub.survey' | 'settings.sub.reports' | 'settings.sub.anonymity' | 'settings.sub.game' | 'settings.sub.canvas' | 'settings.sub.kudos', ...children: Node[]) =>
   h('section', { class: 'subsection' }, h('h3', {}, t(title)), ...children)
+
+// canvasCountRow says how many drawings the team canvas holds, with the button to erase them
+// all. It follows the canvas behind the page, which is this server's.
+function canvasCountRow(guildID: string): HTMLElement {
+  const text = h('span', { class: 'muted small' })
+  const clear = h('button', { class: 'btn btn-danger-outline btn-small', type: 'button', onclick: confirmClear }, t('settings.canvas.clear'))
+  const row = h('div', { class: 'canvas-count', hidden: true }, text, clear)
+  const update = () => {
+    if (!row.isConnected && row.dataset.mounted) return stop()
+    row.dataset.mounted = '1'
+    const st = canvasState()
+    if (!st || st.guildID !== guildID) {
+      row.hidden = true
+      return
+    }
+    const n = countDrawings(st.canvas.strokes)
+    row.hidden = false
+    text.textContent = n === 0 ? t('settings.canvas.count.zero') : n === 1 ? t('settings.canvas.count.one') : t('settings.canvas.count', { n })
+    clear.disabled = n === 0
+  }
+  const stop = onCanvasChange(update)
+  queueMicrotask(update)
+  return row
+}

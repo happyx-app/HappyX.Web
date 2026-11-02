@@ -30,6 +30,8 @@ export interface Guild {
   // out, which means everyone.
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
+  // Whether the team canvas is on. Older APIs leave it out, which means off.
+  canvas_enabled?: boolean
   active: boolean
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
@@ -295,6 +297,7 @@ export interface SettingsPatch {
   survey_message?: string // "" goes back to the default text
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
+  canvas_enabled?: boolean
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.
@@ -385,3 +388,52 @@ export async function logout(): Promise<void> {
   if (isDemo) return
   await fetch(`${base}/auth/logout`, { method: 'POST', credentials: 'same-origin' })
 }
+
+// --- Team canvas ---
+
+// A stroke of the team canvas. Its points are px from the anchor, flat (x0, y0, x1, y1…); the
+// anchor is a fraction of the screen's width and height.
+export interface CanvasStroke {
+  id: string
+  drawing_id: string
+  color: number // 0 to 4, see canvas.ts
+  anchor: [number, number]
+  points: number[]
+  mine: boolean
+  // Who drew it; only for those who may change the server's settings.
+  author?: Member
+  created_at: string
+}
+
+export interface Canvas {
+  enabled: boolean
+  version: number
+  can_moderate: boolean
+  max_strokes: number
+  strokes: CanvasStroke[]
+}
+
+export type NewCanvasStroke = Pick<CanvasStroke, 'drawing_id' | 'color' | 'anchor' | 'points'>
+
+const canvasPath = (guildID: string) => `/guilds/${encodeURIComponent(guildID)}/canvas`
+
+// canvas reads the server's canvas. With the ETag of the last read it returns null when nothing
+// changed, which is what the page's regular check gets most of the time.
+export async function canvas(guildID: string, etag = ''): Promise<{ canvas: Canvas; etag: string } | null> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (etag) headers['If-None-Match'] = etag
+  const res = await fetch(base + canvasPath(guildID), { credentials: 'same-origin', headers })
+  if (res.status === 304) return null
+  if (res.status === 401) throw new Unauthorized()
+  if (res.status === 404) throw new NotFound()
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return { canvas: (await res.json()) as Canvas, etag: res.headers.get('ETag') ?? '' }
+}
+
+export const addCanvasStroke = (guildID: string, stroke: NewCanvasStroke) =>
+  sendJSON<{ stroke: CanvasStroke; version: number }>('POST', `${canvasPath(guildID)}/strokes`, stroke)
+
+export const deleteCanvasDrawing = (guildID: string, drawingID: string) =>
+  sendJSON<{ version: number }>('DELETE', `${canvasPath(guildID)}/drawings/${encodeURIComponent(drawingID)}`, {})
+
+export const clearCanvas = (guildID: string) => sendJSON<{ version: number }>('DELETE', canvasPath(guildID), {})
