@@ -15,6 +15,14 @@ import { type Box, countDrawings, gap, localPoint, maxPoints, sameDrawingMs, sam
 export { countDrawings }
 
 export const penColors = ['#7c3aed', '#fbbf24', '#ec4899', '#3b82f6', '#22c55e'] as const
+// penDot is a pen's colour swatch. The colour goes in through the CSSOM: the site's CSP blocks
+// style attributes.
+function penDot(color: number, small = false): HTMLElement {
+  const dot = h('span', { class: small ? 'canvas-pen canvas-pen-small' : 'canvas-pen' })
+  dot.style.setProperty('--pen', penColors[color] ?? penColors[0])
+  return dot
+}
+
 const colorKeys = ['canvas.color.0', 'canvas.color.1', 'canvas.color.2', 'canvas.color.3', 'canvas.color.4'] as const
 
 function newDrawingID(): string {
@@ -80,8 +88,8 @@ function build(): HTMLCanvasElement {
   dock = h('div', { class: 'canvas-dock', role: 'toolbar', 'aria-label': t('canvas.toolbar') })
   bar = h('div', { class: 'canvas-bar', role: 'status' })
   const fab = tool(t('canvas.open'), pencilIcon(), () => dock.classList.toggle('open'), 'canvas-fab')
-  pens = penColors.map((c, i) =>
-    tool(t('canvas.pen', { color: t(colorKeys[i]) }), h('span', { class: 'canvas-pen', style: `--pen:${c}` }), () => setMode(isPen(mode) && mode.pen === i ? null : { pen: i })),
+  pens = penColors.map((_, i) =>
+    tool(t('canvas.pen', { color: t(colorKeys[i]) }), penDot(i), () => setMode(isPen(mode) && mode.pen === i ? null : { pen: i })),
   )
   eraseBtn = tool(t('canvas.erase'), eraserIcon(), () => setMode(mode === 'erase' ? null : 'erase'))
   moderateBtn = tool(t('canvas.moderate'), shieldIcon(), () => setMode(mode === 'moderate' ? null : 'moderate'))
@@ -526,7 +534,7 @@ function showBar(message?: string) {
     : isPen(mode)
       ? h('span', {}, t('canvas.drawing'), h('span', { class: 'canvas-bar-hint' }, t('canvas.drawing.hint')))
       : h('span', {}, t(mode === 'erase' ? 'canvas.erasing' : 'canvas.moderating'))
-  const dot = isPen(mode) ? h('span', { class: 'canvas-pen canvas-pen-small', style: `--pen:${penColors[mode.pen]}` }) : null
+  const dot = isPen(mode) ? penDot(mode.pen, true) : null
   const clear = mode === 'moderate' ? h('button', { type: 'button', class: 'btn btn-danger-outline btn-small' }, t('canvas.clear')) : null
   if (clear) clear.onclick = confirmClear
   bar.replaceChildren(...[dot, text, clear, done].filter((x): x is HTMLElement => x !== null))
@@ -564,7 +572,7 @@ function openPop(st: api.CanvasStroke, x: number, y: number) {
     h(
       'p',
       { class: 'canvas-who' },
-      h('span', { class: 'canvas-pen canvas-pen-small', style: `--pen:${penColors[st.color] ?? penColors[0]}` }),
+      penDot(st.color, true),
       h('strong', {}, st.author?.username || (st.mine ? t('canvas.you') : '?')),
       h('span', { class: 'muted' }, ` · ${ago(st.created_at)}`),
     ),
