@@ -187,7 +187,7 @@ const en = {
   'settings.anonymous': 'Anonymous answers',
   'settings.anonymous.help': 'Reports and the dashboard don’t show who writes each comment.',
   'settings.anonymous.off':
-    'If you turn this off, reports and the dashboard will show who writes each comment from now on. Comments written while the server was anonymous stay anonymous.',
+    'If you turn this off, reports and the dashboard will show who writes each comment from now on. Comments written while the server was anonymous stay anonymous. Members will see the change in the next survey message.',
   'settings.admin.help.manage': 'Only the main admin or a server administrator can change these permissions.',
   'settings.sections': 'Settings sections',
   'settings.unsaved': 'Unsaved changes',
@@ -632,7 +632,7 @@ const es: Record<Key, string> = {
   'settings.anonymous': 'Respuestas anónimas',
   'settings.anonymous.help': 'Los reports y el panel no muestran quién escribe cada comentario.',
   'settings.anonymous.off':
-    'Si lo desactivas, los reports y el panel mostrarán quién escribe cada comentario a partir de ahora. Los comentarios escritos mientras el servidor era anónimo seguirán siendo anónimos.',
+    'Si lo desactivas, los reports y el panel mostrarán quién escribe cada comentario a partir de ahora. Los comentarios escritos mientras el servidor era anónimo seguirán siendo anónimos. Los miembros lo verán en el próximo mensaje de la encuesta.',
   'settings.admin.help.manage': 'Solo el admin principal o un administrador del servidor pueden cambiar estos permisos.',
   'settings.sections': 'Secciones de los ajustes',
   'settings.unsaved': 'Cambios sin guardar',
