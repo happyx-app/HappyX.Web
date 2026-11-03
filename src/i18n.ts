@@ -48,6 +48,7 @@ const en = {
   'landing.failed': "We couldn't log you in. Try again.",
   'nav.logout': 'Log out',
   'nav.servers': 'Servers',
+  'nav.skip': 'Skip to content',
   'guilds.title': 'Your servers',
   'guilds.empty.title': 'No servers yet',
   'guilds.empty.body':
@@ -190,7 +191,6 @@ const en = {
   'settings.admin.help.manage': 'Only the main admin or a server administrator can change these permissions.',
   'settings.sections': 'Settings sections',
   'settings.unsaved': 'Unsaved changes',
-  'nav.skip': 'Skip to content',
   'settings.saved.none': 'No changes',
   'settings.sub.survey': 'Survey',
   'settings.sub.reports': 'Reports',
@@ -491,6 +491,7 @@ const es: Record<Key, string> = {
   'landing.failed': 'No hemos podido iniciar sesión. Vuelve a intentarlo.',
   'nav.logout': 'Salir',
   'nav.servers': 'Servidores',
+  'nav.skip': 'Ir al contenido',
   'guilds.title': 'Tus servidores',
   'guilds.empty.title': 'Todavía no hay servidores',
   'guilds.empty.body':
@@ -633,7 +634,6 @@ const es: Record<Key, string> = {
   'settings.admin.help.manage': 'Solo el admin principal o un administrador del servidor pueden cambiar estos permisos.',
   'settings.sections': 'Secciones de los ajustes',
   'settings.unsaved': 'Cambios sin guardar',
-  'nav.skip': 'Ir al contenido',
   'settings.saved.none': 'Sin cambios',
   'settings.sub.survey': 'Encuesta',
   'settings.sub.reports': 'Reports',
