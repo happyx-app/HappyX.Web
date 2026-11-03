@@ -822,6 +822,7 @@ function renderSettings(m: api.Me, guildID: string) {
   ]
   const cards = sections.flatMap(([label, card], i) => (card ? [{ label, card, id: `section-${i}` }] : []))
   cards.forEach((c) => (c.card.id ||= c.id))
+  unsavedCards = () => cards.filter((c) => c.card.isConnected && c.card.querySelector('[data-dirty="true"]')).map((c) => c.label)
   page(
     header(m),
     h(
@@ -1093,7 +1094,21 @@ function discordLogo() {
   return svg
 }
 
-window.addEventListener('hashchange', route)
+// Each settings card has its own Save button, so leaving the page with changes in one asks first.
+let unsavedCards: () => string[] = () => []
+let shownURL = location.href
+window.addEventListener('hashchange', () => {
+  const dirty = unsavedCards()
+  if (dirty.length && !confirm(t('settings.leave', { cards: dirty.join(', ') }))) {
+    history.replaceState(null, '', shownURL)
+    return
+  }
+  shownURL = location.href
+  route()
+})
+window.addEventListener('beforeunload', (e) => {
+  if (unsavedCards().length) e.preventDefault()
+})
 route()
 
 const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)

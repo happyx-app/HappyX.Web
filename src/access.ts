@@ -217,6 +217,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
   const refresh = () => {
     const dirty = !sameAccess(saved, state) || known.dropped > 0
     save.disabled = !dirty
+    save.dataset.dirty = String(!sameAccess(saved, state))
     if (dirty) status.textContent = ''
     const admin = byKey.get(`user:${state.admin}`)
     adminWarning.hidden = state.admin === saved.admin

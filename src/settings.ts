@@ -192,6 +192,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     gameRolesBox.hidden = !now.games_enabled
     const gameRolesMissing = now.games_enabled && gameRoles !== null && needsRoles(gameRoles.value())
     save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing
+    save.dataset.dirty = String(dirty)
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     if (dirty) status.textContent = ''
@@ -373,6 +374,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
     stopRow.replaceChildren(h('span', { class: 'dc-button' }, `🔕 ${b().stop}`))
     const dirty = text.trim() !== saved
     save.disabled = !dirty || !survey.isValid(p)
+    save.dataset.dirty = String(dirty)
     if (dirty) status.textContent = ''
   }
   reset.addEventListener('click', () => {

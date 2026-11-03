@@ -145,6 +145,7 @@ function surveyRolesForm(g: api.Guild, roles: api.Role[], onSaved: (g: api.Guild
     const now = editor.value()
     const dirty = !sameSurveyRoles(saved, now)
     save.disabled = !dirty || needsRoles(now)
+    save.dataset.dirty = String(dirty)
     if (dirty) status.textContent = ''
   })
 
