@@ -31,6 +31,7 @@ export const x: Icon = () => icon(path('M18 6 6 18M6 6l12 12'))
 export const download: Icon = () => icon(path('M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3'))
 export const undo: Icon = () => icon(path('M1 4v6h6M3.51 15a9 9 0 1 0 2.13-9.36L1 10'))
 export const chart: Icon = () => icon(path('M3 3v18h18M7 15l4-4 3 3 6-6'))
+export const database: Icon = () => icon(s('ellipse', { cx: 12, cy: 5, rx: 9, ry: 3 }), path('M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0'))
 
 // inline sizes an icon to sit before a line of text, like the emoji it replaces.
 export const inline = (i: Icon) => {
