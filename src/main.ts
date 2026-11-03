@@ -92,8 +92,19 @@ function page(...children: (Node | null)[]) {
   if (api.isDemo && nodes[0] instanceof HTMLElement && nodes[0].classList.contains('topbar')) {
     nodes[0] = h('div', { class: 'demo-head' }, demoBanner(), nodes[0])
   }
-  app.replaceChildren(...nodes, ...(me && !api.isDemo ? [footer()] : []))
+  app.replaceChildren(...skipLink(nodes), ...nodes, ...(me && !api.isDemo ? [footer()] : []))
   window.scrollTo(0, 0)
+}
+
+// The first Tab stop jumps past the top bar to the page's main content. It moves focus by hand:
+// the hash belongs to the router.
+function skipLink(nodes: Node[]): HTMLElement[] {
+  const main = nodes.map((n) => (n instanceof HTMLElement ? n.closest('main') ?? n.querySelector('main') : null)).find((m) => m)
+  if (!main) return []
+  main.tabIndex = -1
+  return [
+    h('a', { class: 'skip-link', href: '#', onclick: (e: Event) => { e.preventDefault(); main.focus() } }, t('nav.skip')),
+  ]
 }
 
 // The demo's notice: what this is, and how to get it for real.
