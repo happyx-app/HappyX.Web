@@ -168,7 +168,13 @@ const brand = () => h('a', { class: 'brand', href: '#/' }, h('img', { class: 'br
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
   const u = m.user
-  const avatar = h('img', { class: 'avatar', alt: '', src: api.avatarURL(u.discord_user_id, u.avatar) })
+  // Some networks block Discord's image server: show the name's initial instead of a broken image.
+  const avatar: HTMLElement = h('img', {
+    class: 'avatar',
+    alt: '',
+    src: api.avatarURL(u.discord_user_id, u.avatar),
+    onerror: () => avatar.replaceWith(h('span', { class: 'avatar avatar-initial', 'aria-hidden': 'true' }, [...u.username.trim()][0]?.toUpperCase() ?? '?')),
+  })
   return h(
     'header',
     { class: 'topbar' },
