@@ -105,6 +105,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` always wins over a component's display (e.g. .btn's inline-flex). */
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body { background: var(--page); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 /* Clip at the window, not the content column, so the landing's glow fades out instead of being cut. */
