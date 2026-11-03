@@ -164,7 +164,14 @@ function themeToggle() {
   return btn
 }
 
-const brand = () => h('a', { class: 'brand', href: '#/' }, h('img', { class: 'brand-mark', src: logoURL, alt: '' }), h('span', { class: 'brand-text' }, 'HappyX'))
+// In the demo the logo leaves it for the real site: on a phone «Back to HappyX» doesn't fit.
+const brand = () =>
+  h(
+    'a',
+    api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
+    h('img', { class: 'brand-mark', src: logoURL, alt: '' }),
+    h('span', { class: 'brand-text' }, 'HappyX'),
+  )
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
   const u = m.user
