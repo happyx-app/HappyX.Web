@@ -346,7 +346,15 @@ function renderGuilds(m: api.Me) {
           ),
         ),
       )
-    : h('div', { class: 'card empty' }, h('h2', {}, t('guilds.empty.title')), h('p', { class: 'secondary' }, t('guilds.empty.body')))
+    : h(
+        'div',
+        { class: 'card empty' },
+        h('h2', {}, t('guilds.empty.title')),
+        h('p', { class: 'secondary' }, t('guilds.empty.body')),
+        h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
+        // The servers you own or administer come from Discord when you log in.
+        h('p', { class: 'muted small' }, t('guilds.empty.relogin')),
+      )
   page(header(m), h('main', { class: 'container' }, h('h1', {}, t('guilds.title')), list))
 }
 
@@ -821,7 +829,11 @@ function renderSettings(m: api.Me, guildID: string) {
     ],
   ]
   const cards = sections.flatMap(([label, card], i) => (card ? [{ label, card, id: `section-${i}` }] : []))
-  cards.forEach((c) => (c.card.id ||= c.id))
+  cards.forEach((c) => {
+    c.card.id ||= c.id
+    // The section list moves focus to the card it scrolls to, so Tab carries on from there.
+    c.card.tabIndex = -1
+  })
   unsavedCards = () => cards.filter((c) => c.card.isConnected && c.card.querySelector('[data-dirty="true"]')).map((c) => c.label)
   page(
     header(m),
@@ -845,7 +857,7 @@ function renderSettings(m: api.Me, guildID: string) {
 function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement {
   const links = cards.map(({ label, card }) =>
     // Only the danger zone's link is red; owners alone have it, and the demo doesn't.
-    h('button', { class: label === t('danger.title') ? 'section-link section-danger' : 'section-link', type: 'button', onclick: () => { card.scrollIntoView({ block: 'start' }); pinned = cards.findIndex((c) => c.card === card); mark(pinned) } }, label),
+    h('button', { class: label === t('danger.title') ? 'section-link section-danger' : 'section-link', type: 'button', onclick: () => { card.scrollIntoView({ block: 'start' }); card.focus({ preventScroll: true }); pinned = cards.findIndex((c) => c.card === card); mark(pinned) } }, label),
   )
   let pinned = -1
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
