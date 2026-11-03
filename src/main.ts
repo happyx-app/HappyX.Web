@@ -473,7 +473,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       stat(
         t('stat.respondents'),
         h('span', {}, formatNumber(r.respondents), health && health.audience > 0 ? h('span', { class: 'stat-unit' }, ` ${t('stat.of', { n: formatNumber(health.audience) })}`) : null),
-        old ? deltaNote(r.respondents, old.respondents) : undefined,
+        // «At least once», so «10 of 10» doesn't read as the opposite of the participation figure.
+        old ? h('span', { class: 'stat-notes' }, t('stat.respondents.note'), deltaNote(r.respondents, old.respondents)) : t('stat.respondents.note'),
       ),
       stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
     ),
