@@ -530,6 +530,12 @@ a { color: var(--accent); }
 
 
 /* Admins and permissions */
+.skip-link {
+  position: absolute; left: 16px; top: 8px; z-index: 50; transform: translateY(-200%);
+  padding: 8px 16px; border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: var(--shadow);
+}
+.skip-link:focus { transform: none; }
+main:focus { outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .access-form, .survey-roles-form { display: grid; gap: 20px; }
 .combo { position: relative; }
@@ -690,7 +696,7 @@ a { color: var(--accent); }
 
 /* Team canvas (canvas.ts): fixed behind the content, which stays readable on top of it. */
 .canvas-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-body.has-canvas #app > :not(.topbar):not(.demo-head) { position: relative; z-index: 1; }
+body.has-canvas #app > :not(.topbar):not(.demo-head):not(.skip-link) { position: relative; z-index: 1; }
 body.canvas-active .canvas-layer { z-index: 5; pointer-events: auto; cursor: crosshair; touch-action: none; }
 body.canvas-picking .canvas-layer { cursor: pointer; }
 body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer-events: none; }
