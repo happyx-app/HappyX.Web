@@ -52,6 +52,7 @@ const en = {
   'guilds.empty.title': 'No servers yet',
   'guilds.empty.body':
     'Servers with HappyX where you are the owner, an administrator or the main admin show up here.',
+  'guilds.empty.relogin': 'Already added it? Log out and back in to refresh the list.',
   'guilds.anonymous': 'Anonymous',
   'guilds.named': 'Names visible',
   'guilds.weekly': 'Weekly reports',
@@ -494,6 +495,7 @@ const es: Record<Key, string> = {
   'guilds.empty.title': 'Todavía no hay servidores',
   'guilds.empty.body':
     'Aquí salen los servidores con HappyX donde eres propietario, administrador o admin principal.',
+  'guilds.empty.relogin': '¿Ya lo has añadido? Sal y vuelve a entrar para actualizar la lista.',
   'guilds.anonymous': 'Anónimo',
   'guilds.named': 'Nombres visibles',
   'guilds.weekly': 'Reports semanales',

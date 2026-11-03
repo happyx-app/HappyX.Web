@@ -346,7 +346,15 @@ function renderGuilds(m: api.Me) {
           ),
         ),
       )
-    : h('div', { class: 'card empty' }, h('h2', {}, t('guilds.empty.title')), h('p', { class: 'secondary' }, t('guilds.empty.body')))
+    : h(
+        'div',
+        { class: 'card empty' },
+        h('h2', {}, t('guilds.empty.title')),
+        h('p', { class: 'secondary' }, t('guilds.empty.body')),
+        h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
+        // The servers you own or administer come from Discord when you log in.
+        h('p', { class: 'muted small' }, t('guilds.empty.relogin')),
+      )
   page(header(m), h('main', { class: 'container' }, h('h1', {}, t('guilds.title')), list))
 }
 
