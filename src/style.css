@@ -258,7 +258,8 @@ a { color: var(--accent); }
 
 .dashboard { display: grid; gap: 20px; }
 .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.stat { gap: 4px; }
+.stat { gap: 4px; margin: 0; }
+.stat dd { margin-left: 0; }
 .stat-label { color: var(--ink-2); font-size: 0.875rem; }
 .stat-value { font-family: var(--display); font-size: 2.75rem; font-weight: 900; letter-spacing: -0.02em; line-height: 1; margin: 4px 0; }
 @media (max-width: 480px) { .stat-value { font-size: 2rem; } .stat-value .stat-emoji { margin-right: 4px; } }

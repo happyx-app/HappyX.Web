@@ -558,7 +558,15 @@ function deltaNote(now: number, before: number, digits = 0, unit: 'delta.vs' | '
   const d = delta(now, before, digits)
   const sign = d.value > 0 ? '+' : d.value < 0 ? '−' : ''
   const arrow = d.trend === 'up' ? '▲ ' : d.trend === 'down' ? '▼ ' : '= '
-  return h('span', { class: `delta delta-${d.trend}` }, arrow, d.trend === 'flat' ? t('delta.same') : t(unit, { value: `${sign}${formatNumber(Math.abs(d.value), digits)}` }))
+  const amount = t(unit === 'delta.points' ? 'delta.sr.points' : 'delta.vs', { value: formatNumber(Math.abs(d.value), digits) })
+  // Screen readers get the change in words instead of «▼ −0,2».
+  const spoken = d.trend === 'flat' ? t('delta.sr.same') : t(d.trend === 'up' ? 'delta.sr.up' : 'delta.sr.down', { value: amount })
+  return h(
+    'span',
+    { class: `delta delta-${d.trend}` },
+    h('span', { 'aria-hidden': 'true' }, arrow, d.trend === 'flat' ? t('delta.same') : t(unit, { value: `${sign}${formatNumber(Math.abs(d.value), digits)}` })),
+    h('span', { class: 'sr-only' }, spoken),
+  )
 }
 
 function weekdayCard(stats: WeekdayStat[]) {
@@ -1023,7 +1031,8 @@ async function renderGame(m: api.Me, guildID: string) {
 }
 
 function stat(label: string, value: Node | string, note?: Node | string) {
-  return h('div', { class: 'card stat' }, h('span', { class: 'stat-label' }, label), h('span', { class: 'stat-value' }, value), note ? h('span', { class: 'muted small' }, note) : null)
+  // A description list, so screen readers pair each figure with its name.
+  return h('dl', { class: 'card stat' }, h('dt', { class: 'stat-label' }, label), h('dd', { class: 'stat-value' }, value), note ? h('dd', { class: 'muted small' }, note) : null)
 }
 
 function messagesCard(r: api.Report) {
