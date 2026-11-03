@@ -79,7 +79,8 @@ async function route() {
     const p = q.get('p')
     return renderMe(me, isEvolutionPeriod(p) ? p : 'month', q.get('g'))
   }
-  if (me.guilds.length === 1 && path === '') {
+  // With one server, the list would be a single card: go straight to it. «Servers» links to #/.
+  if (me.guilds.length === 1 && (path === '' || path === '/')) {
     location.replace(`#/g/${me.guilds[0].discord_guild_id}`)
     return
   }
