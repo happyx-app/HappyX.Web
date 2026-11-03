@@ -924,9 +924,13 @@ export function t(key: Key, vars: Record<string, string | number> = {}): string 
 
 export const moodEmojis = ['😞', '😕', '😐', '🙂', '🤩'] as const
 
-export const moodEmoji = (mood: number) => moodEmojis[Math.min(5, Math.max(1, Math.round(mood))) - 1]
+// Averages are shown with one decimal, so the face follows that shown value: 3,46 and 3,54 both read
+// «3,5» and both get 🙂.
+const moodLevel = (mood: number) => Math.min(5, Math.max(1, Math.round(Math.round(mood * 10) / 10)))
 
-export const moodLabel = (mood: number) => t(`mood.${Math.min(5, Math.max(1, Math.round(mood)))}` as Key)
+export const moodEmoji = (mood: number) => moodEmojis[moodLevel(mood) - 1]
+
+export const moodLabel = (mood: number) => t(`mood.${moodLevel(mood)}` as Key)
 
 export function formatDay(day: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
   return new Intl.DateTimeFormat(lang, { ...opts, timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`))
