@@ -2,7 +2,7 @@
 // Adding a language = one more entry in `messages` with the same keys as `en`.
 
 const en = {
-  'landing.login': 'Log in',
+  'landing.login': 'Log in with Discord',
   'landing.dashboard': 'Open dashboard',
   'landing.add': 'Add to Discord',
   'landing.demo': 'View demo',
@@ -446,7 +446,7 @@ const en = {
 export type Key = keyof typeof en
 
 const es: Record<Key, string> = {
-  'landing.login': 'Entrar',
+  'landing.login': 'Entrar con Discord',
   'landing.dashboard': 'Abrir el panel',
   'landing.add': 'Añadir a Discord',
   'landing.demo': 'Ver demo',
