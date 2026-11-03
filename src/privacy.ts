@@ -39,7 +39,7 @@ export function privacyPage(m: api.Me, onErased: () => void, onLoggedOut: () => 
     h('h2', {}, t('privacy.kept.title')),
     h('p', { class: 'secondary small' }, t('privacy.kept.body')),
     bullets(['privacy.kept.moods', 'privacy.kept.kudos', 'privacy.kept.game', 'privacy.kept.member']),
-    h('p', { class: 'muted small' }, `🔒 ${t('privacy.kept.not')}`),
+    h('p', { class: 'muted small' }, icons.inline(icons.lock), t('privacy.kept.not')),
   )
 
   const download = h(
@@ -106,7 +106,7 @@ export function privacyPage(m: api.Me, onErased: () => void, onLoggedOut: () => 
     confirm,
   )
 
-  return [kept, download, danger, h('p', { class: 'muted small' }, `🗄️ ${t('privacy.backups')}`)]
+  return [kept, download, danger, h('p', { class: 'muted small' }, icons.inline(icons.database), t('privacy.backups'))]
 }
 
 // guildExport is the settings page's card to download the server's data.
