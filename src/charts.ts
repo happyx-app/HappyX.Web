@@ -55,7 +55,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
     days.map((d) => d.day),
     series,
     {
-      label: t('chart.trend'),
+      label: trendSummary(days),
       notes,
       dots: false,
       tooltip: (i) => {
@@ -72,6 +72,24 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       },
     },
   )
+}
+
+// What a screen reader hears for the trend chart: the range of days, the lowest and highest daily
+// average, and the average over the period.
+export function trendSummary(days: DayStat[]): string {
+  const answered = days.filter((d) => d.responses > 0)
+  if (answered.length === 0 || days.length === 0) return t('chart.trend')
+  const avgs = answered.map((d) => d.average)
+  const total = answered.reduce((n, d) => n + d.responses, 0)
+  const avg = answered.reduce((sum, d) => sum + d.average * d.responses, 0) / total
+  const long: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }
+  return t('chart.trend.summary', {
+    from: formatDay(days[0].day, long),
+    to: formatDay(days[days.length - 1].day, long),
+    min: formatNumber(Math.min(...avgs), 1),
+    max: formatNumber(Math.max(...avgs), 1),
+    avg: formatNumber(avg, 1),
+  })
 }
 
 export function answers(n: number): string {
@@ -262,6 +280,8 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   hit.addEventListener('pointerdown', (e) => show(e.clientX))
   hit.addEventListener('pointerleave', hide)
   svg.append(hit)
+  // The label says what the chart shows; its tick and note texts would only be read as a jumble.
+  svg.querySelectorAll('text').forEach((el) => el.setAttribute('aria-hidden', 'true'))
   return svg
 }
 
