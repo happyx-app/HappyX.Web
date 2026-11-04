@@ -152,6 +152,8 @@ export interface MyGuildMoods {
   discord_guild_id: string
   name: string
   timezone: string
+  // Whether the admin sees who answers; older APIs leave it out.
+  anonymous?: boolean
   responses: number
   average: number
   streak: number

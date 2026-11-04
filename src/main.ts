@@ -809,6 +809,10 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
         h('span', { class: g.streak > 0 ? 'streak streak-on' : 'streak' }, streak),
       ),
     ),
+    // Older APIs don't say whether the server is anonymous: then the line is left out.
+    g.anonymous === undefined
+      ? null
+      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), t(g.anonymous ? 'me.mode.anonymous' : 'me.mode.named')),
     h('h3', { class: 'small secondary' }, t('me.latest')),
     msgs.length
       ? h(
