@@ -83,8 +83,12 @@ async function route() {
   if (settingsID) return renderSettings(me, settingsID)
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
-    const p = new URLSearchParams(query).get('p')
+    const q = new URLSearchParams(query)
+    const p = q.get('p')
     const g = me.guilds.find((x) => x.discord_guild_id === guildID)
+    // Right after «Add to Discord», the bot may not have registered the server yet.
+    if (!g && q.get('added') === '1' && !api.isDemo) return renderConnecting(me, guildID)
+    if (g && q.has('added')) return location.replace(`#/g/${guildID}`)
     return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30')
   }
   if (path === '/me' || (path === '' && me.guilds.length === 0)) {
@@ -424,6 +428,41 @@ function renderGuilds(m: api.Me) {
         refreshLine(),
       )
   page(header(m), h('main', { class: 'container' }, h('h1', {}, t('guilds.title')), list))
+}
+
+// How long the web waits for the bot to register a server it was just added to.
+const connectTries = 8
+const connectEvery = 1500
+
+// After «Add to Discord», Discord sends the user here before the bot may have told the API about
+// the new server: ask again for a few seconds, then open its panel.
+async function renderConnecting(m: api.Me, guildID: string) {
+  const card = h(
+    'div',
+    { class: 'card empty', 'aria-live': 'polite', 'aria-busy': 'true' },
+    h('h2', {}, t('guild.connecting.title')),
+  )
+  page(header(m), h('main', { class: 'container' }, card))
+  for (let i = 0; i < connectTries; i++) {
+    await new Promise((r) => setTimeout(r, connectEvery))
+    // The user may have left the page meanwhile.
+    if (!location.hash.startsWith(`#/g/${guildID}`)) return
+    try {
+      const fresh = await api.me()
+      fresh.games ??= []
+      fresh.member_guilds ??= []
+      me = fresh
+      if (fresh.guilds.some((g) => g.discord_guild_id === guildID)) return location.replace(`#/g/${guildID}`)
+    } catch {
+      // Try again on the next round.
+    }
+  }
+  card.removeAttribute('aria-busy')
+  card.replaceChildren(
+    h('h2', {}, t('guild.connecting.slowTitle')),
+    h('p', { class: 'secondary' }, t('guild.connecting.slowBody')),
+    h('a', { class: 'btn btn-outline', href: api.refreshURL(`/g/${guildID}`) }, t('me.noServer.refresh')),
+  )
 }
 
 // A member without access to the dashboard sees the server's name and its team canvas behind,
