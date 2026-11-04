@@ -59,7 +59,10 @@ async function route() {
     showCanvas(null)
     // The legal pages are public, and must stay readable even if the API is down.
     if (legal[path]) return renderLegal(null, legal[path]())
-    if (err instanceof api.Unauthorized && !api.isDemo) return renderLanding(null)
+    if (err instanceof api.Unauthorized && !api.isDemo) {
+      const ask = signInReason(path)
+      return ask ? renderSignIn(path, ask) : renderLanding(null)
+    }
     return renderError(err)
   }
   // A server's pages share its team canvas, behind them.
@@ -976,6 +979,34 @@ function renderPrivacy(m: api.Me) {
 
 // A legal page (privacy policy, terms): with the dashboard's top bar when logged in, the
 // landing's otherwise.
+// A logged-out visitor who follows a link into the app (the bot's game link, say) is asked to log
+// in, and comes back to the same page afterwards. Other routes show the landing page.
+function signInReason(path: string) {
+  if (/^\/g\/\d+(\/settings)?$/.test(path)) return t('signin.guild')
+  if (/^\/game\/\d+$/.test(path) || path === '/games') return t('signin.game')
+  if (path === '/me') return t('signin.me')
+  if (path === '/privacy') return t('signin.privacy')
+  return null
+}
+
+function renderSignIn(path: string, reason: string) {
+  me = null
+  page(
+    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true))),
+    h(
+      'main',
+      { class: 'container narrow' },
+      h(
+        'div',
+        { class: 'card signin' },
+        h('h1', {}, reason),
+        h('p', {}, h('a', { class: 'btn btn-discord', href: `${api.loginURL}?next=${encodeURIComponent(path)}` }, discordLogo(), t('landing.login'))),
+      ),
+    ),
+    landingFooter(),
+  )
+}
+
 function renderLegal(m: api.Me | null, content: HTMLElement[]) {
   if (!m) me = null
   const enter = m
