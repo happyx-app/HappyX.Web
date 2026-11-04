@@ -764,3 +764,8 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
   .canvas-bar-hint { display: none; }
 }
 @media print { .canvas-layer, .canvas-dock, .canvas-bar { display: none; } }
+
+/* Logged out on an app page: one line and the login button. */
+.signin { margin-top: 48px; justify-items: start; }
+.signin h1 { font-size: 1.5rem; margin: 0; }
+.signin p { margin: 0; }
