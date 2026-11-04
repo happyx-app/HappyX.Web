@@ -462,7 +462,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
         'div',
         { class: 'card empty' },
         h('h2', {}, t('empty.title')),
-        next ? h('p', { class: 'secondary' }, t('empty.body', { day: formatDay(next, { weekday: 'long', day: 'numeric', month: 'long' }), time: `${String(g.survey_hour).padStart(2, '0')}:00` })) : null,
+        g.survey_enabled === false
+          ? h('p', { class: 'secondary' }, t('empty.off'))
+          : next ? h('p', { class: 'secondary' }, t('empty.body', { day: formatDay(next, { weekday: 'long', day: 'numeric', month: 'long' }), time: `${String(g.survey_hour).padStart(2, '0')}:00` })) : null,
         longer ? h('a', { class: 'btn', href: `#/g/${guildID}?p=last-30` }, t('empty.longer')) : null,
       ),
       ...extra,
@@ -566,7 +568,9 @@ function healthCard(g: api.Guild, x: api.Health) {
   const item = (done: boolean | null, text: string, link?: [string, string]) =>
     h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
-  todo.push(item(x.audience > 0, x.audience > 0 ? t('health.audience', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
+  const surveyOn = g.survey_enabled !== false
+  if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
+  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   todo.push(item(g.games_enabled, t(g.games_enabled ? 'health.game.on' : 'health.game.off'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
   return h(
@@ -576,7 +580,7 @@ function healthCard(g: api.Guild, x: api.Health) {
     h(
       'div',
       { class: 'health' },
-      tile(t('health.nextSurvey'), next ? `${formatDay(next, long)}, ${hour}` : t('health.noDays'), g.timezone),
+      tile(t('health.nextSurvey'), !surveyOn ? t('health.survey.offShort') : next ? `${formatDay(next, long)}, ${hour}` : t('health.noDays'), surveyOn ? g.timezone : t('health.survey.offNote')),
       tile(
         t('health.lastSurvey'),
         last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),

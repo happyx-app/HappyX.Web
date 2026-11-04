@@ -13,6 +13,9 @@ export interface Guild {
   discord_guild_id: string
   name: string
   anonymous: boolean
+  // Whether members get the survey and the game. A server the bot just joined has it off until an
+  // admin starts it. Older APIs leave it out, which means on.
+  survey_enabled?: boolean
   timezone: string
   language: string
   report_frequency: 'weekly' | 'monthly'
@@ -300,6 +303,7 @@ export interface SettingsPatch {
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
   canvas_enabled?: boolean
+  survey_enabled?: boolean
 }
 
 // Writes send JSON, which the API requires so other sites can't write on the user's behalf.

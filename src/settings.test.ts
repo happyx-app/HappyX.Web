@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { channelGroups, changes, confirmed, type Settings, settingsOf, weekdayName } from './settings'
 
-const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false }
+const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
 
 it('sends only what changed', () => {
   expect(changes(base, base)).toEqual({})
@@ -10,6 +10,7 @@ it('sends only what changed', () => {
   expect(changes(base, { ...base, games_enabled: true })).toEqual({ games_enabled: true })
   expect(changes(base, { ...base, report_dm: false })).toEqual({ report_dm: false })
   expect(changes(base, { ...base, canvas_enabled: true })).toEqual({ canvas_enabled: true })
+  expect(changes(base, { ...base, survey_enabled: false })).toEqual({ survey_enabled: false })
 })
 
 it('compares working days by value', () => {
@@ -35,6 +36,8 @@ it('treats a missing report_dm as on', () => {
   const g = { discord_guild_id: '1', name: 'x', anonymous: true, timezone: 'UTC', language: 'en', report_frequency: 'weekly', survey_hour: 13, games_enabled: false, active: true } as const
   expect(settingsOf(g).report_dm).toBe(true)
   expect(settingsOf({ ...g, report_dm: false }).report_dm).toBe(false)
+  expect(settingsOf(g).survey_enabled).toBe(true) // older APIs: on
+  expect(settingsOf({ ...g, survey_enabled: false }).survey_enabled).toBe(false)
 })
 
 it('sends the game roles only when they change', () => {
