@@ -750,6 +750,8 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
   .canvas-dock.open .canvas-fab { order: 99; }
   .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
   .canvas-bar { top: auto; bottom: 76px; }
+  /* Room under the page, so the corner dock never covers its last lines. */
+  body.has-canvas #app { padding-bottom: 72px; }
 }
 /* On the settings page the side dock would cover the list of sections, so it uses the corner dock at every width. */
 body:has(.settings-page) .canvas-dock { top: auto; bottom: 16px; left: auto; right: 16px; transform: none; grid-auto-flow: column; padding: 8px 12px; }
@@ -758,6 +760,7 @@ body:has(.settings-page) .canvas-dock .canvas-fab { display: grid; color: var(--
 body:has(.settings-page) .canvas-dock.open .canvas-fab { order: 99; }
 body:has(.settings-page) .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
 body:has(.settings-page) .canvas-bar { top: auto; bottom: 76px; }
+body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 @media (max-width: 480px) {
   .canvas-bar { font-size: 0.875rem; padding-left: 14px; }
   .canvas-bar-hint { display: none; }
