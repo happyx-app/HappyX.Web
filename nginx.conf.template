@@ -65,6 +65,11 @@ server {
     location = /demo/ {
         return 301 /demo$is_args$args;
     }
+    # The link preview image (og:image) needs a fixed URL, so it isn't under /assets/.
+    location = /og.png {
+        try_files $uri =404;
+        expires 1d;
+    }
     location /assets/ {
         try_files $uri =404;
         expires 1y;

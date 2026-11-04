@@ -20,7 +20,7 @@ export function dayBefore(day: string): string {
   return d.toISOString().slice(0, 10)
 }
 
-export const medal = (place: number) => ['🥇', '🥈', '🥉'][place] ?? `${place + 1}.`
+export const medal = (place: number) => `${place + 1}.`
 
 // places gives tied scores the same place: [3, 3, 1] -> [0, 0, 2].
 export function places(ranking: api.GameScore[]): number[] {
@@ -38,7 +38,7 @@ export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLEle
   const out: HTMLElement[] = []
   if (cur) out.push(stepper(cur.phase))
   out.push(h('p', { class: 'privacy-note' }, icons.eye(), t('game.privacy')))
-  if (!cur) out.push(h('section', { class: 'card empty' }, h('span', { class: 'game-big', 'aria-hidden': 'true' }, '🎲'), h('p', { class: 'secondary' }, t('game.none'))))
+  if (!cur) out.push(h('section', { class: 'card empty' }, h('p', { class: 'secondary' }, t('game.none'))))
   else if (cur.phase === 'answering') out.push(answerCard(board.discord_guild_id, cur, onLoggedOut))
   else out.push(guessCard(board.discord_guild_id, cur, onLoggedOut))
   if (board.proposal?.open) out.push(proposalCard(board.discord_guild_id, board.proposal, onLoggedOut))
@@ -70,9 +70,9 @@ function question(r: api.GameRound) {
 // proposedLine says the question came from the team: the proposer learns it is theirs, everyone
 // else finds out who once the round is over.
 export function proposedLine(r: api.GameRound) {
-  if (r.proposed_by) return h('p', { class: 'muted small' }, `💡 ${r.my_question ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })}`)
-  if (r.my_question) return h('p', { class: 'small success' }, `💡 ${t('game.myQuestion')}`)
-  if (r.proposed) return h('p', { class: 'muted small' }, `💡 ${t('game.proposed')}`)
+  if (r.proposed_by) return h('p', { class: 'muted small' }, `${r.my_question ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })}`)
+  if (r.my_question) return h('p', { class: 'small success' }, `${t('game.myQuestion')}`)
+  if (r.proposed) return h('p', { class: 'muted small' }, `${t('game.proposed')}`)
   return null
 }
 
@@ -91,7 +91,7 @@ function proposalCard(guildID: string, p: api.GameProposal, onLoggedOut: () => v
   const form = h(
     'form',
     { class: 'card game-card', novalidate: true },
-    h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, t('game.propose.kicker')), h('h2', {}, `💡 ${t('game.propose.title')}`)),
+    h('div', { class: 'game-question' }, h('span', { class: 'muted small' }, t('game.propose.kicker')), h('h2', {}, `${t('game.propose.title')}`)),
     h('p', { class: 'secondary small' }, t('game.propose.body')),
     h('label', { for: 'game-proposal', class: 'field-label' }, t('game.propose.label')),
     input,

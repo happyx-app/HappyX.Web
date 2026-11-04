@@ -62,7 +62,7 @@ export function privacyPage(m: api.Me, onErased: () => void, onLoggedOut: () => 
     h('p', { class: 'small' }, t('privacy.erase.lose')),
     bullets(['privacy.erase.moods', 'privacy.erase.kudos', 'privacy.erase.game']),
     h('p', { class: 'small' }, `⏸️ ${t('privacy.erase.paused')}`),
-    m.guilds.some((g) => g.active) ? h('p', { class: 'warning small' }, `⚠️ ${t('privacy.erase.admin')}`) : null,
+    m.guilds.some((g) => g.active) ? h('p', { class: 'warning small' }, t('privacy.erase.admin')) : null,
     h('div', { class: 'field' }, h('label', { for: 'confirm-user' }, before, h('strong', {}, m.user.username), after), input),
     h('div', { class: 'form-actions' }, erase, cancel, status),
   )
