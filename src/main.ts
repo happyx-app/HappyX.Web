@@ -16,6 +16,14 @@ import { policyPage } from './policy'
 import { termsPage } from './terms'
 import { applySavedTheme, currentTheme, setTheme } from './theme'
 import logoURL from './logo.svg'
+import panelEnLight from './landing/panel-en-light.jpg'
+import panelEnDark from './landing/panel-en-dark.jpg'
+import panelEsLight from './landing/panel-es-light.jpg'
+import panelEsDark from './landing/panel-es-dark.jpg'
+import panelEnLightPhone from './landing/panel-en-light-movil.jpg'
+import panelEnDarkPhone from './landing/panel-en-dark-movil.jpg'
+import panelEsLightPhone from './landing/panel-es-light-movil.jpg'
+import panelEsDarkPhone from './landing/panel-es-dark-movil.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
 import { reloadCanvas, showCanvas } from './canvas'
@@ -224,6 +232,9 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
   )
 }
 
+const shots: Record<string, string> = { 'en-light': panelEnLight, 'en-dark': panelEnDark, 'es-light': panelEsLight, 'es-dark': panelEsDark }
+const phoneShots: Record<string, string> = { 'en-light': panelEnLightPhone, 'en-dark': panelEnDarkPhone, 'es-light': panelEsLightPhone, 'es-dark': panelEsDarkPhone }
+
 // The public landing page: what HappyX is, with buttons to add the bot and to log in. A logged-in
 // user reaches it at #/about, where "Log in" becomes "Open dashboard".
 function renderLanding(m: api.Me | null) {
@@ -233,10 +244,16 @@ function renderLanding(m: api.Me | null) {
   const add = () => h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add'))
   const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
   const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
-  const step = (n: number, title: string, body: string) =>
-    h('li', { class: 'card how-step' }, h('span', { class: 'how-n', 'aria-hidden': 'true' }, n), h('h3', {}, title), h('p', { class: 'secondary' }, body))
-  const feature = (icon: string | Node, title: string, body: string) =>
-    h('li', { class: 'card feature-card' }, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, icon), h('div', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
+  const feature = (title: string, body: string) => h('li', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body))
+  // A real capture of the demo dashboard, in the page's language and theme.
+  const shotLang = lang === 'es' ? 'es' : 'en'
+  const shot = (theme: 'light' | 'dark') =>
+    h(
+      'picture',
+      { class: `shot-${theme}` },
+      h('source', { media: '(max-width: 600px)', srcset: phoneShots[`${shotLang}-${theme}`], width: 780, height: 1500 }),
+      h('img', { src: shots[`${shotLang}-${theme}`], alt: theme === 'light' ? t('landing.shot.alt') : '', width: 2400, height: 1500, loading: 'lazy', decoding: 'async' }),
+    )
   page(
     h(
       'header',
@@ -263,14 +280,8 @@ function renderLanding(m: api.Me | null) {
       h(
         'section',
         { class: 'landing-section' },
-        h('h2', {}, t('landing.how.title')),
-        h(
-          'ol',
-          { class: 'how' },
-          step(1, t('landing.how.1.title'), t('landing.how.1.body')),
-          step(2, t('landing.how.2.title'), t('landing.how.2.body')),
-          step(3, t('landing.how.3.title'), t('landing.how.3.body')),
-        ),
+        h('h2', {}, t('landing.shot.title')),
+        h('figure', { class: 'shot' }, h('div', { class: 'shot-frame' }, shot('light'), shot('dark')), h('figcaption', {}, t('landing.shot.caption'))),
       ),
       h(
         'section',
@@ -278,11 +289,11 @@ function renderLanding(m: api.Me | null) {
         h('h2', {}, t('landing.features.title')),
         h(
           'ul',
-          { class: 'feature-grid' },
-          feature('💛', t('landing.f.kudos.title'), t('landing.f.kudos.body')),
-          feature('🎲', t('landing.f.game.title'), t('landing.f.game.body')),
-          feature(icons.chart(), t('landing.f.web.title'), t('landing.f.web.body')),
-          feature(icons.gear(), t('landing.f.settings.title'), t('landing.f.settings.body')),
+          { class: 'feature-list' },
+          feature(t('landing.f.kudos.title'), t('landing.f.kudos.body')),
+          feature(t('landing.f.game.title'), t('landing.f.game.body')),
+          feature(t('landing.f.web.title'), t('landing.f.web.body')),
+          feature(t('landing.f.settings.title'), t('landing.f.settings.body')),
         ),
       ),
       h(
@@ -291,7 +302,7 @@ function renderLanding(m: api.Me | null) {
         h('h2', {}, t('landing.privacy.title')),
         h(
           'ul',
-          { class: 'card checks privacy' },
+          { class: 'checks privacy' },
           ...(['landing.privacy.1', 'landing.privacy.2', 'landing.privacy.3', 'landing.privacy.4'] as const).map((k) => h('li', {}, t(k))),
         ),
       ),
@@ -795,7 +806,7 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
         'span',
         { class: 'my-guild-meta' },
         h('span', {}, g.responses > 0 ? `${moodLabel(g.average)} · ${answers(g.responses)}` : t('chart.noAnswers')),
-        h('span', { class: g.streak > 0 ? 'streak streak-on' : 'streak' }, g.streak > 0 ? `🔥 ${streak}` : streak),
+        h('span', { class: g.streak > 0 ? 'streak streak-on' : 'streak' }, streak),
       ),
     ),
     h('h3', { class: 'small secondary' }, t('me.latest')),
@@ -1004,7 +1015,7 @@ function renderGames(m: api.Me) {
               'a',
               { class: 'card guild-card', href: `#/game/${g.discord_guild_id}` },
               h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
-              h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, `🎲 ${t('game.title')}`)),
+              h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, t('game.title'))),
             ),
           ),
         ),

@@ -16,15 +16,10 @@ const en = {
   'landing.mock.time': 'Today at 13:00',
   'landing.body':
     'HappyX is a Discord bot that asks your team how they feel every working day, by direct message. It takes two seconds to answer. Every week or month you get a report with the results.',
-  'landing.how.title': 'How it works',
-  'landing.how.1.title': 'Add the bot',
-  'landing.how.1.body': 'Invite it to your server in two clicks. Each server keeps its data apart.',
-  'landing.how.2.title': 'One question a day',
-  'landing.how.2.body':
-    'On working days, every member gets a direct message: they pick a face from 😞 to 🤩 and can add a comment.',
-  'landing.how.3.title': 'You get the report',
-  'landing.how.3.body':
-    'Every week or month, an image by direct message with the average mood, the daily trend, how answers spread and the comments.',
+  'landing.shot.title': 'What the dashboard looks like',
+  'landing.shot.caption':
+    'The demo server: average mood, participation, daily trend and comments. Every week or month the bot also sends you a summary image by direct message.',
+  'landing.shot.alt': 'HappyX dashboard for the demo server',
   'landing.features.title': 'What else it does',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -466,15 +461,10 @@ const es: Record<Key, string> = {
   'landing.mock.time': 'Hoy a las 13:00',
   'landing.body':
     'HappyX es un bot de Discord que pregunta a tu equipo cómo se siente cada día laborable, por mensaje privado. Se responde en dos segundos. Cada semana o cada mes recibes un report con los resultados.',
-  'landing.how.title': 'Cómo funciona',
-  'landing.how.1.title': 'Añade el bot',
-  'landing.how.1.body': 'Invítalo a tu servidor en dos clics. Cada servidor guarda sus datos por separado.',
-  'landing.how.2.title': 'Una pregunta al día',
-  'landing.how.2.body':
-    'Los días laborables, cada miembro recibe un mensaje privado: elige una cara de 😞 a 🤩 y, si quiere, añade un comentario.',
-  'landing.how.3.title': 'Recibes el report',
-  'landing.how.3.body':
-    'Cada semana o cada mes, una imagen por mensaje privado con el ánimo medio, la tendencia diaria, el reparto de respuestas y los comentarios.',
+  'landing.shot.title': 'Así se ve el panel',
+  'landing.shot.caption':
+    'El servidor de demo: ánimo medio, participación, tendencia diaria y comentarios. Cada semana o cada mes el bot también te manda un resumen en imagen por mensaje privado.',
+  'landing.shot.alt': 'Panel de HappyX del servidor de demo',
   'landing.features.title': 'Qué más incluye',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
