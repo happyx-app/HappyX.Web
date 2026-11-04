@@ -7,6 +7,12 @@ describe('previousRange', () => {
     expect(previousRange({ from: '2026-10-01', to: '2026-10-30' })).toEqual({ from: '2026-09-01', to: '2026-09-30' })
     expect(previousRange({ from: '2026-10-26', to: '2026-10-26' })).toEqual({ from: '2026-10-25', to: '2026-10-25' })
   })
+  it('compares a week or month still going with the same days before', () => {
+    expect(previousRange({ from: '2026-11-02', to: '2026-11-04' }, 'this-week')).toEqual({ from: '2026-10-26', to: '2026-10-28' })
+    expect(previousRange({ from: '2026-11-01', to: '2026-11-04' }, 'this-month')).toEqual({ from: '2026-10-01', to: '2026-10-04' })
+    expect(previousRange({ from: '2026-03-01', to: '2026-03-31' }, 'this-month')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+    expect(previousRange({ from: '2026-10-01', to: '2026-10-31' }, 'last-month')).toEqual({ from: '2026-09-01', to: '2026-09-30' })
+  })
 })
 
 describe('delta', () => {
