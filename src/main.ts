@@ -451,7 +451,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     return
   }
   body.removeAttribute('aria-busy')
-  const extra = health ? [healthCard(g, health)] : []
+  const healthSection = health ? healthCard(g, health) : null
+  const extra = healthSection ? [healthSection] : []
   if (r.responses === 0) {
     const next = nextSurveyDay(g.timezone, g.survey_hour, g.working_days ?? [1, 2, 3, 4, 5])
     const longer = preset !== 'last-30' && preset !== 'last-90'
@@ -491,6 +492,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays),
+    ...(health && healthSection ? [healthAlert(health, healthSection)].filter((n): n is HTMLParagraphElement => n !== null) : []),
     h(
       'div',
       { class: 'stats' },
@@ -527,6 +529,26 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     ),
     ...extra,
   )
+}
+
+// «Server status» sits at the bottom of the dashboard. When the last survey didn't reach everyone,
+// or reaches nobody, a line under the summary says so and leads down to it.
+function healthAlert(x: api.Health, card: HTMLElement) {
+  const last = x.last_survey
+  const text =
+    x.audience === 0
+      ? t('health.audience.none')
+      : last && last.failed > 0
+        ? t(last.failed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(last.failed), day: formatDay(last.day, { weekday: 'long' }) })
+        : null
+  if (!text) return null
+  const see = (e: Event) => {
+    e.preventDefault()
+    card.tabIndex = -1
+    card.scrollIntoView({ block: 'start' })
+    card.focus({ preventScroll: true })
+  }
+  return h('p', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, text), h('a', { href: '#', onclick: see }, `${t('health.alert.see')} →`))
 }
 
 // When the next survey and report go out, how the last survey went, and what is left to set up.
