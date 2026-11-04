@@ -773,3 +773,12 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .signin { margin-top: 48px; justify-items: start; }
 .signin h1 { font-size: 1.5rem; margin: 0; }
 .signin p { margin: 0; }
+
+/* «My evolution» without any server: one way for admins, another for everyone else. */
+.empty-choices { display: grid; gap: 20px; width: 100%; max-width: 560px; margin-top: 8px; }
+@media (min-width: 640px) { .empty-choices { grid-template-columns: 1fr 1fr; } }
+.empty-choice { display: grid; gap: 10px; justify-items: center; align-content: start; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); }
+.empty-choice p { margin: 0; }
+.refresh-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 0; }
+.no-access { max-width: 560px; margin: 24px auto 0; }
+.no-access-links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
