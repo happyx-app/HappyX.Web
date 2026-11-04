@@ -27,6 +27,7 @@ export const botLanguages: [code: string, name: string][] = [
 export type Settings = Required<Omit<api.SettingsPatch, 'survey_message' | 'survey_roles'>>
 
 export const settingsOf = (g: api.Guild): Settings => ({
+  survey_enabled: g.survey_enabled ?? true,
   anonymous: g.anonymous,
   timezone: g.timezone,
   language: g.language,
@@ -96,6 +97,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   )
 
   const reportDM = h('input', { id: 'report-dm', type: 'checkbox', role: 'switch', checked: saved.report_dm })
+  const surveyOn = h('input', { id: 'survey-on', type: 'checkbox', role: 'switch', checked: saved.survey_enabled })
 
   const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
     h(
@@ -176,6 +178,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     timezone: tz.value.trim(),
     report_frequency: (freq.map((l) => l.querySelector('input')!).find((i) => i.checked)?.value ?? saved.report_frequency) as Settings['report_frequency'],
     report_dm: reportDM.checked,
+    survey_enabled: surveyOn.checked,
     anonymous: anon.checked,
     games_enabled: games.checked,
     kudos_channel_id: kudosChannel.value,
@@ -205,6 +208,12 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     { class: 'card settings', novalidate: true },
     h('h2', {}, t('settings.title')),
     sub('settings.sub.survey',
+      h(
+        'div',
+        { class: 'field' },
+        h('label', { class: 'switch', for: 'survey-on' }, surveyOn, h('span', {}, t('settings.surveyOn'))),
+        h('p', { class: 'muted small' }, t('settings.surveyOn.help')),
+      ),
       // Short fields sit side by side when the card is wide enough.
       h('div', { class: 'field-row' },
         field('language', t('settings.language'), t('settings.language.help'), language),
