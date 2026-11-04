@@ -693,6 +693,29 @@ function kudosCard(k: api.KudosSummary) {
   )
 }
 
+// Whether the viewer has no answer in the last 12 months. data is the period already loaded.
+async function neverAnswered(period: EvolutionPeriod, data: api.MyMoods) {
+  if (period === 'year') return data.guilds.every((g) => g.responses === 0)
+  const year = evolutionRange('year', todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
+  try {
+    return (await api.myMoods(year.from, year.to)).guilds.every((g) => g.responses === 0)
+  } catch {
+    return false
+  }
+}
+
+// «My evolution» for someone without HappyX on any server: what's missing, and the way to add it.
+function noServerCard() {
+  return h(
+    'div',
+    { class: 'card empty' },
+    h('h2', {}, t('me.noServer.title')),
+    h('p', { class: 'secondary' }, t('me.noServer.body')),
+    h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
+    h('p', { class: 'muted small' }, t('me.noServer.relogin')),
+  )
+}
+
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
@@ -724,7 +747,10 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   }
   body.removeAttribute('aria-busy')
   if (data.guilds.every((g) => g.responses === 0)) {
-    body.replaceChildren(h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    // Someone with no server to manage or play in, and no answer in the last year, most likely
+    // has no server with HappyX: say how to add it instead.
+    const noServer = !api.isDemo && m.guilds.length === 0 && m.games.length === 0 && (await neverAnswered(period, data))
+    body.replaceChildren(noServer ? noServerCard() : h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
