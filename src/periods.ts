@@ -1,7 +1,7 @@
 // Date ranges for the period picker. Days are 'YYYY-MM-DD' strings, like the API's, and
 // "today" is taken in the server's timezone so the dashboard matches the bot's reports.
 
-// Shortest first. The dashboard opens on last-30.
+// Shortest first. The dashboard opens on the period of the latest report (see defaultPreset).
 export const presets = ['this-week', 'last-week', 'this-month', 'last-month', 'last-30', 'last-90'] as const
 export type Preset = (typeof presets)[number]
 
@@ -12,6 +12,15 @@ export interface Range {
 
 export function isPreset(v: string | null): v is Preset {
   return v !== null && (presets as readonly string[]).includes(v)
+}
+
+// The period the dashboard opens on, so it matches the report the admin just got. Weekly reports
+// go out on Monday: Monday and Tuesday show last week, the rest of the week this week. Monthly
+// reports go out on the 1st: the first five days show last month, then the last 30 days.
+export function defaultPreset(frequency: 'weekly' | 'monthly' | undefined, today: string): Preset {
+  if (frequency === 'monthly') return Number(today.slice(8, 10)) <= 5 ? 'last-month' : 'last-30'
+  const weekday = parse(today).getUTCDay() // 0 is Sunday
+  return weekday === 1 || weekday === 2 ? 'last-week' : 'this-week'
 }
 
 export function todayIn(timeZone: string, now = new Date()): string {

@@ -5,7 +5,7 @@ import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
-import { isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
@@ -83,7 +83,8 @@ async function route() {
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
     const p = new URLSearchParams(query).get('p')
-    return renderGuild(me, guildID, isPreset(p) ? p : 'last-30')
+    const g = me.guilds.find((x) => x.discord_guild_id === guildID)
+    return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30')
   }
   if (path === '/me' || (path === '' && me.guilds.length === 0)) {
     const q = new URLSearchParams(query)
@@ -433,7 +434,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     ),
   )
 
-  const before = previousRange(range)
+  const before = previousRange(range, preset)
   let r: api.Report
   let prev: api.Report | null
   // Older APIs don't have it; the dashboard just leaves that card out.

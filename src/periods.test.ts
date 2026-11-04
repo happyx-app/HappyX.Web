@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, isPreset, rangeFor, todayIn } from './periods'
+import { addDays, defaultPreset, isPreset, rangeFor, todayIn } from './periods'
 
 describe('rangeFor', () => {
   const thursday = '2026-10-22'
@@ -46,4 +46,16 @@ it('isPreset', () => {
   expect(isPreset('last-week')).toBe(true)
   expect(isPreset('yesterday')).toBe(false)
   expect(isPreset(null)).toBe(false)
+})
+
+it('defaultPreset follows the report', () => {
+  // 2026-11-02 is a Monday.
+  expect(defaultPreset('weekly', '2026-11-02')).toBe('last-week')
+  expect(defaultPreset('weekly', '2026-11-03')).toBe('last-week')
+  expect(defaultPreset('weekly', '2026-11-04')).toBe('this-week')
+  expect(defaultPreset('weekly', '2026-11-08')).toBe('this-week')
+  expect(defaultPreset(undefined, '2026-11-02')).toBe('last-week')
+  expect(defaultPreset('monthly', '2026-11-01')).toBe('last-month')
+  expect(defaultPreset('monthly', '2026-11-05')).toBe('last-month')
+  expect(defaultPreset('monthly', '2026-11-06')).toBe('last-30')
 })

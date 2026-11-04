@@ -3,7 +3,7 @@
 // rate and when the next survey and report go out.
 
 import type { DayStat, Report, ReportMessage } from './api'
-import { addDays, type Range } from './periods'
+import { addDays, type Preset, type Range } from './periods'
 
 // The rate as a whole percentage, or null without surveys sent.
 export function participationRate(p: { recipients: number; answered: number } | undefined): number | null {
@@ -47,9 +47,23 @@ export function nextReportDay(frequency: 'weekly' | 'monthly', timeZone: string,
   return addDays(today, 8 - isoWeekday(today))
 }
 
-// The range of the same length that ends the day before this one starts.
-export function previousRange(r: Range): Range {
+// The range to compare with: the same length, ending the day before this one starts. «This week»
+// and «this month» are still going, so they compare with the same days of the week or month
+// before (Monday to Wednesday with last Monday to Wednesday, not with the weekend). «Last month»
+// compares with the whole month before it.
+export function previousRange(r: Range, preset?: Preset): Range {
   const days = Math.round((Date.parse(`${r.to}T00:00:00Z`) - Date.parse(`${r.from}T00:00:00Z`)) / 86_400_000) + 1
+  if (preset === 'this-week') return { from: addDays(r.from, -7), to: addDays(r.to, -7) }
+  if (preset === 'last-month') {
+    const to = addDays(r.from, -1)
+    return { from: to.slice(0, 8) + '01', to }
+  }
+  if (preset === 'this-month') {
+    const lastOfPrev = addDays(r.from, -1)
+    const from = lastOfPrev.slice(0, 8) + '01'
+    const to = addDays(from, days - 1)
+    return { from, to: to > lastOfPrev ? lastOfPrev : to }
+  }
   return { from: addDays(r.from, -days), to: addDays(r.from, -1) }
 }
 
