@@ -55,6 +55,7 @@ async function route() {
   try {
     me ??= await api.me()
     me.games ??= []
+    me.member_guilds ??= []
   } catch (err) {
     showCanvas(null)
     // The legal pages are public, and must stay readable even if the API is down.
@@ -206,7 +207,7 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
         'nav',
         { class: 'nav' },
         h('a', { href: '#/me', class: active === 'me' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'me' ? 'page' : undefined }, t('nav.me')),
-        m.guilds.length > 0
+        m.guilds.length > 0 || memberGuilds(m).length > 0
           ? h('a', { href: '#/', class: active === 'servers' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'servers' ? 'page' : undefined }, t('nav.servers'))
           : null,
         m.games.length > 0
@@ -247,7 +248,13 @@ function renderLanding(m: api.Me | null) {
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
   const add = () => h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add'))
   const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
-  const enter = (cls = 'btn btn-outline') => (m ? h('a', { class: cls, href: '#/' }, t('landing.dashboard')) : h('a', { class: cls, href: api.loginURL }, t('landing.login')))
+  // Someone without any dashboard goes to «My evolution», and the button says so.
+  const enter = (cls = 'btn btn-outline') =>
+    !m
+      ? h('a', { class: cls, href: api.loginURL }, t('landing.login'))
+      : m.guilds.length
+        ? h('a', { class: cls, href: '#/' }, t('landing.dashboard'))
+        : h('a', { class: cls, href: '#/me' }, t('nav.me'))
   const feature = (title: string, body: string) => h('li', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body))
   // A real capture of the demo dashboard, in the page's language and theme.
   const shotLang = lang === 'es' ? 'es' : 'en'
@@ -359,8 +366,28 @@ function surveyMock() {
   )
 }
 
+const memberGuilds = (m: api.Me) => m.member_guilds ?? []
+
+// A server where the user is a member without access to the dashboard: its name, and its page
+// shows the team canvas.
+const memberGuildCard = (g: api.GameGuild) =>
+  h(
+    'li',
+    {},
+    h(
+      'a',
+      { class: 'card guild-card', href: `#/g/${g.discord_guild_id}` },
+      h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
+      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, t('guilds.access.none'))),
+    ),
+  )
+
+// «Already added it?» and a button that rereads the user's servers from Discord.
+const refreshLine = (next?: string, label = t('guilds.refresh')) =>
+  h('p', { class: 'muted small refresh-line' }, t('guilds.added'), ' ', h('a', { class: 'btn btn-outline', href: api.refreshURL(next) }, label))
+
 function renderGuilds(m: api.Me) {
-  const list = m.guilds.length
+  const list = m.guilds.length || memberGuilds(m).length
     ? h(
         'ul',
         { class: 'guild-list' },
@@ -385,6 +412,7 @@ function renderGuilds(m: api.Me) {
             ),
           ),
         ),
+        ...memberGuilds(m).map(memberGuildCard),
       )
     : h(
         'div',
@@ -393,14 +421,42 @@ function renderGuilds(m: api.Me) {
         h('p', { class: 'secondary' }, t('guilds.empty.body')),
         h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
         // The servers you own or administer come from Discord when you log in.
-        h('p', { class: 'muted small' }, t('guilds.empty.relogin')),
+        refreshLine(),
       )
   page(header(m), h('main', { class: 'container' }, h('h1', {}, t('guilds.title')), list))
+}
+
+// A member without access to the dashboard sees the server's name and its team canvas behind,
+// and the way to their own answers and the game.
+function renderMemberGuild(m: api.Me, g: api.GameGuild) {
+  const plays = m.games.some((x) => x.discord_guild_id === g.discord_guild_id)
+  page(
+    header(m),
+    h(
+      'main',
+      { class: 'container' },
+      h('h1', {}, g.name),
+      h(
+        'div',
+        { class: 'card empty no-access' },
+        h('h2', {}, t('guild.noAccess.title')),
+        h('p', { class: 'secondary' }, t('guild.noAccess.body')),
+        h(
+          'p',
+          { class: 'no-access-links' },
+          h('a', { class: 'btn', href: '#/me' }, t('nav.me')),
+          plays ? h('a', { class: 'btn', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
+        ),
+      ),
+    ),
+  )
 }
 
 async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
+    const member = memberGuilds(m).find((x) => x.discord_guild_id === guildID)
+    if (member) return renderMemberGuild(m, member)
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
     return
   }
@@ -709,14 +765,30 @@ async function neverAnswered(period: EvolutionPeriod, data: api.MyMoods) {
 }
 
 // «My evolution» for someone without HappyX on any server: what's missing, and the way to add it.
+// Admins add it; everyone else asks an admin, and can look at the demo meanwhile.
 function noServerCard() {
   return h(
     'div',
     { class: 'card empty' },
     h('h2', {}, t('me.noServer.title')),
     h('p', { class: 'secondary' }, t('me.noServer.body')),
-    h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
-    h('p', { class: 'muted small' }, t('me.noServer.relogin')),
+    h(
+      'div',
+      { class: 'empty-choices' },
+      h(
+        'div',
+        { class: 'empty-choice' },
+        h('p', {}, h('strong', {}, t('me.noServer.admin'))),
+        h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add')),
+        refreshLine('/me', t('me.noServer.refresh')),
+      ),
+      h(
+        'div',
+        { class: 'empty-choice' },
+        h('p', {}, h('strong', {}, t('me.noServer.member')), ' ', t('me.noServer.ask')),
+        h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo')),
+      ),
+    ),
   )
 }
 
@@ -724,19 +796,21 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
+  const periods = h(
+    'div',
+    { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
+    ...evolutionPeriods.map((p) =>
+      h('a', { href: href(p, filter), ...(p === period ? { 'aria-current': 'page' } : {}), class: p === period ? 'seg seg-on' : 'seg' }, t(`me.period.${p}`)),
+    ),
+  )
   page(
     header(m, 'me'),
     h(
       'main',
       { class: 'container' },
-      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), h('p', { class: 'me-dates' }, formatRange(range.from, range.to))),
-      h(
-        'div',
-        { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
-        ...evolutionPeriods.map((p) =>
-          h('a', { href: href(p, filter), ...(p === period ? { 'aria-current': 'page' } : {}), class: p === period ? 'seg seg-on' : 'seg' }, t(`me.period.${p}`)),
-        ),
-      ),
+      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), dates),
+      periods,
       body,
     ),
   )
@@ -753,7 +827,12 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   if (data.guilds.every((g) => g.responses === 0)) {
     // Someone with no server to manage or play in, and no answer in the last year, most likely
     // has no server with HappyX: say how to add it instead.
-    const noServer = !api.isDemo && m.guilds.length === 0 && m.games.length === 0 && (await neverAnswered(period, data))
+    const noServer = !api.isDemo && m.guilds.length === 0 && m.games.length === 0 && memberGuilds(m).length === 0 && (await neverAnswered(period, data))
+    // Without a single answer, the period and its dates say nothing.
+    if (noServer) {
+      dates.remove()
+      periods.remove()
+    }
     body.replaceChildren(noServer ? noServerCard() : h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
@@ -1108,8 +1187,8 @@ function renderGames(m: api.Me) {
           ),
         ),
       )
-    : h('div', { class: 'card empty' }, h('p', {}, t('game.notFound')))
-  page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t('games.title')), list))
+    : h('div', { class: 'card empty' }, h('p', {}, t('games.empty')))
+  page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
 }
 
 async function renderGame(m: api.Me, guildID: string) {

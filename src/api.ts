@@ -90,6 +90,9 @@ export interface Me {
   user: User
   guilds: Guild[]
   games: GameGuild[]
+  // Servers with HappyX where the user is a member without access to the dashboard. Older APIs
+  // leave it out.
+  member_guilds?: GameGuild[]
 }
 
 export interface DayStat {
@@ -252,6 +255,9 @@ export function isDemoPath(path: string): boolean {
 const base = isDemo ? `/api/web/demo/${lang}` : '/api/web'
 
 export const loginURL = '/api/web/auth/login'
+// Logging in again rereads from Discord the servers the user owns or administers. Discord skips
+// its consent screen for an app already allowed, so this is one quick round trip.
+export const refreshURL = (next?: string) => (next ? `${loginURL}?next=${encodeURIComponent(next)}` : loginURL)
 export const inviteURL = '/api/web/auth/invite'
 
 export class Unauthorized extends Error {}
