@@ -18,8 +18,12 @@ const en = {
     'HappyX is a Discord bot that asks your team how they feel every working day, by direct message. It takes two seconds to answer. Every week or month you get a report with the results.',
   'landing.shot.title': 'What the dashboard looks like',
   'landing.shot.caption':
-    'The demo server: average mood, participation, daily trend and comments. Every week or month the bot also sends you a summary image by direct message.',
+    'The demo server: average mood, participation, daily trend and comments.',
   'landing.shot.alt': 'HappyX dashboard for the demo server',
+  'landing.report.title': 'The report',
+  'landing.report.body': 'Every week or month, the bot sends the admin this summary by direct message.',
+  'landing.report.alt': 'Weekly report image: average mood, answers, people, kudos, mood per day and answers by mood',
+  'landing.free': 'Free while in beta.',
   'landing.features.title': 'What else it does',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -39,7 +43,7 @@ const en = {
   'landing.privacy.4':
     'Anyone can leave the survey with one button and download or erase their data. Admins can remove HappyX and all its data from the settings.',
   'landing.cta.title': 'Add HappyX to your server',
-  'landing.cta.body': 'The survey starts when you say so.',
+  'landing.cta.body': 'The survey starts when you say so. When you add the bot, it sends you a setup assistant by direct message to choose the time, the language and who gets it.',
   'landing.failed': "We couldn't log you in. Try again.",
   'signin.guild': "Log in to see your server's dashboard",
   'signin.game': "Log in to play «Who's who?»",
@@ -499,8 +503,12 @@ const es: Record<Key, string> = {
     'HappyX es un bot de Discord que pregunta a tu equipo cómo se siente cada día laborable, por mensaje privado. Se responde en dos segundos. Cada semana o cada mes recibes un report con los resultados.',
   'landing.shot.title': 'Así se ve el panel',
   'landing.shot.caption':
-    'El servidor de demo: ánimo medio, participación, tendencia diaria y comentarios. Cada semana o cada mes el bot también te manda un resumen en imagen por mensaje privado.',
+    'El servidor de demo: ánimo medio, participación, tendencia diaria y comentarios.',
   'landing.shot.alt': 'Panel de HappyX del servidor de demo',
+  'landing.report.title': 'El report',
+  'landing.report.body': 'Cada semana o cada mes, el bot le manda al admin este resumen por mensaje privado.',
+  'landing.report.alt': 'Imagen del report semanal: ánimo medio, respuestas, personas, kudos, ánimo por día y respuestas por ánimo',
+  'landing.free': 'Gratis mientras está en beta.',
   'landing.features.title': 'Qué más incluye',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -521,7 +529,7 @@ const es: Record<Key, string> = {
   'landing.privacy.4':
     'Cualquiera puede dejar la encuesta con un botón y descargar o borrar sus datos. Los admins pueden quitar HappyX y todos sus datos desde los ajustes.',
   'landing.cta.title': 'Añade HappyX a tu servidor',
-  'landing.cta.body': 'La encuesta empieza cuando tú digas.',
+  'landing.cta.body': 'La encuesta empieza cuando tú digas. Al añadir el bot, te manda por mensaje privado un asistente para elegir la hora, el idioma y quién la recibe.',
   'landing.failed': 'No hemos podido iniciar sesión. Vuelve a intentarlo.',
   'signin.guild': 'Entra para ver el panel de tu servidor',
   'signin.game': 'Entra para jugar a «¿Quién es quién?»',

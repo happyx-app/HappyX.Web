@@ -24,6 +24,8 @@ import panelEnLightPhone from './landing/panel-en-light-movil.jpg'
 import panelEnDarkPhone from './landing/panel-en-dark-movil.jpg'
 import panelEsLightPhone from './landing/panel-es-light-movil.jpg'
 import panelEsDarkPhone from './landing/panel-es-dark-movil.jpg'
+import reportEn from './landing/report-en.jpg'
+import reportEs from './landing/report-es.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
 import { reloadCanvas, showCanvas } from './canvas'
@@ -290,6 +292,7 @@ function renderLanding(m: api.Me | null) {
           h('p', { class: 'lead secondary' }, t('landing.body')),
           failed ? h('p', { class: 'alert', role: 'alert' }, t('landing.failed')) : null,
           h('div', { class: 'actions' }, add(), demo()),
+          h('p', { class: 'muted' }, t('landing.free')),
         ),
         h('div', { class: 'hero-art' }, surveyMock()),
       ),
@@ -298,6 +301,13 @@ function renderLanding(m: api.Me | null) {
         { class: 'landing-section' },
         h('h2', {}, t('landing.shot.title')),
         h('figure', { class: 'shot' }, h('div', { class: 'shot-frame' }, shot('light'), shot('dark')), h('figcaption', {}, t('landing.shot.caption'))),
+      ),
+      // The report image exactly as the bot draws it, for the demo's made-up week.
+      h(
+        'section',
+        { class: 'landing-section report-shot' },
+        h('div', {}, h('h2', {}, t('landing.report.title')), h('p', { class: 'secondary' }, t('landing.report.body'))),
+        h('img', { src: lang === 'es' ? reportEs : reportEn, alt: t('landing.report.alt'), width: 1200, height: 1234, loading: 'lazy', decoding: 'async' }),
       ),
       h(
         'section',
