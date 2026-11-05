@@ -660,7 +660,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   )
 }
 
-// «To look at»: at most three lines under the summary, from fixed rules on the team's own numbers,
+// «To review»: at most three lines under the summary, from fixed rules on the team's own numbers,
 // each leading to where to look. Without any, the section is left out.
 type Watch = { text: string; go: () => void }
 
