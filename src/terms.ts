@@ -24,7 +24,7 @@ const es = (): Policy => ({
       body: [
         {
           p: [
-            'HappyX manda una encuesta de ánimo por mensaje privado los días que elige cada servidor, guarda las respuestas y enseña los resultados en la web y en un report. También tiene kudos y el juego «¿Quién es quién?». Ahora mismo es gratuito. Si algún día deja de serlo, se avisará antes.',
+            'HappyX manda una encuesta de ánimo por mensaje privado los días que elige cada servidor, guarda las respuestas y enseña los resultados en la web y en un report. También tiene kudos y el juego «¿Quién es quién?».',
           ],
         },
       ],
@@ -141,7 +141,7 @@ const en = (): Policy => ({
       body: [
         {
           p: [
-            'HappyX sends a mood survey by direct message on the days each server picks, keeps the answers and shows the results on the website and in a report. It also has kudos and the «Who’s who?» game. It is free for now. If that ever changes, you’ll be told in advance.',
+            'HappyX sends a mood survey by direct message on the days each server picks, keeps the answers and shows the results on the website and in a report. It also has kudos and the «Who’s who?» game.',
           ],
         },
       ],
