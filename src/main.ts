@@ -6,8 +6,8 @@ import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { comparable, delta, extremeDays, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
-import { dangerZone, settingsForm, surveyMessageCard } from './settings'
+import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
+import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
 import { gamePage } from './game'
@@ -573,6 +573,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   body.removeAttribute('aria-busy')
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
+  if (r.responses === 0 && isNewGuild(g.created_at)) {
+    body.replaceChildren(firstSteps(g), ...extra)
+    return
+  }
   if (r.responses === 0) {
     const next = nextSurveyDay(g.timezone, g.survey_hour, g.working_days ?? [1, 2, 3, 4, 5])
     const longer = preset !== 'last-30' && preset !== 'last-90'
@@ -653,6 +657,30 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   )
 }
 
+// A server added less than 14 days ago and still without answers: what it is set to, and where
+// to change it, instead of «no answers in this period». Whether the survey is on, and when it goes
+// out, is in «Server status» below.
+function firstSteps(g: api.Guild) {
+  const settings = `#/g/${g.discord_guild_id}/settings`
+  const manage = api.canManage(g)
+  const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
+  const item = (done: boolean | null, text: string, link?: string) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: settings }, `${link} →`) : null)
+  const language = botLanguages.find(([code]) => code === g.language)?.[1] ?? g.language
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', {}, t('first.title')),
+    h(
+      'ul',
+      { class: 'todo' },
+      item(null, t('first.language', { language }), t('first.change')),
+      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
+      item(null, t('first.assistant')),
+    ),
+  )
+}
+
 // «Server status» sits at the bottom of the dashboard. When the last survey didn't reach everyone,
 // or reaches nobody, a line under the summary says so and leads down to it.
 function healthAlert(x: api.Health, card: HTMLElement) {
@@ -702,7 +730,7 @@ function healthCard(g: api.Guild, x: api.Health) {
       tile(t('health.nextSurvey'), !surveyOn ? t('health.survey.offShort') : next ? `${formatDay(next, long)}, ${hour}` : t('health.noDays'), surveyOn ? g.timezone : t('health.survey.offNote')),
       tile(
         t('health.lastSurvey'),
-        last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),
+        last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t(isNewGuild(g.created_at) ? 'health.none.yet' : 'health.none'),
         last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : '',
       ),
       // Without answers there is no report to send, so while the survey is off there is no date.
@@ -1094,7 +1122,7 @@ function renderSettings(m: api.Me, guildID: string) {
       h(
         'div',
         { class: 'settings-layout' },
-        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name)),
+        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name), h('p', { class: 'muted' }, t('settings.assistant'))),
         sectionNav(cards),
         h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card)),
       ),
