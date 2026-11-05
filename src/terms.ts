@@ -5,7 +5,7 @@ import { lang } from './i18n'
 import { legalPage, type Policy } from './policy'
 
 // The day the text last changed, shown at the top.
-export const updated = '2026-11-01'
+export const updated = '2026-11-05'
 
 const link = (href: string) => (text: string) => ({ text, href })
 const policy = link('#/privacy-policy')
