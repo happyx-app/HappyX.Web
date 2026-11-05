@@ -667,7 +667,7 @@ function healthCard(g: api.Guild, x: api.Health) {
   if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
   todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
-  todo.push(item(g.games_enabled, t(g.games_enabled ? 'health.game.on' : 'health.game.off'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
+  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
   return h(
     'section',
     { class: 'card' },
