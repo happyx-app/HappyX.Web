@@ -23,7 +23,6 @@ const en = {
   'landing.report.title': 'The report',
   'landing.report.body': 'Every week or month you get this image by direct message.',
   'landing.report.alt': 'Weekly report image: average mood, answers, people, kudos, mood per day and answers by mood',
-  'landing.free': 'Free while in beta.',
   'landing.features.title': 'What else it does',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -508,7 +507,6 @@ const es: Record<Key, string> = {
   'landing.report.title': 'El report',
   'landing.report.body': 'Cada semana o cada mes te llega esta imagen por mensaje privado.',
   'landing.report.alt': 'Imagen del report semanal: ánimo medio, respuestas, personas, kudos, ánimo por día y respuestas por ánimo',
-  'landing.free': 'Gratis mientras está en beta.',
   'landing.features.title': 'Qué más incluye',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':

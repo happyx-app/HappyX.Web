@@ -292,7 +292,6 @@ function renderLanding(m: api.Me | null) {
           h('p', { class: 'lead secondary' }, t('landing.body')),
           failed ? h('p', { class: 'alert', role: 'alert' }, t('landing.failed')) : null,
           h('div', { class: 'actions' }, add(), demo()),
-          h('p', { class: 'muted' }, t('landing.free')),
         ),
         h('div', { class: 'hero-art' }, surveyMock()),
       ),
