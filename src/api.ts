@@ -93,6 +93,8 @@ export interface Me {
   // Servers with HappyX where the user is a member without access to the dashboard. Older APIs
   // leave it out.
   member_guilds?: GameGuild[]
+  // Servers where the user paused the survey («Don't ask me again»); older APIs leave it out.
+  paused_guilds?: GameGuild[]
 }
 
 export interface DayStat {
@@ -386,6 +388,11 @@ export const eraseMyData = (confirmName: string) => sendJSON<void>('DELETE', '/m
 // downloadGuildData saves the server's data as JSON, with the dashboard's anonymity.
 export const downloadGuildData = (guildID: string) =>
   download(`/guilds/${encodeURIComponent(guildID)}/export`, `happyx-${guildID}.json`)
+
+// setMySurvey resumes (or pauses) the survey for the logged-in user in one server, like
+// /happyx resume in Discord.
+export const setMySurvey = (guildID: string, active: boolean) =>
+  sendJSON<{ active: boolean }>('PUT', `/guilds/${encodeURIComponent(guildID)}/me/survey`, { active })
 
 export const answerGame = (guildID: string, answer: string) =>
   sendJSON<{ week: string; answer: string }>('PUT', `/guilds/${encodeURIComponent(guildID)}/game/answer`, { answer })

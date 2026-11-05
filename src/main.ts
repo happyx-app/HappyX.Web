@@ -56,6 +56,7 @@ async function route() {
     me ??= await api.me()
     me.games ??= []
     me.member_guilds ??= []
+    me.paused_guilds ??= []
   } catch (err) {
     showCanvas(null)
     // The legal pages are public, and must stay readable even if the API is down.
@@ -465,6 +466,28 @@ async function renderConnecting(m: api.Me, guildID: string) {
   )
 }
 
+// «Your survey is paused in <server>» and the button that turns it back on, as /happyx resume does
+// in Discord. Afterwards the page is drawn again without it.
+function pausedNotice(g: api.GameGuild) {
+  const note = h('p', { class: 'alert small', role: 'alert', hidden: true }, t('paused.failed'))
+  const button = h('button', { class: 'btn', type: 'button' }, t('paused.resume'))
+  button.addEventListener('click', async () => {
+    button.disabled = true
+    note.hidden = true
+    try {
+      await api.setMySurvey(g.discord_guild_id, true)
+      me = null
+      route()
+    } catch {
+      button.disabled = false
+      note.hidden = false
+    }
+  })
+  return h('div', { class: 'card paused-notice' }, h('p', {}, t('paused.text', { server: g.name })), button, note)
+}
+
+const pausedIn = (m: api.Me, guildID?: string) => (m.paused_guilds ?? []).filter((g) => guildID === undefined || g.discord_guild_id === guildID)
+
 // A member without access to the dashboard sees the server's name and its team canvas behind,
 // and the way to their own answers and the game.
 function renderMemberGuild(m: api.Me, g: api.GameGuild) {
@@ -475,6 +498,7 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
       'main',
       { class: 'container' },
       h('h1', {}, g.name),
+      ...pausedIn(m, g.discord_guild_id).map(pausedNotice),
       h(
         'div',
         { class: 'card empty no-access' },
@@ -849,6 +873,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       'main',
       { class: 'container' },
       h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), dates),
+      ...pausedIn(m).map(pausedNotice),
       periods,
       body,
     ),
