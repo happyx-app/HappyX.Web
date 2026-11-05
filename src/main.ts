@@ -570,6 +570,16 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     body.replaceChildren(errorCard(err))
     return
   }
+  // A default period without answers, when this week has some (a new server, early in the
+  // month): open on this week instead.
+  const thisWeek = rangeFor('this-week', todayIn(g.timezone))
+  if (r.responses === 0 && !chosen && preset !== 'this-week') {
+    const now = await api.report(guildID, thisWeek.from, thisWeek.to).catch(() => null)
+    if (now && now.responses > 0) {
+      history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
+      return renderGuild(m, guildID, 'this-week')
+    }
+  }
   body.removeAttribute('aria-busy')
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
@@ -594,7 +604,6 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   // the dashboard opens on it, unless the period was chosen.
   const answeredDays = r.days.filter((d) => d.responses > 0)
   const few = answeredDays.length < fewDays
-  const thisWeek = rangeFor('this-week', todayIn(g.timezone))
   if (few && !chosen && preset !== 'this-week' && answeredDays.every((d) => d.day >= thisWeek.from)) {
     history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
     return renderGuild(m, guildID, 'this-week')
