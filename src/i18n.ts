@@ -186,7 +186,7 @@ const en = {
   'me.empty.title': "You haven't answered in this period",
   'paused.text': 'Your survey is paused in {server}.',
   'paused.resume': 'Resume',
-  'paused.failed': "Couldn't resume it. Try again.",
+  'paused.failed': "Couldn't resume. Try again.",
   'me.noServer.title': "You haven't answered a survey yet",
   'me.noServer.body': 'The survey arrives by Discord direct message from servers with HappyX.',
   'me.noServer.admin': 'Admin of a server?',
