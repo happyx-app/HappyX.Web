@@ -705,7 +705,10 @@ function healthCard(g: api.Guild, x: api.Health) {
         last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),
         last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : '',
       ),
-      tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm')),
+      // Without answers there is no report to send, so while the survey is off there is no date.
+      surveyOn
+        ? tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm'))
+        : tile(t('health.nextReport'), t('health.report.none'), t('health.survey.offNote')),
     ),
     h('ul', { class: 'todo' }, ...todo),
   )
