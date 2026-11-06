@@ -858,6 +858,22 @@ function noServerCard() {
   )
 }
 
+// «My evolution» without answers, when the survey is off in every server the viewer manages and
+// they get it from no other server: it says so instead of «the survey reaches you», and leads to
+// where it starts.
+function surveyOffCard(m: api.Me) {
+  if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
+  const one = m.guilds.length === 1 ? m.guilds[0] : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
+  return h(
+    'div',
+    { class: 'card empty' },
+    h('h2', {}, one ? t('me.off.title', { server: one.name }) : t('me.off.title.many')),
+    h('p', { class: 'secondary' }, t(one && !api.canManage(one) ? 'me.off.body.ask' : 'me.off.body')),
+    start,
+  )
+}
+
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
@@ -900,7 +916,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       dates.remove()
       periods.remove()
     }
-    body.replaceChildren(noServer ? noServerCard() : h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    body.replaceChildren(noServer ? noServerCard() : surveyOffCard(m) ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
