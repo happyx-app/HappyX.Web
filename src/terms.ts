@@ -5,7 +5,7 @@ import { lang } from './i18n'
 import { legalPage, type Policy } from './policy'
 
 // The day the text last changed, shown at the top.
-export const updated = '2026-11-01'
+export const updated = '2026-11-06'
 
 const link = (href: string) => (text: string) => ({ text, href })
 const policy = link('#/privacy-policy')
@@ -75,7 +75,7 @@ const es = (): Policy => ({
       body: [
         {
           p: [
-            'Tus comentarios, kudos y respuestas y preguntas del juego siguen siendo tuyos. Permites a HappyX guardarlos y enseñarlos como explica la ',
+            'Lo que escribes en HappyX (comentarios, kudos, respuestas y preguntas del juego) sigue siendo tuyo. Permites a HappyX guardarlo y enseñarlo como explica la ',
             policy('política de privacidad'),
             ', solo para que el servicio funcione.',
           ],
@@ -89,7 +89,7 @@ const es = (): Policy => ({
           ul: [
             ['Se ofrece tal cual. No se garantiza que esté siempre disponible ni libre de errores, y puede cambiar o cerrar. Si cierra, se avisará antes en la web para que puedas descargar tus datos.'],
             ['HappyX no es una herramienta médica ni de salud mental. Si alguien de tu equipo está mal, la encuesta no sustituye hablar con esa persona ni la ayuda de un profesional.'],
-            ['En la medida en que lo permita la ley, HappyX no responde de daños indirectos ni de las decisiones que los admins tomen con sus datos.'],
+            ['En la medida en que lo permita la ley, HappyX no responde de daños indirectos ni de las decisiones que los admins tomen con lo que ven en HappyX.'],
           ],
         },
       ],
@@ -113,7 +113,7 @@ const es = (): Policy => ({
           p: [
             'Con «No volver a preguntar» dejas de recibir la encuesta de ese servidor, y en ',
             yourData('Tus datos'),
-            ' borras lo que has respondido. Un admin puede quitar HappyX del servidor, o eliminar el servidor y todos sus datos desde la Zona de peligro. Qué pasa con los datos en cada caso lo explica la ',
+            ' borras lo que has respondido. Un admin puede quitar HappyX del servidor, o eliminar el servidor de HappyX, con todos sus datos, desde su Zona de peligro. Qué pasa con los datos en cada caso lo explica la ',
             policy('política de privacidad'),
             '.',
           ],
@@ -192,7 +192,7 @@ const en = (): Policy => ({
       body: [
         {
           p: [
-            'Your comments, kudos and game answers and questions stay yours. You let HappyX keep and show them as the ',
+            'What you write in HappyX (comments, kudos, game answers and questions) stays yours. You let HappyX keep and show it as the ',
             policy('privacy policy'),
             ' explains, only so the service works.',
           ],
@@ -206,7 +206,7 @@ const en = (): Policy => ({
           ul: [
             ['It is provided as is. It is not guaranteed to be always available or free of errors, and it may change or close. If it closes, there will be notice on the website so you can download your data.'],
             ['HappyX is not a medical or mental health tool. If someone on your team is struggling, the survey doesn’t replace talking to them or professional help.'],
-            ['As far as the law allows, HappyX is not liable for indirect damages or for decisions admins make with its data.'],
+            ['As far as the law allows, HappyX is not liable for indirect damages or for decisions admins make with what they see in HappyX.'],
           ],
         },
       ],
@@ -230,7 +230,7 @@ const en = (): Policy => ({
           p: [
             '«Don’t ask me again» stops that server’s survey, and in ',
             yourData('Your data'),
-            ' you erase what you answered. An admin can remove HappyX from the server, or delete the server and all its data from the Danger zone. The ',
+            ' you erase what you answered. An admin can remove HappyX from the server, or delete the server from HappyX, with all its data, in its Danger zone. The ',
             policy('privacy policy'),
             ' explains what happens to the data in each case.',
           ],
