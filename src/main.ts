@@ -84,7 +84,7 @@ async function route() {
   }
   if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
-  if (settingsID) return renderSettings(me, settingsID)
+  if (settingsID) return renderSettings(me, settingsID, new URLSearchParams(query).get('f'))
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
     const q = new URLSearchParams(query)
@@ -724,8 +724,8 @@ function firstSteps(g: api.Guild) {
   const settings = `#/g/${g.discord_guild_id}/settings`
   const manage = api.canManage(g)
   const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
-  const item = (done: boolean | null, text: string, link?: string) =>
-    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: settings }, `${link} →`) : null)
+  const item = (done: boolean | null, text: string, link?: string, field?: string) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: `${settings}?f=${field}` }, `${link} →`) : null)
   const language = botLanguages.find(([code]) => code === g.language)?.[1] ?? g.language
   return h(
     'section',
@@ -734,8 +734,8 @@ function firstSteps(g: api.Guild) {
     h(
       'ul',
       { class: 'todo' },
-      item(null, t('first.language', { language }), t('first.change')),
-      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
+      item(null, t('first.language', { language }), t('first.change'), 'language'),
+      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change'), 'hour'),
       item(null, t('first.assistant')),
     ),
   )
@@ -787,12 +787,12 @@ function healthCard(g: api.Guild, x: api.Health) {
     h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
-  if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
-  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
+  if (!surveyOn) todo.push(item(false, t('health.survey.off'), [`${settings}?f=survey-on`, t('health.start')]))
+  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [`${settings}?f=${surveyRolesSection}`, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
-  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
+  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   return h(
     'section',
     { class: 'card' },
@@ -969,7 +969,7 @@ function noServerCard() {
 function surveyOffCard(m: api.Me) {
   if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
   const one = m.guilds.length === 1 ? m.guilds[0] : null
-  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings?f=survey-on` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
   return h(
     'div',
     { class: 'card empty' },
@@ -1163,7 +1163,7 @@ function swatch(color: string) {
   return el
 }
 
-function renderSettings(m: api.Me, guildID: string) {
+function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
@@ -1225,7 +1225,18 @@ function renderSettings(m: api.Me, guildID: string) {
       ),
     ),
   )
+  stickUnderTopbar()
+  // «Start →», «Change →» and the like open the page on the control they are about.
+  const target = focus ? document.getElementById(focus) : null
+  if (target) {
+    target.scrollIntoView({ block: 'center' })
+    if (target.tabIndex < 0 && !target.matches('input, select, textarea, button')) target.tabIndex = -1
+    target.focus({ preventScroll: true })
+  }
 }
+
+// The «Who gets the survey» card, for links that lead to it (see renderSettings' sections).
+const surveyRolesSection = 'section-2'
 
 // sectionNav lists the settings cards beside them on a wide screen and above them on a phone.
 // The links scroll instead of changing the hash, which the router owns, and the one being read
@@ -1237,7 +1248,17 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   )
   let pinned = -1
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
-  const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))
+  // On a phone the list is one scrolling row: the marked section stays in view, and the edge fades
+  // while there are more sections to the right.
+  const fade = () => nav.classList.toggle('more-right', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2)
+  nav.addEventListener('scroll', fade, { passive: true })
+  requestAnimationFrame(fade)
+  const mark = (i: number) =>
+    links.forEach((l, j) => {
+      if (j !== i) return l.removeAttribute('aria-current')
+      l.setAttribute('aria-current', 'true')
+      if (nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: l.offsetLeft - nav.clientWidth / 2 + l.offsetWidth / 2 })
+    })
   mark(0)
   const visible = new Set<Element>()
   const spy = new IntersectionObserver(
@@ -1256,6 +1277,16 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   addEventListener('wheel', () => (pinned = -1), { passive: true })
   addEventListener('touchmove', () => (pinned = -1), { passive: true })
   return nav
+}
+
+// The settings list sticks under the top bar, whose height depends on the width (on a phone the
+// links wrap to a second row). The demo's head stops sticking on a phone, and then counts as 0.
+function stickUnderTopbar() {
+  const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
+  if (!bar) return
+  const set = () => document.documentElement.style.setProperty('--topbar-h', getComputedStyle(bar).position === 'sticky' ? `${bar.offsetHeight}px` : '0px')
+  new ResizeObserver(set).observe(bar)
+  set()
 }
 
 // refreshAfterHandover reloads what the user can do once they gave the main admin to someone

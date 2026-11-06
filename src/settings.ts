@@ -9,6 +9,7 @@ import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
 import * as survey from './surveyMessage'
 import { filterOf, needsRoles, type RoleFilterEditor, roleFilterEditor, toSave } from './surveyRoles'
+import { unsavedNote } from './unsaved'
 import { canvasState, confirmClear, countDrawings, onCanvasChange } from './canvas'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
@@ -421,7 +422,7 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       h('div', { class: 'field' }, h('p', { class: 'field-label' }, t('survey.vars.title')), h('p', { class: 'muted small' }, t('survey.vars')), h('ul', { class: 'survey-vars' }, ...vars)),
     ),
     h('div', { class: 'field' }, previewTitle, preview, h('p', { class: 'muted small' }, icons.inline(icons.lock), t('survey.always'))),
-    h('div', { class: 'form-actions' }, save, status),
+    h('div', { class: 'form-actions' }, save, unsavedNote(save), status),
   )
   form.addEventListener('input', refresh)
   // The preview follows the language and anonymity chosen in the settings form above.
