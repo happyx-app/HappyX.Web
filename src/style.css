@@ -404,6 +404,10 @@ a { color: var(--accent); }
   font: inherit; color: var(--ink); background: var(--surface); width: 100%;
   border: 1px solid var(--control-border); border-radius: 10px; padding: 9px 12px;
 }
+.settings input[type='date'] {
+  font: inherit; color: var(--ink); background: var(--surface); width: 100%;
+  border: 1px solid var(--control-border); border-radius: 10px; padding: 8px 12px;
+}
 .settings select:disabled, .settings input:disabled { opacity: 0.6; }
 .settings input:invalid { border-color: var(--danger); }
 .radios { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -569,6 +573,12 @@ main:focus { outline: none; }
 .btn-icon { padding: 6px 8px; line-height: 1; color: var(--muted); }
 .btn-icon:hover { color: var(--danger); }
 .grant-empty[hidden] { display: none; }
+.vacation-form { display: grid; gap: 16px; }
+.vacation-form > p, .vacation-summary > p { margin: 0; }
+.vacation-form[hidden] { display: none; }
+.vacation-summary { display: grid; gap: 12px; }
+.vacation-list .grant { grid-template-columns: minmax(0, 1fr) auto; }
+.vacation-list .vacation-row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .radios.stacked { flex-direction: column; align-items: flex-start; }
 .role-filter { display: grid; gap: 16px; }
 .role-filter .grant { grid-template-columns: minmax(0, 1fr) auto; }

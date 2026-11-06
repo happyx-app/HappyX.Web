@@ -10,6 +10,7 @@ import { comparable, delta, extremeDays, filterMessages, highestWeekday, lowestW
 import { dangerZone, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
+import { guildVacationsCard, myVacationCard } from './vacation'
 import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { policyPage } from './policy'
@@ -486,6 +487,8 @@ function pausedNotice(g: api.GameGuild) {
   return h('div', { class: 'card paused-notice' }, h('p', {}, t('paused.text', { server: g.name })), button, note)
 }
 
+const inAnyServer = (m: api.Me) => m.guilds.length > 0 || m.games.length > 0 || memberGuilds(m).length > 0 || pausedIn(m).length > 0
+
 const pausedIn = (m: api.Me, guildID?: string) => (m.paused_guilds ?? []).filter((g) => guildID === undefined || g.discord_guild_id === guildID)
 
 // A member without access to the dashboard sees the server's name and its team canvas behind,
@@ -691,6 +694,8 @@ function healthCard(g: api.Guild, x: api.Health) {
   if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
   todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
+  const away = x.on_vacation ?? 0
+  if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
   todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
   return h(
     'section',
@@ -879,6 +884,8 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       ...pausedIn(m).map(pausedNotice),
       periods,
       body,
+      // Vacations are for people in a server with HappyX, not for someone who has none yet.
+      inAnyServer(m) ? myVacationCard(() => renderLanding(null)) : null,
     ),
   )
 
@@ -1063,6 +1070,7 @@ function renderSettings(m: api.Me, guildID: string) {
     [t('settings.title'), settingsForm(g, onSaved, () => renderLanding(null))],
     [t('survey.title'), surveyMessageCard(g, onSaved, () => renderLanding(null), m.user)],
     [t('surveyRoles.title'), surveyRolesCard(g, onSaved, () => renderLanding(null))],
+    [t('vacation.title'), guildVacationsCard(g, () => renderLanding(null))],
     [t('access.title'), owner ? accessCard(g, () => refreshAfterHandover(guildID), () => renderLanding(null)) : null],
     [t('export.title'), real ? guildExport(g, () => renderLanding(null)) : null],
     [
