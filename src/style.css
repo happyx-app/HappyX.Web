@@ -246,6 +246,7 @@ a { color: var(--accent); }
 .guild-icon { width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center; background: var(--series-soft); color: var(--ink); font-weight: 700; font-size: 1.125rem; }
 .guild-text { display: grid; min-width: 0; }
 .guild-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guild-meta > span { white-space: nowrap; }
 .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
 
 .back { color: var(--ink-2); text-decoration: none; font-size: 0.875rem; }
@@ -546,6 +547,7 @@ a { color: var(--accent); }
 }
 .skip-link:focus { transform: none; }
 main:focus { outline: none; }
+.nowrap { white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .access-form, .survey-roles-form { display: grid; gap: 20px; }
 .combo { position: relative; }
@@ -688,9 +690,11 @@ main:focus { outline: none; }
 .subsection:first-of-type { border-top: 0; padding-top: 0; }
 .subsection h3 { margin: 0; font-family: var(--display); font-size: 1rem; }
 .gear-label { margin-left: 6px; }
-@media (max-width: 640px) { .gear-label { display: none; } }
-.privacy-note { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.875rem; }
-.privacy-note svg { width: 16px; height: 16px; flex: none; }
+/* On a phone only the gear shows; screen readers still read «Settings». */
+@media (max-width: 640px) { .gear-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+.privacy-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 0.875rem; }
+/* Level with the first line when the note runs to several. */
+.privacy-note svg { width: 16px; height: 16px; flex: none; margin-top: calc((1.5em - 16px) / 2); }
 .rank-num { color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; min-width: 1.5em; }
 .me-dates { color: var(--muted); margin: 4px 0 0; }
 .demo-banner .btn-sun { background: #fff; color: var(--primary); }
@@ -786,6 +790,12 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .to-watch h2 { margin: 0; font-size: 1rem; }
 .to-watch ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .health-alert a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; }
+/* «To review»: the circle stays beside the text however long it is; on a phone «See →» goes under the text. */
+.to-watch .health-alert { display: grid; grid-template-columns: 1em minmax(0, 1fr) auto; gap: 4px 10px; }
+@media (max-width: 560px) {
+  .to-watch .health-alert { grid-template-columns: 1em minmax(0, 1fr); }
+  .to-watch .health-alert a { grid-column: 2; justify-self: start; margin-left: 0; }
+}
 /* Logged out on an app page: one line and the login button. */
 .signin { margin-top: 48px; justify-items: start; }
 .signin h1 { font-size: 1.5rem; margin: 0; }
@@ -809,4 +819,19 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 @media (max-width: 560px) {
   .topbar .btn, .topbar .lang-picker, .topbar .nav-link { min-height: 44px; min-width: 44px; }
   .topbar .nav-link { display: inline-flex; align-items: center; justify-content: center; }
+}
+/* The page's small controls keep their look, but what a finger can hit is 44 px tall. */
+@media (max-width: 560px) {
+  .chip, .seg, .card-head > .btn-ghost, .todo a, .health-alert a { position: relative; }
+  .chip::after, .seg::after, .card-head > .btn-ghost::after, .todo a::after, .health-alert a::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%);
+  }
+  .settings-nav .section-link { padding: 12px 14px; }
+}
+/* On a phone the closed pencil sits at the end of the page, in the room left for it, so it never
+   covers a card while scrolling. Open, it floats again so the tools stay at hand while drawing. */
+@media (max-width: 560px) {
+  body.has-canvas { position: relative; min-height: 100vh; }
+  .canvas-dock:not(.open) { position: absolute; }
+  .canvas-dock .canvas-fab { width: 44px; height: 44px; }
 }
