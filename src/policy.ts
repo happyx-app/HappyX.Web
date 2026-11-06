@@ -51,7 +51,7 @@ const es = (): Policy => ({
           ul: [
             ['Mandarte la encuesta diaria por mensaje privado.'],
             ['Publicar los kudos en el canal del servidor y avisar por mensaje privado a quien los recibe.'],
-            ['Enseñar los resultados, los comentarios y los reports a los admins del servidor y a quien ellos den acceso. Por defecto es anónimo: ven medias y comentarios, nunca quién ha respondido qué. Si un admin lo cambia, ven tu nombre en las respuestas que des a partir de entonces; las anteriores siguen anónimas.'],
+            ['Enseñar los resultados, los comentarios y los reports a los admins del servidor y a quien ellos den acceso. Por defecto, el servidor es anónimo: ven medias y comentarios, nunca quién ha respondido qué. Si un admin cambia este ajuste, ven tu nombre en las respuestas que des a partir de entonces; las anteriores siguen anónimas.'],
             ['Enseñarte «Mi evolución», que solo ves tú.'],
             ['Jugar a «¿Quién es quién?». Aquí nada es anónimo: al acabar la semana todos ven quién escribió cada respuesta, quién propuso la pregunta y cuántas acertó cada uno.'],
           ],
@@ -151,7 +151,7 @@ const en = (): Policy => ({
           ul: [
             ['Sending you the daily survey by direct message.'],
             ['Posting kudos in the server’s channel and telling whoever gets them by direct message.'],
-            ["Showing results, comments and reports to the server's admins and to whoever they give access. It is anonymous by default: they see averages and comments, never who answered what. If an admin changes that, they see your name on answers you give from then on; earlier ones stay anonymous."],
+            ["Showing results, comments and reports to the server's admins and to whoever they give access to. Servers are anonymous by default: they see averages and comments, never who answered what. If an admin changes this setting, they see your name on answers you give from then on; earlier ones stay anonymous."],
             ['Showing you «My evolution», which only you see.'],
             ["Playing «Who's who?». Nothing here is anonymous: when the week ends everyone sees who wrote each answer, who proposed the question and how many each person got right."],
           ],
