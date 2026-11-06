@@ -277,7 +277,6 @@ a { color: var(--accent); }
 .chart .tick-y { font-size: 14px; }
 .chart .line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
 .chart .dot { stroke: var(--surface); stroke-width: 2; }
-.chart .area { stroke: none; pointer-events: none; }
 .chart .note { font-size: 12px; font-weight: 700; fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
 .chart .focus { stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .chart .crosshair { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
