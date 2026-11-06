@@ -642,10 +642,17 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   })
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
+  const messages = messagesCard(r)
 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
-    ...(health && healthSection ? [healthAlert(health, healthSection)].filter((n): n is HTMLParagraphElement => n !== null) : []),
+    ...[toWatch([
+      ...(health && healthSection ? [healthAlert(health, healthSection)] : []),
+      lowComments(r, messages),
+      rate !== null && oldRate !== null && oldRate - rate >= participationDrop && healthSection
+        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection) }
+        : null,
+    ])].filter((n): n is HTMLElement => n !== null),
     h(
       'div',
       { class: 'stats' },
@@ -676,10 +683,34 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
           h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r)),
         ),
     h('div', { class: 'grid-2' },
-      messagesCard(r),
+      messages.card,
       kudosCard(kudos),
     ),
     ...extra,
+  )
+}
+
+// «To review»: at most three lines under the summary, from fixed rules on the team's own numbers,
+// each leading to where to look. Without any, the section is left out.
+type Watch = { text: string; go: () => void }
+
+// A drop in participation of at least this many points is worth a look.
+const participationDrop = 15
+
+function toWatch(items: (Watch | null)[]) {
+  const shown = items.filter((x): x is Watch => x !== null).slice(0, 3)
+  if (!shown.length) return null
+  return h(
+    'section',
+    { class: 'to-watch', 'aria-labelledby': 'to-watch-title' },
+    h('h2', { id: 'to-watch-title' }, t('watch.title')),
+    h(
+      'ul',
+      {},
+      ...shown.map((w) =>
+        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
+      ),
+    ),
   )
 }
 
@@ -707,9 +738,14 @@ function firstSteps(g: api.Guild) {
   )
 }
 
-// «Server status» sits at the bottom of the dashboard. When the last survey didn't reach everyone,
-// or reaches nobody, a line under the summary says so and leads down to it.
-function healthAlert(x: api.Health, card: HTMLElement) {
+function focusCard(card: HTMLElement) {
+  card.tabIndex = -1
+  card.scrollIntoView({ block: 'start' })
+  card.focus({ preventScroll: true })
+}
+
+// When the last survey didn't reach everyone, or reaches nobody: «Server status», at the bottom.
+function healthAlert(x: api.Health, card: HTMLElement): Watch | null {
   const last = x.last_survey
   const text =
     x.audience === 0
@@ -717,14 +753,20 @@ function healthAlert(x: api.Health, card: HTMLElement) {
       : last && last.failed > 0
         ? t(last.failed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(last.failed), day: formatDay(last.day, { weekday: 'long' }) })
         : null
-  if (!text) return null
-  const see = (e: Event) => {
-    e.preventDefault()
-    card.tabIndex = -1
-    card.scrollIntoView({ block: 'start' })
-    card.focus({ preventScroll: true })
+  return text ? { text, go: () => focusCard(card) } : null
+}
+
+// Comments of Bad or Awful in the period: the comments card, filtered to them.
+function lowComments(r: api.Report, messages: { card: HTMLElement; show: (f: MoodFilter) => void }): Watch | null {
+  const n = filterMessages(r.messages, 'low').length
+  if (n === 0) return null
+  return {
+    text: n === 1 ? t('watch.low.one') : t('watch.low', { n: formatNumber(n) }),
+    go: () => {
+      messages.show('low')
+      focusCard(messages.card)
+    },
   }
-  return h('p', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, text), h('a', { href: '#', onclick: see }, `${t('health.alert.see')} →`))
 }
 
 // When the next survey and report go out, how the last survey went, and what is left to set up.
@@ -1416,7 +1458,12 @@ function messagesCard(r: api.Report) {
     )
   }
   draw()
-  return h(
+  const show = (f: MoodFilter) => {
+    current = f
+    all = false
+    draw()
+  }
+  const card = h(
     'section',
     { class: 'card' },
     h('h2', {}, t('messages.title')),
@@ -1429,6 +1476,7 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
+  return { card, show }
 }
 
 function skeleton() {
