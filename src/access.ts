@@ -273,6 +273,11 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
   const form = h(
     'form',
     { class: 'access-form', novalidate: true },
+    // The levels first, so the words in the pickers below already mean something.
+    h('dl', { class: 'levels small' },
+      h('dt', {}, t('access.level.view')), h('dd', {}, t('access.level.view.help')),
+      h('dt', {}, t('access.level.manage')), h('dd', {}, t('access.level.manage.help')),
+    ),
     h('div', { class: 'field' },
       h('label', { for: 'main-admin' }, t('access.admin')),
       adminPicker,
@@ -288,10 +293,6 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       h('label', { class: 'sr-only', for: 'add-grant' }, t('access.add')),
       addPicker,
       roles.length === 0 ? h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.noRoles')) : null,
-    ),
-    h('dl', { class: 'levels small' },
-      h('dt', {}, t('access.level.view')), h('dd', {}, t('access.level.view.help')),
-      h('dt', {}, t('access.level.manage')), h('dd', {}, t('access.level.manage.help')),
     ),
     h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.discordAdmins')),
     h('div', { class: 'form-actions' }, save, status),

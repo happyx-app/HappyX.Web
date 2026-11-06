@@ -420,7 +420,7 @@ function renderGuilds(m: api.Me) {
                 h('span', { class: 'muted small' }, [
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
-                  g.access === 'view' || g.access === 'manage' ? t(`guilds.access.${g.access}`) : '',
+                  g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
                 ].filter(Boolean).join(' · ')),
               ),
             ),
