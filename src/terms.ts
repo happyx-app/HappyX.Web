@@ -75,7 +75,7 @@ const es = (): Policy => ({
       body: [
         {
           p: [
-            'Lo que escribes en HappyX (comentarios, kudos, respuestas y preguntas del juego) sigue siendo tuyo. Permites a HappyX guardarlo y enseñarlo como explica la ',
+            'Lo que escribes en HappyX (comentarios, kudos, dibujos, respuestas y preguntas del juego) sigue siendo tuyo. Permites a HappyX guardarlo y enseñarlo como explica la ',
             policy('política de privacidad'),
             ', solo para que el servicio funcione.',
           ],
@@ -192,7 +192,7 @@ const en = (): Policy => ({
       body: [
         {
           p: [
-            'What you write in HappyX (comments, kudos, game answers and questions) stays yours. You let HappyX keep and show it as the ',
+            'What you write in HappyX (comments, kudos, drawings, game answers and questions) stays yours. You let HappyX keep and show it as the ',
             policy('privacy policy'),
             ' explains, only so the service works.',
           ],

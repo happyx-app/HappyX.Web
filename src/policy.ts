@@ -38,7 +38,7 @@ const es = (): Policy => ({
             ['Los kudos que das y recibes, con su texto.'],
             ['En «¿Quién es quién?»: tus respuestas, lo que adivinas y las preguntas que propones.'],
             ['Los dibujos del lienzo del equipo, con quién los hizo.'],
-            ['Las vacaciones que marcas tú o que un admin marca por ti: el primer y el último día, y quién las puso.'],
+            ['Las vacaciones que pones tú o que un admin te pone: el primer y el último día, y quién las puso.'],
             ['De cada servidor: su ID, su nombre, quién es el admin principal, a quién da acceso y sus ajustes (canales, roles, horario, idioma).'],
             ['Al entrar en la web: una cookie de sesión con tu ID, nombre, avatar y los servidores que gestionas. Caduca a las 12 horas y HappyX no guarda una copia. El idioma y el tema se guardan solo en tu navegador.'],
           ],
