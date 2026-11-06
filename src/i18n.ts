@@ -980,10 +980,19 @@ export const languages = [
 
 const storageKey = 'happyx.lang'
 
-// The saved choice if we still have that language, English otherwise.
-export function pickLanguage(saved: string | null): string {
-  return saved && messages[saved] ? saved : 'en'
+// The saved choice if we still have that language; otherwise the first browser language we have
+// (es-ES and ca, es both give es); English if none.
+export function pickLanguage(saved: string | null, browser: readonly string[] = []): string {
+  if (saved && messages[saved]) return saved
+  for (const tag of browser) {
+    const base = tag.toLowerCase().split('-')[0]
+    if (messages[base]) return base
+  }
+  return 'en'
 }
+
+const browserLanguages = (): readonly string[] =>
+  typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : navigator.language ? [navigator.language] : []
 
 function savedLanguage(): string | null {
   try {
@@ -993,7 +1002,7 @@ function savedLanguage(): string | null {
   }
 }
 
-export const lang = pickLanguage(typeof localStorage === 'undefined' ? null : savedLanguage())
+export const lang = pickLanguage(typeof localStorage === 'undefined' ? null : savedLanguage(), browserLanguages())
 
 // Every string is read at render time, so a reload is the simplest way to switch.
 export function setLanguage(code: string) {
