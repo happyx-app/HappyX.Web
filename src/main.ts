@@ -916,6 +916,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     label: t('me.chart'),
     tick: (x) => formatDay(x, pts.byWeek ? { month: 'short' } : { day: 'numeric', month: 'short' }),
     // By week, label the first week of each month.
+    weekLines: !pts.byWeek,
     tickAt: pts.byWeek ? (i) => i === 0 || pts.xs[i].slice(0, 7) !== pts.xs[i - 1].slice(0, 7) : undefined,
     tooltip: (i) => [
       h('div', { class: 'tooltip-title' }, xLabel(pts.xs[i])),

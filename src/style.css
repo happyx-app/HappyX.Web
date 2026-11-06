@@ -273,6 +273,7 @@ a { color: var(--accent); }
 .chart { display: block; overflow: visible; touch-action: pan-y; }
 .chart .grid { stroke: var(--grid); stroke-width: 1; }
 .chart .axis { stroke: var(--axis); stroke-width: 1; }
+.chart .week { stroke: var(--grid); stroke-width: 1; }
 .chart .tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart .tick-y { font-size: 14px; }
 .chart .line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
