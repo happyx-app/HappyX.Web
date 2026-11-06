@@ -7,6 +7,7 @@ import { h } from './dom'
 import { showSaveError } from './errors'
 import * as icons from './icons'
 import { t } from './i18n'
+import { unsavedNote } from './unsaved'
 
 export interface Option {
   kind: 'user' | 'role'
@@ -295,7 +296,7 @@ function accessForm(g: api.Guild, a: api.Access, onAdminChanged: () => void, onL
       roles.length === 0 ? h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.noRoles')) : null,
     ),
     h('p', { class: 'muted small' }, icons.inline(icons.info), t('access.discordAdmins')),
-    h('div', { class: 'form-actions' }, save, status),
+    h('div', { class: 'form-actions' }, save, unsavedNote(save), status),
   )
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
