@@ -25,6 +25,8 @@ interface LineChartOptions {
   notes?: { index: number; text: string; below?: boolean }[]
   // A dot on every point (default). Without, only lone points get one.
   dots?: boolean
+  // A faint vertical line where a new week starts (xs are days).
+  weekLines?: boolean
 }
 
 // Mood over time, one line per series, redrawn to fit its container.
@@ -58,6 +60,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       label: trendSummary(days),
       notes,
       dots: false,
+      weekLines: true,
       tooltip: (i) => {
         const d = days[i]
         const p = prevOf(i)
@@ -136,7 +139,15 @@ function runs(values: (number | null)[]): number[][] {
   return out
 }
 
-let areaCount = 0
+// The indexes of the days (YYYY-MM-DD) that start a new week: the first day after a Sunday,
+// or after a skipped week. Days without a survey are often left out, so this need not be Monday.
+export function weekStarts(xs: string[]): number[] {
+  const dow = (d: string) => (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7
+  const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5)
+  const out: number[] = []
+  for (let i = 1; i < xs.length; i++) if (dow(xs[i]) < dow(xs[i - 1]) || days(xs[i - 1], xs[i]) >= 7) out.push(i)
+  return out
+}
 
 function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): SVGSVGElement {
   const height = 260
@@ -159,6 +170,14 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     )
   }
 
+  // Week lines: halfway between the last day of a week and the first of the next.
+  if (opts.weekLines) {
+    for (const i of weekStarts(xs)) {
+      const xm = (x(i - 1) + x(i)) / 2
+      svg.append(s('line', { x1: xm, x2: xm, y1: m.top, y2: m.top + ih, class: 'week' }))
+    }
+  }
+
   // X ticks: about one every 80px. Evenly spaced (always including the last point), or
   // only at the points tickAt allows (at least 56px apart).
   if (opts.tickAt) {
@@ -178,19 +197,11 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     })
   }
 
-  // A single solid line gets a soft fill under it, fading to the bottom; each run of
-  // consecutive days is its own shape, so gaps stay empty.
+  // A single solid line gets a flat, faint fill under it; each run of consecutive days is
+  // its own shape, so gaps stay empty.
   const solid = series.filter((se) => !se.dashed)
   if (solid.length === 1) {
     const se = solid[0]
-    const id = `area-${++areaCount}`
-    const stops = [0, 1].map((o) => {
-      const stop = s('stop', { offset: o })
-      stop.style.stopColor = se.color
-      stop.style.stopOpacity = o ? '0' : '0.22'
-      return stop
-    })
-    svg.append(s('defs', {}, s('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, ...stops)))
     const bottom = m.top + ih
     let d = ''
     for (const run of runs(se.values)) {
@@ -198,7 +209,11 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       const pts = run.map((i): [number, number] => [x(i), y(se.values[i]!)])
       d += `M${pts[0][0].toFixed(1)},${bottom}L${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}${monotone(pts)}L${pts[pts.length - 1][0].toFixed(1)},${bottom}Z`
     }
-    if (d) svg.append(s('path', { d, class: 'area', fill: `url(#${id})` }))
+    if (d) {
+      const area = s('path', { d, class: 'area' })
+      area.style.fill = se.color // CSSOM, not a style attribute: the CSP blocks those
+      svg.append(area)
+    }
   }
 
   // Lines are joined only between consecutive points that both have a value.

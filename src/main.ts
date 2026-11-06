@@ -665,7 +665,6 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       'section',
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
-      h('p', { class: 'muted small' }, t('chart.trend.desc')),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
       trendChart(r.days, old?.days, notes),
       tableWrap,
@@ -992,6 +991,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     label: t('me.chart'),
     tick: (x) => formatDay(x, pts.byWeek ? { month: 'short' } : { day: 'numeric', month: 'short' }),
     // By week, label the first week of each month.
+    weekLines: !pts.byWeek,
     tickAt: pts.byWeek ? (i) => i === 0 || pts.xs[i].slice(0, 7) !== pts.xs[i - 1].slice(0, 7) : undefined,
     tooltip: (i) => [
       h('div', { class: 'tooltip-title' }, xLabel(pts.xs[i])),
