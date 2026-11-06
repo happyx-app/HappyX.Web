@@ -36,6 +36,8 @@ export interface Guild {
   // Whether the team canvas is on. Older APIs leave it out, which means off.
   canvas_enabled?: boolean
   active: boolean
+  // When the bot joined the server. Older APIs leave it out.
+  created_at?: string
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
 }

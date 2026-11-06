@@ -47,6 +47,13 @@ export const mondayToFriday = [1, 2, 3, 4, 5]
 export const weekdayName = (iso: number, width: 'short' | 'long' = 'short') =>
   formatDay(`2026-10-${18 + iso}`, { weekday: width }) // 19 October 2026 is a Monday
 
+// daysLabel says which days the survey goes out: a run of days as «Mon–Fri», others as a list.
+export function daysLabel(days: number[]) {
+  const d = [...days].sort((a, b) => a - b)
+  if (d.length >= 3 && d.every((x, i) => i === 0 || x === d[i - 1] + 1)) return `${weekdayName(d[0])}–${weekdayName(d[d.length - 1])}`
+  return d.map((x) => weekdayName(x)).join(', ')
+}
+
 // changes returns only the fields that differ, so a save never rewrites what didn't change.
 export function changes(before: Settings, after: Settings): api.SettingsPatch {
   const out: api.SettingsPatch = {}
