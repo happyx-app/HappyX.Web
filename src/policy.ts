@@ -26,7 +26,7 @@ const es = (): Policy => ({
   title: 'Política de privacidad',
   updated: 'Última actualización:',
   intro:
-    'HappyX es un bot de Discord que pregunta cada día cómo estás y enseña los resultados a quien gestiona el servidor. Esta página explica qué datos guarda, para qué y cómo controlarlos.',
+    'HappyX es un bot de Discord que pregunta cómo estás los días que elige cada servidor y enseña los resultados a quien gestiona el servidor. Esta página explica qué datos guarda, para qué y cómo controlarlos.',
   sections: [
     {
       title: 'Qué datos guarda',
@@ -37,6 +37,8 @@ const es = (): Policy => ({
             ['Las respuestas a la encuesta: el ánimo (de 1 a 5), el comentario si lo escribes, el día y si el servidor era anónimo en ese momento.'],
             ['Los kudos que das y recibes, con su texto.'],
             ['En «¿Quién es quién?»: tus respuestas, lo que adivinas y las preguntas que propones.'],
+            ['Los dibujos del lienzo del equipo, con quién los hizo.'],
+            ['Las vacaciones que pones tú o que un admin te pone: el primer y el último día, y quién las puso.'],
             ['De cada servidor: su ID, su nombre, quién es el admin principal, a quién da acceso y sus ajustes (canales, roles, horario, idioma).'],
             ['Al entrar en la web: una cookie de sesión con tu ID, nombre, avatar y los servidores que gestionas. Caduca a las 12 horas y HappyX no guarda una copia. El idioma y el tema se guardan solo en tu navegador.'],
           ],
@@ -95,7 +97,7 @@ const es = (): Policy => ({
           ul: [
             ['Mientras HappyX esté en el servidor.'],
             ['Si borras tus datos desde ', yourData('Tus datos'), ', se borran al momento. Solo se quedan tu ID de Discord y tus roles, para no volver a mandarte la encuesta, y los ajustes del servidor que te nombran (admin principal, permisos).'],
-            ['Si un admin elimina el servidor desde su Zona de peligro, sus datos se borran al momento.'],
+            ['Si un admin elimina el servidor de HappyX desde su Zona de peligro, sus datos se borran al momento.'],
             ['Si se quita HappyX del servidor, los datos de ese servidor se borran a los 30 días.'],
             ['Las copias de seguridad nocturnas guardan los datos borrados hasta 6 meses. Solo se usan para recuperar el servicio tras una avería.'],
           ],
@@ -126,7 +128,7 @@ const en = (): Policy => ({
   title: 'Privacy policy',
   updated: 'Last updated:',
   intro:
-    'HappyX is a Discord bot that asks every day how you are and shows the results to whoever runs the server. This page explains what data it keeps, what for, and how to control it.',
+    'HappyX is a Discord bot that asks how you are on the days each server picks and shows the results to whoever runs the server. This page explains what data it keeps, what for, and how to control it.',
   sections: [
     {
       title: 'What data it keeps',
@@ -137,6 +139,8 @@ const en = (): Policy => ({
             ['Survey answers: the mood (1 to 5), the comment if you write one, the day and whether the server was anonymous at the time.'],
             ['Kudos you give and get, with their text.'],
             ["In «Who's who?»: your answers, your guesses and the questions you propose."],
+            ['Drawings on the team canvas, with who made them.'],
+            ['Vacations you set, or an admin sets for you: the first and last day, and who set them.'],
             ['For each server: its ID, its name, who the main admin is, who it gives access to and its settings (channels, roles, schedule, language).'],
             ['When you log in to the website: a session cookie with your ID, name, avatar and the servers you manage. It expires after 12 hours and HappyX keeps no copy of it. Language and theme are saved only in your browser.'],
           ],
@@ -195,7 +199,7 @@ const en = (): Policy => ({
           ul: [
             ['As long as HappyX is in the server.'],
             ['If you erase your data from ', yourData('Your data'), ', it is deleted right away. Only your Discord ID and roles are kept, so you don’t get the survey again, and server settings that name you (main admin, permissions).'],
-            ['If an admin deletes the server from its Danger zone, its data is deleted right away.'],
+            ['If an admin deletes the server from HappyX in its Danger zone, its data is deleted right away.'],
             ['If HappyX is removed from the server, that server’s data is deleted after 30 days.'],
             ['Nightly backups keep erased data for up to 6 months. They are only used to restore the service after a failure.'],
           ],
