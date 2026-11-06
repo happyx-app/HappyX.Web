@@ -199,6 +199,9 @@ a { color: var(--accent); }
 .shot img { display: block; width: 100%; height: auto; }
 .shot figcaption { color: var(--muted); font-size: 0.9375rem; }
 .shot-dark { display: none; }
+.report-shot { display: grid; gap: 24px; align-items: center; }
+.report-shot img { display: block; width: 100%; max-width: 420px; height: auto; border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--dc-shadow); }
+@media (min-width: 760px) { .report-shot { grid-template-columns: 1fr 420px; } }
 :root[data-theme='dark'] .shot-frame .shot-light { display: none; }
 :root[data-theme='dark'] .shot-frame .shot-dark { display: block; }
 @media (prefers-color-scheme: dark) {
