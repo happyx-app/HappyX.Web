@@ -149,6 +149,7 @@ export interface KudosSummary {
 export interface Health {
   audience: number
   opted_out: number
+  on_vacation?: number // older APIs don't send it
   last_survey: { day: string; recipients: number; failed: number } | null
 }
 
@@ -458,3 +459,53 @@ export const deleteCanvasDrawing = (guildID: string, drawingID: string) =>
   sendJSON<{ version: number }>('DELETE', `${canvasPath(guildID)}/drawings/${encodeURIComponent(drawingID)}`, {})
 
 export const clearCanvas = (guildID: string) => sendJSON<{ version: number }>('DELETE', canvasPath(guildID), {})
+
+// --- Vacations ---
+
+// A vacation: no survey or game from `from` to `to`, both included (YYYY-MM-DD). The person's own
+// applies in every server and has no discord_guild_id; one an admin set has the server's.
+export interface Vacation {
+  from: string
+  to: string
+  discord_guild_id?: string
+  guild_name?: string
+  set_by_admin: boolean
+}
+
+export interface MyVacations {
+  own: Vacation | null
+  set_by_admins: Vacation[]
+}
+
+// A member's vacation as the server's admins see it. set_here is false for the member's own,
+// which admins can see but not change.
+export interface GuildVacation {
+  discord_user_id: string
+  username: string
+  from: string
+  to: string
+  set_here: boolean
+}
+
+export interface GuildVacations {
+  vacations: GuildVacation[]
+  members: Member[]
+}
+
+export const myVacations = () => getJSON<MyVacations>('/me/vacations')
+
+export const setMyVacation = (from: string, to: string) => sendJSON<Vacation>('PUT', '/me/vacation', { from, to })
+
+export const deleteMyVacation = () => sendJSON<void>('DELETE', '/me/vacation', {})
+
+// deleteVacationSetByAdmin removes the vacation an admin set for the user in that server.
+export const deleteVacationSetByAdmin = (guildID: string) =>
+  sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}/me/vacation`, {})
+
+export const guildVacations = (guildID: string) => getJSON<GuildVacations>(`/guilds/${encodeURIComponent(guildID)}/vacations`)
+
+export const setGuildVacation = (guildID: string, userID: string, from: string, to: string) =>
+  sendJSON<GuildVacation>('PUT', `/guilds/${encodeURIComponent(guildID)}/vacations/${encodeURIComponent(userID)}`, { from, to })
+
+export const deleteGuildVacation = (guildID: string, userID: string) =>
+  sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}/vacations/${encodeURIComponent(userID)}`, {})
