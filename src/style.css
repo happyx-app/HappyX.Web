@@ -790,3 +790,9 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .paused-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
 .paused-notice > p:first-child { margin: 0; flex: 1 1 16rem; }
 .paused-notice .alert { flex-basis: 100%; margin: 0; }
+
+/* On a phone every header control is at least 44 px, the size a finger can hit. */
+@media (max-width: 560px) {
+  .topbar .btn, .topbar .lang-picker, .topbar .nav-link { min-height: 44px; min-width: 44px; }
+  .topbar .nav-link { display: inline-flex; align-items: center; justify-content: center; }
+}
