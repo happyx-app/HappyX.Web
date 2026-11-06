@@ -8,11 +8,15 @@ it('every language has the same keys as English', () => {
   }
 })
 
-it('uses the saved language and English otherwise', () => {
+it('uses the saved language, then the browser language, then English', () => {
   expect(pickLanguage('es')).toBe('es')
   expect(pickLanguage('ca')).toBe('en')
   expect(pickLanguage('ja')).toBe('en')
   expect(pickLanguage(null)).toBe('en')
+  expect(pickLanguage(null, ['es-ES', 'en'])).toBe('es')
+  expect(pickLanguage(null, ['ca', 'es'])).toBe('es')
+  expect(pickLanguage(null, ['de-DE'])).toBe('en')
+  expect(pickLanguage('en', ['es-ES'])).toBe('en')
 })
 
 it('picks the face from the average as shown, with one decimal', () => {

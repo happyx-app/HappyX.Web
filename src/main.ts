@@ -6,8 +6,8 @@ import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
 import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
-import { comparable, delta, extremeDays, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
-import { dangerZone, settingsForm, surveyMessageCard } from './settings'
+import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
+import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
 import { gamePage } from './game'
@@ -24,6 +24,8 @@ import panelEnLightPhone from './landing/panel-en-light-movil.jpg'
 import panelEnDarkPhone from './landing/panel-en-dark-movil.jpg'
 import panelEsLightPhone from './landing/panel-es-light-movil.jpg'
 import panelEsDarkPhone from './landing/panel-es-dark-movil.jpg'
+import reportEn from './landing/report-en.jpg'
+import reportEs from './landing/report-es.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
 import { reloadCanvas, showCanvas } from './canvas'
@@ -90,7 +92,7 @@ async function route() {
     // Right after «Add to Discord», the bot may not have registered the server yet.
     if (!g && q.get('added') === '1' && !api.isDemo) return renderConnecting(me, guildID)
     if (g && q.has('added')) return location.replace(`#/g/${guildID}`)
-    return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30')
+    return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30', isPreset(p))
   }
   if (path === '/me' || (path === '' && me.guilds.length === 0)) {
     const q = new URLSearchParams(query)
@@ -299,6 +301,13 @@ function renderLanding(m: api.Me | null) {
         h('h2', {}, t('landing.shot.title')),
         h('figure', { class: 'shot' }, h('div', { class: 'shot-frame' }, shot('light'), shot('dark')), h('figcaption', {}, t('landing.shot.caption'))),
       ),
+      // The report image exactly as the bot draws it, for the demo's made-up week.
+      h(
+        'section',
+        { class: 'landing-section report-shot' },
+        h('div', {}, h('h2', {}, t('landing.report.title')), h('p', { class: 'secondary' }, t('landing.report.body'))),
+        h('img', { src: lang === 'es' ? reportEs : reportEn, alt: t('landing.report.alt'), width: 1200, height: 1234, loading: 'lazy', decoding: 'async' }),
+      ),
       h(
         'section',
         { class: 'landing-section' },
@@ -411,7 +420,7 @@ function renderGuilds(m: api.Me) {
                 h('span', { class: 'muted small' }, [
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
-                  g.access === 'view' || g.access === 'manage' ? t(`guilds.access.${g.access}`) : '',
+                  g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
                 ].filter(Boolean).join(' · ')),
               ),
             ),
@@ -515,7 +524,7 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
   )
 }
 
-async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
+async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = true) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     const member = memberGuilds(m).find((x) => x.discord_guild_id === guildID)
@@ -570,9 +579,23 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     body.replaceChildren(errorCard(err))
     return
   }
+  // A default period without answers, when this week has some (a new server, early in the
+  // month): open on this week instead.
+  const thisWeek = rangeFor('this-week', todayIn(g.timezone))
+  if (r.responses === 0 && !chosen && preset !== 'this-week') {
+    const now = await api.report(guildID, thisWeek.from, thisWeek.to).catch(() => null)
+    if (now && now.responses > 0) {
+      history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
+      return renderGuild(m, guildID, 'this-week')
+    }
+  }
   body.removeAttribute('aria-busy')
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
+  if (r.responses === 0 && isNewGuild(g.created_at)) {
+    body.replaceChildren(firstSteps(g), ...extra)
+    return
+  }
   if (r.responses === 0) {
     const next = nextSurveyDay(g.timezone, g.survey_hour, g.working_days ?? [1, 2, 3, 4, 5])
     const longer = preset !== 'last-30' && preset !== 'last-90'
@@ -589,6 +612,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       ...extra,
     )
     return
+  }
+  // With answers on fewer than 3 days there is no tone or trend yet. If they all fall in this week,
+  // the dashboard opens on it, unless the period was chosen.
+  const answeredDays = r.days.filter((d) => d.responses > 0)
+  const few = answeredDays.length < fewDays
+  if (few && !chosen && preset !== 'this-week' && answeredDays.every((d) => d.day >= thisWeek.from)) {
+    history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
+    return renderGuild(m, guildID, 'this-week')
   }
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
@@ -614,7 +645,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const messages = messagesCard(r)
 
   body.replaceChildren(
-    summaryCard(r, old, week ? [] : weekdays),
+    summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
       ...(health && healthSection ? [healthAlert(health, healthSection)] : []),
       lowComments(r, messages),
@@ -641,7 +672,6 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
       'section',
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
-      h('p', { class: 'muted small' }, t('chart.trend.desc')),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
       trendChart(r.days, old?.days, notes),
       tableWrap,
@@ -680,6 +710,30 @@ function toWatch(items: (Watch | null)[]) {
       ...shown.map((w) =>
         h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
       ),
+    ),
+  )
+}
+
+// A server added less than 14 days ago and still without answers: what it is set to, and where
+// to change it, instead of «no answers in this period». Whether the survey is on, and when it goes
+// out, is in «Server status» below.
+function firstSteps(g: api.Guild) {
+  const settings = `#/g/${g.discord_guild_id}/settings`
+  const manage = api.canManage(g)
+  const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
+  const item = (done: boolean | null, text: string, link?: string) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: settings }, `${link} →`) : null)
+  const language = botLanguages.find(([code]) => code === g.language)?.[1] ?? g.language
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', {}, t('first.title')),
+    h(
+      'ul',
+      { class: 'todo' },
+      item(null, t('first.language', { language }), t('first.change')),
+      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
+      item(null, t('first.assistant')),
     ),
   )
 }
@@ -744,7 +798,7 @@ function healthCard(g: api.Guild, x: api.Health) {
       tile(t('health.nextSurvey'), !surveyOn ? t('health.survey.offShort') : next ? `${formatDay(next, long)}, ${hour}` : t('health.noDays'), surveyOn ? g.timezone : t('health.survey.offNote')),
       tile(
         t('health.lastSurvey'),
-        last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t('health.none'),
+        last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t(isNewGuild(g.created_at) ? 'health.none.yet' : 'health.none'),
         last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : '',
       ),
       // Without answers there is no report to send, so while the survey is off there is no date.
@@ -756,9 +810,13 @@ function healthCard(g: api.Guild, x: api.Health) {
   )
 }
 
+// Below this many days with answers, the dashboard gives no tone or trend.
+const fewDays = 3
+
 // The period in a few words: the tone as the title, then only what the numbers below don't
 // say (how the average moved, and the weekday that costs the most).
-function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[]) {
+function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[], few = false) {
+  if (few) return h('section', { class: 'card summary' }, h('div', {}, h('p', { class: 'secondary' }, t('summary.few', { n: fewDays }))))
   const parts: string[] = []
   if (old) {
     const d = delta(r.average, old.average, 1)
@@ -900,6 +958,22 @@ function noServerCard() {
   )
 }
 
+// «My evolution» without answers, when the survey is off in every server the viewer manages and
+// they get it from no other server: it says so instead of «the survey reaches you», and leads to
+// where it starts.
+function surveyOffCard(m: api.Me) {
+  if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
+  const one = m.guilds.length === 1 ? m.guilds[0] : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
+  return h(
+    'div',
+    { class: 'card empty' },
+    h('h2', {}, one ? t('me.off.title', { server: one.name }) : t('me.off.title.many')),
+    h('p', { class: 'secondary' }, t(one && !api.canManage(one) ? 'me.off.body.ask' : 'me.off.body')),
+    start,
+  )
+}
+
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
@@ -942,7 +1016,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       dates.remove()
       periods.remove()
     }
-    body.replaceChildren(noServer ? noServerCard() : h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    body.replaceChildren(noServer ? noServerCard() : surveyOffCard(m) ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
@@ -959,6 +1033,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     label: t('me.chart'),
     tick: (x) => formatDay(x, pts.byWeek ? { month: 'short' } : { day: 'numeric', month: 'short' }),
     // By week, label the first week of each month.
+    weekLines: !pts.byWeek,
     tickAt: pts.byWeek ? (i) => i === 0 || pts.xs[i].slice(0, 7) !== pts.xs[i - 1].slice(0, 7) : undefined,
     tooltip: (i) => [
       h('div', { class: 'tooltip-title' }, xLabel(pts.xs[i])),
@@ -1136,7 +1211,7 @@ function renderSettings(m: api.Me, guildID: string) {
       h(
         'div',
         { class: 'settings-layout' },
-        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name)),
+        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name), h('p', { class: 'muted' }, t('settings.assistant'))),
         sectionNav(cards),
         h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card)),
       ),

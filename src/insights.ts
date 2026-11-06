@@ -156,3 +156,11 @@ export function extremeDays(days: DayStat[], average: number): { high: number | 
 export function highestWeekday(stats: WeekdayStat[]): WeekdayStat | null {
   return stats.length < 2 ? null : stats.reduce((a, b) => (b.average > a.average ? b : a))
 }
+
+// A server added less than 14 days ago: «none in 14 days» would read as stalled, and the
+// dashboard shows the first steps instead of «no answers».
+export const newGuildDays = 14
+export function isNewGuild(createdAt: string | undefined, now = Date.now()) {
+  const at = createdAt ? Date.parse(createdAt) : NaN
+  return !Number.isNaN(at) && now - at < newGuildDays * 86_400_000
+}

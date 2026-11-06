@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ReportMessage } from './api'
 import { delta, extremeDays, filterMessages, lowestWeekday, moodGroup, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages } from './insights'
+import { isNewGuild } from './insights'
 
 describe('previousRange', () => {
   it('takes the same number of days just before', () => {
@@ -102,4 +103,12 @@ describe('extremeDays', () => {
   it('prefers the most recent day on a tie', () => {
     expect(extremeDays([...week, day(8, 4.4), day(9, 4.4)], 3.5).high).toBe(8)
   })
+})
+
+it('knows a server added less than 14 days ago', () => {
+  const now = Date.parse('2026-11-05T12:00:00Z')
+  expect(isNewGuild('2026-11-05T09:00:00Z', now)).toBe(true)
+  expect(isNewGuild('2026-10-23T12:00:00Z', now)).toBe(true)
+  expect(isNewGuild('2026-10-22T11:00:00Z', now)).toBe(false)
+  expect(isNewGuild(undefined, now)).toBe(false)
 })

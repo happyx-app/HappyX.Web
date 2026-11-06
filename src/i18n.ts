@@ -8,7 +8,7 @@ const en = {
   'landing.demo': 'View demo',
   'demo.label': 'Demo',
   'demo.title': 'A made-up team.',
-  'demo.body': 'This is what Laura, the admin, sees; the rest of the team doesn’t.',
+  'demo.body': 'This is what Laura, the admin, sees; the rest of the team doesn’t. It’s anonymous: Laura sees averages and comments, never who answered what.',
   'demo.home': 'Back to HappyX',
   'demo.readonly': 'Nothing is saved in the demo.',
   'landing.title': 'How is your team *really* doing?',
@@ -18,8 +18,11 @@ const en = {
     'HappyX is a Discord bot that asks your team how they feel every working day, by direct message. It takes two seconds to answer. Every week or month you get a report with the results.',
   'landing.shot.title': 'What the dashboard looks like',
   'landing.shot.caption':
-    'The demo server: average mood, participation, daily trend and comments. Every week or month the bot also sends you a summary image by direct message.',
+    'The demo server: average mood, participation, daily trend and comments.',
   'landing.shot.alt': 'HappyX dashboard for the demo server',
+  'landing.report.title': 'The report',
+  'landing.report.body': 'Every week or month you get this image by direct message.',
+  'landing.report.alt': 'Weekly report image: average mood, answers, people, kudos, mood per day and answers by mood',
   'landing.features.title': 'What else it does',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -39,7 +42,7 @@ const en = {
   'landing.privacy.4':
     'Anyone can leave the survey with one button and download or erase their data. Admins can remove HappyX and all its data from the settings.',
   'landing.cta.title': 'Add HappyX to your server',
-  'landing.cta.body': 'The survey starts when you say so.',
+  'landing.cta.body': 'When you add the bot, it sends you a direct message to choose the time, the language and who gets the survey. It starts when you say so.',
   'landing.failed': "We couldn't log you in. Try again.",
   'signin.guild': "Log in to see your server's dashboard",
   'signin.game': "Log in to play «Who's who?»",
@@ -76,7 +79,6 @@ const en = {
   'stat.respondents': 'People who answered',
   'stat.respondents.note': 'At least once',
   'chart.trend': 'Average mood per day',
-  'chart.trend.desc': 'Gaps are days without answers.',
   'chart.trend.summary': 'Average mood per day, from {from} to {to}: between {min} and {max}, average {avg}. Use «Show as table» for the data.',
   'chart.distribution': 'Answers by mood',
   'chart.table.show': 'Show as table',
@@ -100,6 +102,7 @@ const en = {
   'delta.sr.down': 'Down {value} from the previous period',
   'delta.sr.same': 'Same as the previous period',
   'delta.sr.points': '{value} points',
+  'summary.few': 'The summary needs answers on at least {n} days.',
   'summary.tone.great': 'Very good mood',
   'summary.tone.good': 'Good mood',
   'summary.tone.mixed': 'Okay mood',
@@ -143,6 +146,13 @@ const en = {
   'watch.low.one': '1 comment from a Bad or awful answer',
   'watch.participation': 'Participation is down {n} points',
   'health.none': 'None in 14 days',
+  'health.none.yet': 'None yet',
+  'first.title': 'First steps',
+  'first.language': 'Bot language: {language}',
+  'first.time': 'Survey: {days} at {time} ({timezone})',
+  'first.change': 'Change',
+  'first.assistant': 'Introduce HappyX in a channel with /happyx setup in Discord.',
+  'settings.assistant': 'You can also set it up from Discord with /happyx setup.',
   'health.nextReport': 'Next report',
   'health.report.dm': 'By direct message to the main admin and here',
   'health.report.web': 'Only here, on the web',
@@ -177,8 +187,8 @@ const en = {
   'mood.5': 'Great',
   'nav.me': 'My evolution',
   'me.subtitle': 'Only you can see this page.',
-  'me.mode.anonymous': 'Anonymous: admins don’t see who writes each comment.',
-  'me.mode.named': 'Named: admins see who writes each comment. What you wrote while it was anonymous stays anonymous.',
+  'me.mode.anonymous': 'It’s anonymous: admins see averages and comments, never who answered what.',
+  'me.mode.named': 'Named: admins see who answered what. What you answered while it was anonymous stays anonymous.',
   'me.period.label': 'Period',
   'me.period.week': '7 days',
   'me.period.month': '30 days',
@@ -186,10 +196,14 @@ const en = {
   'me.filter.label': 'Servers',
   'me.all': 'All',
   'me.chart': 'Your mood',
-  'me.chart.desc.day': 'Your answer each day, from 1 (awful) to 5 (great). Gaps are days you didn’t answer.',
+  'me.chart.desc.day': 'Your answer each day, from 1 (awful) to 5 (great).',
   'me.chart.desc.week': 'Your average each week, from 1 (awful) to 5 (great).',
   'me.weekOf': 'Week of {day}',
   'me.empty.title': "You haven't answered in this period",
+  'me.off.title': 'The survey is off in {server}',
+  'me.off.title.many': 'The survey is off in your servers',
+  'me.off.body': 'Nobody gets it until you start it. Once you answer it, your evolution shows up here.',
+  'me.off.body.ask': 'Nobody gets it until an admin starts it. Once you answer it, your evolution shows up here.',
   'paused.text': 'Your survey is paused in {server}.',
   'paused.resume': 'Resume',
   'paused.failed': "Couldn't resume. Try again.",
@@ -244,8 +258,6 @@ const en = {
   'settings.freq.weekly': 'Weekly',
   'settings.freq.monthly': 'Monthly',
   'settings.readonly': 'You can see the reports. To change settings, ask the main admin for permission.',
-  'guilds.access.view': 'Reports only',
-  'guilds.access.manage': 'Reports and settings',
   'surveyRoles.title': 'Who gets the survey',
   'surveyRoles.help': 'For example, to leave out external collaborators.',
   'surveyRoles.mode.all': 'Everyone in the server',
@@ -291,8 +303,8 @@ const en = {
   'access.dropped': '{n} members with access left the server; they’ll be removed when you save.',
   'access.levelFor': 'Permission for {name}',
   'access.remove': 'Remove {name}',
-  'access.level.view': 'View reports',
-  'access.level.manage': 'View and change settings',
+  'access.level.view': 'View only',
+  'access.level.manage': 'View and change',
   'access.level.view.help': 'Sees this dashboard’s charts and reports, and can use /happyx report.',
   'access.level.manage.help': 'Also changes the survey settings here and with /happyx config.',
   'access.discordAdmins': 'The server’s owner and anyone with Discord’s Administrator permission always have full access.',
@@ -493,7 +505,7 @@ const es: Record<Key, string> = {
   'landing.demo': 'Ver demo',
   'demo.label': 'Demo',
   'demo.title': 'Equipo inventado.',
-  'demo.body': 'Así ve el panel Laura, la admin; el resto del equipo, no.',
+  'demo.body': 'Así ve el panel Laura, la admin; el resto del equipo, no. Es anónimo: Laura ve medias y comentarios, nunca quién ha respondido qué.',
   'demo.home': 'Volver a HappyX',
   'demo.readonly': 'En la demo no se guarda nada.',
   'landing.title': '¿Cómo está *de verdad* tu equipo?',
@@ -503,8 +515,11 @@ const es: Record<Key, string> = {
     'HappyX es un bot de Discord que pregunta a tu equipo cómo se siente cada día laborable, por mensaje privado. Se responde en dos segundos. Cada semana o cada mes recibes un report con los resultados.',
   'landing.shot.title': 'Así se ve el panel',
   'landing.shot.caption':
-    'El servidor de demo: ánimo medio, participación, tendencia diaria y comentarios. Cada semana o cada mes el bot también te manda un resumen en imagen por mensaje privado.',
+    'El servidor de demo: ánimo medio, participación, tendencia diaria y comentarios.',
   'landing.shot.alt': 'Panel de HappyX del servidor de demo',
+  'landing.report.title': 'El report',
+  'landing.report.body': 'Cada semana o cada mes te llega esta imagen por mensaje privado.',
+  'landing.report.alt': 'Imagen del report semanal: ánimo medio, respuestas, personas, kudos, ánimo por día y respuestas por ánimo',
   'landing.features.title': 'Qué más incluye',
   'landing.f.kudos.title': 'Kudos',
   'landing.f.kudos.body':
@@ -525,7 +540,7 @@ const es: Record<Key, string> = {
   'landing.privacy.4':
     'Cualquiera puede dejar la encuesta con un botón y descargar o borrar sus datos. Los admins pueden quitar HappyX y todos sus datos desde los ajustes.',
   'landing.cta.title': 'Añade HappyX a tu servidor',
-  'landing.cta.body': 'La encuesta empieza cuando tú digas.',
+  'landing.cta.body': 'Al añadir el bot, te manda un mensaje privado para elegir la hora, el idioma y quién recibe la encuesta. Empieza cuando tú digas.',
   'landing.failed': 'No hemos podido iniciar sesión. Vuelve a intentarlo.',
   'signin.guild': 'Entra para ver el panel de tu servidor',
   'signin.game': 'Entra para jugar a «¿Quién es quién?»',
@@ -562,7 +577,6 @@ const es: Record<Key, string> = {
   'stat.respondents': 'Personas que respondieron',
   'stat.respondents.note': 'Al menos una vez',
   'chart.trend': 'Ánimo medio por día',
-  'chart.trend.desc': 'Los huecos son días sin respuestas.',
   'chart.trend.summary': 'Ánimo medio por día, del {from} al {to}: entre {min} y {max}, media {avg}. Usa «Ver como tabla» para ver los datos.',
   'chart.distribution': 'Respuestas por ánimo',
   'chart.table.show': 'Ver como tabla',
@@ -586,6 +600,7 @@ const es: Record<Key, string> = {
   'delta.sr.down': 'Bajó {value} respecto al periodo anterior',
   'delta.sr.same': 'Igual que el periodo anterior',
   'delta.sr.points': '{value} puntos',
+  'summary.few': 'El resumen necesita respuestas de al menos {n} días.',
   'summary.tone.great': 'Muy buen ánimo',
   'summary.tone.good': 'Buen ánimo',
   'summary.tone.mixed': 'Ánimo normal',
@@ -629,6 +644,13 @@ const es: Record<Key, string> = {
   'watch.low.one': '1 comentario de una respuesta Mal o muy mal',
   'watch.participation': 'La participación baja {n} puntos',
   'health.none': 'Ninguna en 14 días',
+  'health.none.yet': 'Todavía ninguna',
+  'first.title': 'Primeros pasos',
+  'first.language': 'Idioma del bot: {language}',
+  'first.time': 'Encuesta: {days} a las {time} ({timezone})',
+  'first.change': 'Cambiar',
+  'first.assistant': 'Presenta HappyX en un canal con /happyx asistente en Discord.',
+  'settings.assistant': 'También puedes configurarlo desde Discord con /happyx asistente.',
   'health.nextReport': 'Próximo report',
   'health.report.dm': 'Por mensaje privado al admin principal y aquí',
   'health.report.web': 'Solo aquí, en la web',
@@ -663,8 +685,8 @@ const es: Record<Key, string> = {
   'mood.5': 'Genial',
   'nav.me': 'Mi evolución',
   'me.subtitle': 'Solo tú ves esta página.',
-  'me.mode.anonymous': 'Anónimo: los admins no ven quién escribe cada comentario.',
-  'me.mode.named': 'Con nombre: los admins ven quién escribe cada comentario. Lo que escribiste cuando era anónimo sigue siendo anónimo.',
+  'me.mode.anonymous': 'Es anónimo: los admins ven medias y comentarios, nunca quién ha respondido qué.',
+  'me.mode.named': 'Con nombre: los admins ven quién ha respondido qué. Lo que respondiste cuando era anónimo sigue siendo anónimo.',
   'me.period.label': 'Periodo',
   'me.period.week': '7 días',
   'me.period.month': '30 días',
@@ -672,10 +694,14 @@ const es: Record<Key, string> = {
   'me.filter.label': 'Servidores',
   'me.all': 'Todos',
   'me.chart': 'Tu ánimo',
-  'me.chart.desc.day': 'Tu respuesta de cada día, de 1 (muy mal) a 5 (genial). Los huecos son días sin responder.',
+  'me.chart.desc.day': 'Tu respuesta de cada día, de 1 (muy mal) a 5 (genial).',
   'me.chart.desc.week': 'Tu media de cada semana, de 1 (muy mal) a 5 (genial).',
   'me.weekOf': 'Semana del {day}',
   'me.empty.title': 'No has respondido en este periodo',
+  'me.off.title': 'La encuesta está apagada en {server}',
+  'me.off.title.many': 'La encuesta está apagada en tus servidores',
+  'me.off.body': 'Nadie la recibe hasta que la empieces. Cuando la respondas, verás aquí tu evolución.',
+  'me.off.body.ask': 'Nadie la recibe hasta que un admin la empiece. Cuando la respondas, verás aquí tu evolución.',
   'paused.text': 'Tienes la encuesta pausada en {server}.',
   'paused.resume': 'Activar',
   'paused.failed': 'No se ha podido activar. Vuelve a intentarlo.',
@@ -730,8 +756,6 @@ const es: Record<Key, string> = {
   'settings.freq.weekly': 'Semanal',
   'settings.freq.monthly': 'Mensual',
   'settings.readonly': 'Puedes ver los reports. Para cambiar ajustes, pide permiso al admin principal.',
-  'guilds.access.view': 'Solo reports',
-  'guilds.access.manage': 'Reports y ajustes',
   'surveyRoles.title': 'Quién recibe la encuesta',
   'surveyRoles.help': 'Por ejemplo, para dejar fuera a colaboradores externos.',
   'surveyRoles.mode.all': 'Todo el servidor',
@@ -777,8 +801,8 @@ const es: Record<Key, string> = {
   'access.dropped': '{n} miembros con acceso ya no están en el servidor; se quitarán al guardar.',
   'access.levelFor': 'Permiso para {name}',
   'access.remove': 'Quitar a {name}',
-  'access.level.view': 'Ver reports',
-  'access.level.manage': 'Ver y cambiar ajustes',
+  'access.level.view': 'Solo ver',
+  'access.level.manage': 'Ver y cambiar',
   'access.level.view.help': 'Ve las gráficas y los reports de este panel, y puede usar /happyx report.',
   'access.level.manage.help': 'Además cambia los ajustes de la encuesta aquí y con /happyx config.',
   'access.discordAdmins': 'El propietario del servidor y quien tenga el permiso Administrador de Discord siempre tienen acceso completo.',
@@ -980,10 +1004,19 @@ export const languages = [
 
 const storageKey = 'happyx.lang'
 
-// The saved choice if we still have that language, English otherwise.
-export function pickLanguage(saved: string | null): string {
-  return saved && messages[saved] ? saved : 'en'
+// The saved choice if we still have that language; otherwise the first browser language we have
+// (es-ES and ca, es both give es); English if none.
+export function pickLanguage(saved: string | null, browser: readonly string[] = []): string {
+  if (saved && messages[saved]) return saved
+  for (const tag of browser) {
+    const base = tag.toLowerCase().split('-')[0]
+    if (messages[base]) return base
+  }
+  return 'en'
 }
+
+const browserLanguages = (): readonly string[] =>
+  typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : navigator.language ? [navigator.language] : []
 
 function savedLanguage(): string | null {
   try {
@@ -993,7 +1026,7 @@ function savedLanguage(): string | null {
   }
 }
 
-export const lang = pickLanguage(typeof localStorage === 'undefined' ? null : savedLanguage())
+export const lang = pickLanguage(typeof localStorage === 'undefined' ? null : savedLanguage(), browserLanguages())
 
 // Every string is read at render time, so a reload is the simplest way to switch.
 export function setLanguage(code: string) {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { channelGroups, changes, confirmed, type Settings, settingsOf, weekdayName } from './settings'
+import { channelGroups, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
 
 const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
 
@@ -20,6 +20,8 @@ it('compares working days by value', () => {
 
 it('names ISO days', () => {
   expect([1, 7].map((d) => weekdayName(d))).toEqual(['Mon', 'Sun'])
+  expect(daysLabel([5, 1, 2, 3, 4])).toBe('Mon–Fri')
+  expect(daysLabel([1, 3])).toBe('Mon, Wed')
 })
 
 it('asks for the exact server name before deleting', () => {

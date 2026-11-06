@@ -199,6 +199,9 @@ a { color: var(--accent); }
 .shot img { display: block; width: 100%; height: auto; }
 .shot figcaption { color: var(--muted); font-size: 0.9375rem; }
 .shot-dark { display: none; }
+.report-shot { display: grid; gap: 24px; align-items: center; }
+.report-shot img { display: block; width: 100%; max-width: 420px; height: auto; border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--dc-shadow); }
+@media (min-width: 760px) { .report-shot { grid-template-columns: 1fr 420px; } }
 :root[data-theme='dark'] .shot-frame .shot-light { display: none; }
 :root[data-theme='dark'] .shot-frame .shot-dark { display: block; }
 @media (prefers-color-scheme: dark) {
@@ -273,11 +276,12 @@ a { color: var(--accent); }
 .chart { display: block; overflow: visible; touch-action: pan-y; }
 .chart .grid { stroke: var(--grid); stroke-width: 1; }
 .chart .axis { stroke: var(--axis); stroke-width: 1; }
+.chart .week { stroke: var(--grid); stroke-width: 1; }
+.chart .area { stroke: none; fill-opacity: 0.12; pointer-events: none; }
 .chart .tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart .tick-y { font-size: 14px; }
 .chart .line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
 .chart .dot { stroke: var(--surface); stroke-width: 2; }
-.chart .area { stroke: none; pointer-events: none; }
 .chart .note { font-size: 12px; font-weight: 700; fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
 .chart .focus { stroke: var(--surface); stroke-width: 2; pointer-events: none; }
 .chart .crosshair { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
@@ -790,3 +794,9 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .paused-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
 .paused-notice > p:first-child { margin: 0; flex: 1 1 16rem; }
 .paused-notice .alert { flex-basis: 100%; margin: 0; }
+
+/* On a phone every header control is at least 44 px, the size a finger can hit. */
+@media (max-width: 560px) {
+  .topbar .btn, .topbar .lang-picker, .topbar .nav-link { min-height: 44px; min-width: 44px; }
+  .topbar .nav-link { display: inline-flex; align-items: center; justify-content: center; }
+}
