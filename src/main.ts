@@ -193,6 +193,8 @@ const brand = () =>
     api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
     h('img', { class: 'brand-mark', src: logoURL, alt: '' }),
     h('span', { class: 'brand-text' }, 'HappyX'),
+    // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
+    api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
   )
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
@@ -385,7 +387,7 @@ const memberGuilds = (m: api.Me) => m.member_guilds ?? []
 
 // A server where the user is a member without access to the dashboard: its name, and its page
 // shows the team canvas.
-const memberGuildCard = (g: api.GameGuild) =>
+const memberGuildCard = (g: api.GameGuild, paused = false) =>
   h(
     'li',
     {},
@@ -393,7 +395,7 @@ const memberGuildCard = (g: api.GameGuild) =>
       'a',
       { class: 'card guild-card', href: `#/g/${g.discord_guild_id}` },
       h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
-      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, t('guilds.access.none'))),
+      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, [t('guilds.access.none'), paused ? t('guilds.paused') : ''].filter(Boolean).join(' · '))),
     ),
   )
 
@@ -422,12 +424,13 @@ function renderGuilds(m: api.Me) {
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
                   g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
+                  pausedIn(m, g.discord_guild_id).length ? t('guilds.paused') : '',
                 ].filter(Boolean).join(' · ')),
               ),
             ),
           ),
         ),
-        ...memberGuilds(m).map(memberGuildCard),
+        ...memberGuilds(m).map((g) => memberGuildCard(g, pausedIn(m, g.discord_guild_id).length > 0)),
       )
     : h(
         'div',
@@ -480,7 +483,7 @@ async function renderConnecting(m: api.Me, guildID: string) {
 // in Discord. Afterwards the page is drawn again without it.
 function pausedNotice(g: api.GameGuild) {
   const note = h('p', { class: 'alert small', role: 'alert', hidden: true }, t('paused.failed'))
-  const button = h('button', { class: 'btn', type: 'button' }, t('paused.resume'))
+  const button = h('button', { class: 'btn btn-primary', type: 'button' }, t('paused.resume'))
   button.addEventListener('click', async () => {
     button.disabled = true
     note.hidden = true
@@ -493,7 +496,7 @@ function pausedNotice(g: api.GameGuild) {
       note.hidden = false
     }
   })
-  return h('div', { class: 'card paused-notice' }, h('p', {}, t('paused.text', { server: g.name })), button, note)
+  return h('div', { class: 'card paused-notice' }, h('div', {}, h('p', {}, h('strong', {}, t('paused.text', { server: g.name }))), h('p', { class: 'secondary small' }, t('paused.body'))), button, note)
 }
 
 const inAnyServer = (m: api.Me) => m.guilds.length > 0 || m.games.length > 0 || memberGuilds(m).length > 0 || pausedIn(m).length > 0
@@ -519,8 +522,8 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
         h(
           'p',
           { class: 'no-access-links' },
-          h('a', { class: 'btn', href: '#/me' }, t('nav.me')),
-          plays ? h('a', { class: 'btn', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
+          h('a', { class: 'btn btn-primary', href: '#/me' }, t('nav.me')),
+          plays ? h('a', { class: 'btn btn-outline', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
         ),
       ),
     ),
@@ -596,7 +599,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
   if (r.responses === 0 && isNewGuild(g.created_at)) {
-    body.replaceChildren(firstSteps(g), ...extra)
+    // «First steps» starts with starting the survey, so «Server status» doesn't repeat it.
+    const status = health ? healthCard(g, health, false) : null
+    body.replaceChildren(firstSteps(g), ...(status ? [status] : []))
     return
   }
   if (r.responses === 0) {
@@ -650,10 +655,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
-      ...(health && healthSection ? [healthAlert(health, healthSection)] : []),
+      ...(health && healthSection ? [healthAlert(health, healthSection, !api.canManage(g))] : []),
       lowComments(r, messages),
       rate !== null && oldRate !== null && oldRate - rate >= participationDrop && healthSection
-        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection) }
+        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection), ask: !api.canManage(g) }
         : null,
     ])].filter((n): n is HTMLElement => n !== null),
     h(
@@ -667,7 +672,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
         t('stat.respondents'),
         h('span', {}, formatNumber(r.respondents), health && health.audience > 0 ? h('span', { class: 'stat-unit' }, ` ${t('stat.of', { n: formatNumber(health.audience) })}`) : null),
         // «At least once», so «10 of 10» doesn't read as the opposite of the participation figure.
-        old ? h('span', { class: 'stat-notes' }, t('stat.respondents.note'), deltaNote(r.respondents, old.respondents)) : t('stat.respondents.note'),
+        // The delta first, level with the others; «at least once» under it.
+        old ? h('span', { class: 'stat-notes' }, deltaNote(r.respondents, old.respondents), t('stat.respondents.note')) : t('stat.respondents.note'),
       ),
       stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
     ),
@@ -695,7 +701,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 
 // «To review»: at most three lines under the summary, from fixed rules on the team's own numbers,
 // each leading to where to look. Without any, the section is left out.
-type Watch = { text: string; go: () => void }
+// ask: the viewer can only look, and what it leads to is for whoever can change the settings.
+type Watch = { text: string; go: () => void; ask?: boolean }
 
 // A drop in participation of at least this many points is worth a look.
 const participationDrop = 15
@@ -711,7 +718,7 @@ function toWatch(items: (Watch | null)[]) {
       'ul',
       {},
       ...shown.map((w) =>
-        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
+        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small' }, t('watch.ask')) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
       ),
     ),
   )
@@ -724,8 +731,8 @@ function firstSteps(g: api.Guild) {
   const settings = `#/g/${g.discord_guild_id}/settings`
   const manage = api.canManage(g)
   const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
-  const item = (done: boolean | null, text: string, link?: string) =>
-    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: settings }, `${link} →`) : null)
+  const item = (done: boolean | null, text: string, link?: string, field?: string) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: field ? `${settings}?f=${field}` : settings }, `${link} →`) : null)
   const language = botLanguages.find(([code]) => code === g.language)?.[1] ?? g.language
   return h(
     'section',
@@ -734,6 +741,7 @@ function firstSteps(g: api.Guild) {
     h(
       'ul',
       { class: 'todo' },
+      g.survey_enabled === false ? item(false, t('health.survey.off'), t('health.start'), 'survey-on') : null,
       item(null, t('first.language', { language }), t('first.change')),
       item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
       item(null, t('first.assistant')),
@@ -748,7 +756,7 @@ function focusCard(card: HTMLElement) {
 }
 
 // When the last survey didn't reach everyone, or reaches nobody: «Server status», at the bottom.
-function healthAlert(x: api.Health, card: HTMLElement): Watch | null {
+function healthAlert(x: api.Health, card: HTMLElement, ask = false): Watch | null {
   const last = x.last_survey
   const text =
     x.audience === 0
@@ -756,7 +764,7 @@ function healthAlert(x: api.Health, card: HTMLElement): Watch | null {
       : last && last.failed > 0
         ? t(last.failed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(last.failed), day: formatDay(last.day, { weekday: 'long' }) })
         : null
-  return text ? { text, go: () => focusCard(card) } : null
+  return text ? { text, go: () => focusCard(card), ask } : null
 }
 
 // Comments of Bad or Awful in the period: the comments card, filtered to them.
@@ -773,7 +781,7 @@ function lowComments(r: api.Report, messages: { card: HTMLElement; show: (f: Moo
 }
 
 // When the next survey and report go out, how the last survey went, and what is left to set up.
-function healthCard(g: api.Guild, x: api.Health) {
+function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   const days = g.working_days ?? [1, 2, 3, 4, 5]
   const next = nextSurveyDay(g.timezone, g.survey_hour, days)
   const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
@@ -787,7 +795,7 @@ function healthCard(g: api.Guild, x: api.Health) {
     h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
-  if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
+  if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
   todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
@@ -969,7 +977,7 @@ function noServerCard() {
 function surveyOffCard(m: api.Me) {
   if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
   const one = m.guilds.length === 1 ? m.guilds[0] : null
-  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn btn-primary', href: `#/g/${one.discord_guild_id}/settings?f=survey-on` }, t('health.start')) : !one ? h('a', { class: 'btn btn-primary', href: '#/' }, t('nav.servers')) : null
   return h(
     'div',
     { class: 'card empty' },
@@ -982,7 +990,7 @@ function surveyOffCard(m: api.Me) {
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('me'))
   const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
   const periods = h(
     'div',
@@ -997,8 +1005,9 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       'main',
       { class: 'container' },
       h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), dates),
-      ...pausedIn(m).map(pausedNotice),
       periods,
+      // Under the periods, where «the survey is off» also shows.
+      ...pausedIn(m).map(pausedNotice),
       body,
       // Vacations are for people in a server with HappyX, not for someone who has none yet.
       inAnyServer(m) ? myVacationCard(() => renderLanding(null)) : null,
@@ -1018,12 +1027,13 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     // Someone with no server to manage or play in, and no answer in the last year, most likely
     // has no server with HappyX: say how to add it instead.
     const noServer = !api.isDemo && m.guilds.length === 0 && m.games.length === 0 && memberGuilds(m).length === 0 && (await neverAnswered(period, data))
-    // Without a single answer, the period and its dates say nothing.
-    if (noServer) {
+    const off = noServer ? null : surveyOffCard(m)
+    // Without a single answer, and none coming, the period and its dates say nothing.
+    if (noServer || off) {
       dates.remove()
       periods.remove()
     }
-    body.replaceChildren(noServer ? noServerCard() : surveyOffCard(m) ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    body.replaceChildren(noServer ? noServerCard() : off ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
@@ -1325,6 +1335,8 @@ function renderSignIn(path: string, reason: string) {
         { class: 'card signin' },
         h('h1', {}, reason),
         h('p', {}, h('a', { class: 'btn btn-discord', href: `${api.loginURL}?next=${encodeURIComponent(path)}` }, discordLogo(), t('landing.login'))),
+        // Someone who got the link from a colleague may not know HappyX yet.
+        h('p', { class: 'signin-more small' }, h('a', { href: '#/about' }, t('signin.what')), h('a', { href: '/demo' }, t('landing.demo'))),
       ),
     ),
     landingFooter(),
@@ -1385,7 +1397,7 @@ function renderGames(m: api.Me) {
 
 async function renderGame(m: api.Me, guildID: string) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('game'))
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
   page(
     header(m, 'games'),
@@ -1487,7 +1499,10 @@ function messagesCard(r: api.Report) {
   return { card, show }
 }
 
-function skeleton() {
+// A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
+function skeleton(shape: 'dashboard' | 'me' | 'game' = 'dashboard') {
+  if (shape === 'me') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-chart' }), h('div', { class: 'grid-2' }, h('div', { class: 'sk sk-card' })))
+  if (shape === 'game') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-steps' }), h('div', { class: 'sk sk-card' }))
   return h('div', { class: 'skeleton' }, h('div', { class: 'sk-row' }, ...[0, 1, 2, 3].map(() => h('div', { class: 'sk sk-stats' }))), h('div', { class: 'sk sk-chart' }))
 }
 
@@ -1501,8 +1516,15 @@ function errorCard(err: unknown) {
   )
 }
 
+// The API didn't answer: a top bar without the user's links, the error with «Try again», and
+// the footer, so the legal pages and the landing stay a click away.
 function renderError(err: unknown) {
-  page(h('main', { class: 'container' }, errorCard(err)))
+  me = null
+  page(
+    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true))),
+    h('main', { class: 'container narrow' }, errorCard(err)),
+    landingFooter(),
+  )
 }
 
 function discordLogo() {
