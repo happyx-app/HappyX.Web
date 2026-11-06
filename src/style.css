@@ -274,6 +274,7 @@ a { color: var(--accent); }
 .chart .grid { stroke: var(--grid); stroke-width: 1; }
 .chart .axis { stroke: var(--axis); stroke-width: 1; }
 .chart .week { stroke: var(--grid); stroke-width: 1; }
+.chart .area { stroke: none; fill-opacity: 0.12; pointer-events: none; }
 .chart .tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chart .tick-y { font-size: 14px; }
 .chart .line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }

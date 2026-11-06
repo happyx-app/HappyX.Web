@@ -197,6 +197,25 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     })
   }
 
+  // A single solid line gets a flat, faint fill under it; each run of consecutive days is
+  // its own shape, so gaps stay empty.
+  const solid = series.filter((se) => !se.dashed)
+  if (solid.length === 1) {
+    const se = solid[0]
+    const bottom = m.top + ih
+    let d = ''
+    for (const run of runs(se.values)) {
+      if (run.length < 2) continue
+      const pts = run.map((i): [number, number] => [x(i), y(se.values[i]!)])
+      d += `M${pts[0][0].toFixed(1)},${bottom}L${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}${monotone(pts)}L${pts[pts.length - 1][0].toFixed(1)},${bottom}Z`
+    }
+    if (d) {
+      const area = s('path', { d, class: 'area' })
+      area.style.fill = se.color // CSSOM, not a style attribute: the CSP blocks those
+      svg.append(area)
+    }
+  }
+
   // Lines are joined only between consecutive points that both have a value.
   for (const se of series) {
     let path = ''
