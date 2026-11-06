@@ -90,7 +90,7 @@ async function route() {
     // Right after «Add to Discord», the bot may not have registered the server yet.
     if (!g && q.get('added') === '1' && !api.isDemo) return renderConnecting(me, guildID)
     if (g && q.has('added')) return location.replace(`#/g/${guildID}`)
-    return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30')
+    return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30', isPreset(p))
   }
   if (path === '/me' || (path === '' && me.guilds.length === 0)) {
     const q = new URLSearchParams(query)
@@ -515,7 +515,7 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
   )
 }
 
-async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
+async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = true) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     const member = memberGuilds(m).find((x) => x.discord_guild_id === guildID)
@@ -570,6 +570,16 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     body.replaceChildren(errorCard(err))
     return
   }
+  // A default period without answers, when this week has some (a new server, early in the
+  // month): open on this week instead.
+  const thisWeek = rangeFor('this-week', todayIn(g.timezone))
+  if (r.responses === 0 && !chosen && preset !== 'this-week') {
+    const now = await api.report(guildID, thisWeek.from, thisWeek.to).catch(() => null)
+    if (now && now.responses > 0) {
+      history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
+      return renderGuild(m, guildID, 'this-week')
+    }
+  }
   body.removeAttribute('aria-busy')
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
@@ -594,6 +604,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
     )
     return
   }
+  // With answers on fewer than 3 days there is no tone or trend yet. If they all fall in this week,
+  // the dashboard opens on it, unless the period was chosen.
+  const answeredDays = r.days.filter((d) => d.responses > 0)
+  const few = answeredDays.length < fewDays
+  if (few && !chosen && preset !== 'this-week' && answeredDays.every((d) => d.day >= thisWeek.from)) {
+    history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
+    return renderGuild(m, guildID, 'this-week')
+  }
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
   if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
@@ -617,7 +635,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset) {
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
 
   body.replaceChildren(
-    summaryCard(r, old, week ? [] : weekdays),
+    summaryCard(r, old, week ? [] : weekdays, few),
     ...(health && healthSection ? [healthAlert(health, healthSection)].filter((n): n is HTMLParagraphElement => n !== null) : []),
     h(
       'div',
@@ -742,9 +760,13 @@ function healthCard(g: api.Guild, x: api.Health) {
   )
 }
 
+// Below this many days with answers, the dashboard gives no tone or trend.
+const fewDays = 3
+
 // The period in a few words: the tone as the title, then only what the numbers below don't
 // say (how the average moved, and the weekday that costs the most).
-function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[]) {
+function summaryCard(r: api.Report, old: api.Report | null, weekdays: WeekdayStat[], few = false) {
+  if (few) return h('section', { class: 'card summary' }, h('div', {}, h('p', { class: 'secondary' }, t('summary.few', { n: fewDays }))))
   const parts: string[] = []
   if (old) {
     const d = delta(r.average, old.average, 1)
