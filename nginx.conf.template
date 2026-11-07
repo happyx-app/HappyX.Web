@@ -11,15 +11,17 @@ server {
     root /usr/share/nginx/html;
     server_tokens off;
 
-    # The HTTPS reverse proxy in front of this container sits on a private network. Trust its
-    # X-Forwarded-For so the rate limits count visitors, not the proxy; a header sent from
-    # anywhere else is ignored, so it can't be spoofed to dodge them.
+    # The HTTPS reverse proxy in front of this container is a Cloudflare Tunnel on a private
+    # network. Cloudflare puts the visitor's real IP in CF-Connecting-IP, so key the rate limits
+    # on that header and trust it only from the tunnel's private address; a request from anywhere
+    # else keeps its own address, so the header can't be spoofed to dodge the limits. (Using
+    # X-Forwarded-For here did not yield a stable per-visitor key through the tunnel, so the
+    # limits never actually throttled a single client.)
     set_real_ip_from 10.0.0.0/8;
     set_real_ip_from 172.16.0.0/12;
     set_real_ip_from 192.168.0.0/16;
     set_real_ip_from 127.0.0.0/8;
-    real_ip_header X-Forwarded-For;
-    real_ip_recursive on;
+    real_ip_header CF-Connecting-IP;
     limit_req_status 429;
 
     add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https://cdn.discordapp.com; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" always;
