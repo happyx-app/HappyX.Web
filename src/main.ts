@@ -1,6 +1,6 @@
 import './style.css'
 import * as api from './api'
-import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
@@ -628,15 +628,18 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   // The comparison is said once, here; the deltas below don't repeat it.
   if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
   const week = preset === 'this-week' || preset === 'last-week'
-  const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
+  // Over 90 days one point a day can't be read: the chart and its table go by week.
+  const byWeek = preset === 'last-90'
+  const points = byWeek ? weeklyStats(r.days) : r.days
+  const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
   const notes = [
-    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
-    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
+    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(points[peaks.high].average, 1) }) }] : []),
+    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(points[peaks.low].average, 1) }), below: true }] : []),
   ]
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days))
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -674,9 +677,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'section',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
+      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(r.days, old?.days, notes),
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek),
       tableWrap,
     ),
     week
