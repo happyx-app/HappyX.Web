@@ -77,7 +77,8 @@ async function route() {
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
-  if (gameID) return renderGame(me, gameID)
+  // ?history (from «My evolution») scrolls to the past rounds.
+  if (gameID) return renderGame(me, gameID, new URLSearchParams(query).has('history'))
   if (path === '/games') {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
@@ -1393,7 +1394,7 @@ function renderGames(m: api.Me) {
   page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
 }
 
-async function renderGame(m: api.Me, guildID: string) {
+async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
@@ -1423,6 +1424,7 @@ async function renderGame(m: api.Me, guildID: string) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
+  if (toHistory) document.getElementById('history')?.scrollIntoView()
 }
 
 function stat(label: string, value: Node | string, note?: Node | string) {
@@ -1550,7 +1552,7 @@ const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)
 // bars only show from three rounds on: with fewer, the total says it all.
 function myGamesCard(g: api.MyGames['guilds'][number], many: boolean) {
   const { weeks, correct, guesses, bars: recent } = gameTotals(g.weeks)
-  const bars = recent.length === 0 ? null : h(
+  const list = recent.length === 0 ? null : h(
     'ol',
     { class: 'mygames-bars' },
     ...recent.map((w) => {
@@ -1562,10 +1564,12 @@ function myGamesCard(g: api.MyGames['guilds'][number], many: boolean) {
       return h('li', {}, h('span', { class: 'sr-only' }, `${day}: ${score}`), h('span', { class: 'mygames-col', 'aria-hidden': 'true' }, fill), h('span', { class: 'small mygames-score', 'aria-hidden': 'true' }, score), h('span', { class: 'muted small', 'aria-hidden': 'true' }, day))
     }),
   )
+  // A long period shows only the latest rounds: say so, so the bars don't read as all of them.
+  const bars = list && (recent.length < weeks.length ? h('div', { class: 'mygames-recent' }, h('p', { class: 'muted small' }, t('me.games.bars', { n: recent.length })), list) : list)
   return h(
     'section',
     { class: 'card mygames' },
     h('h2', {}, many ? t('me.games.title.guild', { guild: g.name }) : t('me.games.title')),
-    h('div', { class: bars ? 'mygames-body' : 'mygames-body mygames-solo' }, h('div', { class: 'mygames-total' }, h('strong', { class: 'stat-value' }, t('me.games.total', { correct, guesses })), h('span', { class: 'muted small' }, weeks.length === 1 ? t('me.games.rounds.one', { guild: g.name }) : t('me.games.rounds', { n: weeks.length, guild: g.name })), h('a', { href: `#/game/${g.discord_guild_id}`, class: 'small' }, `${t('me.games.link')} →`)), bars),
+    h('div', { class: bars ? 'mygames-body' : 'mygames-body mygames-solo' }, h('div', { class: 'mygames-total' }, h('strong', { class: 'stat-value' }, t('me.games.total', { correct, guesses })), h('span', { class: 'muted small' }, weeks.length === 1 ? t('me.games.rounds.one') : t('me.games.rounds', { n: weeks.length })), h('a', { href: `#/game/${g.discord_guild_id}?history`, class: 'small' }, `${t('me.games.link')} →`)), bars),
   )
 }

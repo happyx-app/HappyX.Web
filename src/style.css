@@ -812,6 +812,7 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 }
 
 /* «Who's who?» history, and your own score in «My evolution» */
+#history { scroll-margin-top: 88px; }
 .history { list-style: none; margin: -8px 0 0; padding: 0; display: grid; }
 .history-row { border-bottom: 1px solid var(--grid); }
 .history-row:last-child { border-bottom: 0; }
@@ -836,6 +837,8 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .mygames-solo { grid-template-columns: 1fr; }
 .mygames-total { display: grid; gap: 4px; }
 .mygames-total .stat-value { font-size: 1.5rem; }
+.mygames-recent { display: grid; gap: 8px; }
+.mygames-recent > p { margin: 0; }
 .mygames-bars { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 72px; justify-content: start; gap: 8px; }
 .mygames-score { color: var(--ink-2); font-weight: 600; }
 .mygames-bars li { display: grid; justify-items: center; gap: 2px; white-space: nowrap; }
@@ -845,16 +848,14 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --track: #34343b; } }
 :root[data-theme='dark'] { --track: #34343b; }
 @media (max-width: 760px) {
-  .history-row summary, .history-off { grid-template-columns: minmax(0, 1fr) auto; }
+  .history-row summary, .history-off { grid-template-columns: minmax(0, 1fr) 5.5rem; }
   .history-when { grid-column: 1 / -1; grid-row: 1; }
   .history-main { grid-column: 1; grid-row: 2; }
   .history-row summary::after { grid-column: 2; grid-row: 2; }
   .history-team { grid-column: 1; grid-row: 3; }
-  .history-mine { grid-column: 2; grid-row: 3; align-self: end; }
+  .history-mine { grid-column: 2; grid-row: 3; align-self: start; }
   .history-row details > .reveal { margin-left: 0; }
   .mygames-bars { grid-auto-columns: minmax(0, 1fr); gap: 4px; }
   .mygames-bars li { font-size: 0.75rem; }
-  /* On a phone, the latest five rounds. */
-  .mygames-bars li:nth-last-child(n + 6) { display: none; }
   .mygames-body { grid-template-columns: 1fr; }
 }

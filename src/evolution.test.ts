@@ -63,7 +63,7 @@ it('adds up your game rounds and shows bars from three on', () => {
   const three = gameTotals([w('2026-10-05', 2, 5), w('2026-10-12', 0, 4), w('2026-10-19', 5, 6)])
   expect([three.correct, three.guesses, three.bars.length]).toEqual([7, 15, 3])
   const many = gameTotals(Array.from({ length: 12 }, (_, i) => w(`2026-0${1 + Math.floor(i / 4)}-0${1 + (i % 4)}`, 1, 2)))
-  expect([many.weeks.length, many.correct, many.bars.length, many.bars[0].week]).toEqual([12, 12, 8, '2026-02-01'])
+  expect([many.weeks.length, many.correct, many.bars.length, many.bars[0].week]).toEqual([12, 12, 6, '2026-02-03'])
 })
 
 it('rounds the share of right guesses', () => {

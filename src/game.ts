@@ -323,7 +323,7 @@ const historyPage = 5
 function historyCard(rounds: api.GameHistoryRound[]) {
   const list = h('ul', { class: 'history' })
   let shown = 0
-  const more = h('button', { class: 'btn btn-ghost small', type: 'button' }, t('game.history.more'))
+  const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' }, t('game.history.more'))
   const showMore = () => {
     const next = rounds.slice(shown, shown + historyPage).map(historyRow)
     list.append(...next)
@@ -347,7 +347,7 @@ function historyRow(r: api.GameHistoryRound) {
   const team = r.guesses === 0
     ? h('span', { class: 'history-team muted' }, t('game.history.none'))
     : h('span', { class: 'history-team' }, h('span', { class: 'history-team-text' }, t('game.history.team', { p })), bar)
-  const mine = h('span', { class: 'history-mine small muted' }, r.mine ? t('game.history.mine', { correct: r.mine.correct, guesses: r.mine.guesses }) : t('game.history.notPlayed'))
+  const mine = h('span', { class: 'history-mine small muted' }, r.mine ? t('game.history.mine', { correct: r.mine.correct, guesses: r.mine.guesses }) : t(r.answers.some((a) => a.mine) ? 'game.history.notGuessed' : 'game.history.notPlayed'))
   const guesses = r.my_guesses ?? {}
   const myID = r.answers.find((a) => a.mine)?.discord_user_id
   const players = r.players === 1 ? t('game.history.players.one') : t('game.history.players', { n: r.players })

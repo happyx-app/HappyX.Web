@@ -68,7 +68,7 @@ export const share = (correct: number, guesses: number) => (guesses > 0 ? Math.r
 // Bars per round only start at this many rounds: with fewer, the total says it all. A long
 // period shows the latest maxGameBars rounds, so the bars stay readable on a phone.
 export const minGameBars = 3
-export const maxGameBars = 8
+export const maxGameBars = 6
 
 // gameTotals adds up your «Who's who?» rounds, leaving out any where you didn't guess.
 export function gameTotals(weeks: MyGameWeek[]) {
