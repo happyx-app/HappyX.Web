@@ -27,7 +27,7 @@ export interface Points {
   counts: Map<string, number[]> // guild ID -> answers per point
 }
 
-function monday(day: string): string {
+export function monday(day: string): string {
   const offset = (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7
   return addDays(day, -offset)
 }

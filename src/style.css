@@ -246,6 +246,7 @@ a { color: var(--accent); }
 .guild-icon { width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center; background: var(--series-soft); color: var(--ink); font-weight: 700; font-size: 1.125rem; }
 .guild-text { display: grid; min-width: 0; }
 .guild-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guild-meta > span { white-space: nowrap; }
 .badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
 
 .back { color: var(--ink-2); text-decoration: none; font-size: 0.875rem; }
@@ -396,12 +397,22 @@ svg.pickable { cursor: pointer; }
 .section-link[aria-current] { color: var(--ink); border-left-color: var(--series); font-weight: 600; }
 .section-danger { color: var(--danger); }
 @media (max-width: 860px) {
-  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'nav' 'body'; gap: 16px; }
+  /* A block, not a grid: a sticky child can't leave its grid row, and the list must follow the whole page. */
+  .settings-layout { display: block; min-width: 0; }
+  .settings-head { margin-bottom: 16px; }
+  .settings-nav { margin-bottom: 16px; }
+  .settings-sections { grid-template-columns: minmax(0, 1fr); }
   .settings-nav { max-width: none; }
+  /* Under the top bar while scrolling, so any section is one tap away on a long page. The right
+     edge fades while more sections are hidden there. */
   .settings-nav {
-    position: static; display: flex; gap: 4px; padding: 4px; overflow-x: auto; scrollbar-width: none;
-    background: var(--surface-2); border-radius: 12px;
+    top: calc(var(--topbar-h, 0px) + 8px); z-index: 9; display: flex; gap: 4px; padding: 4px; overflow-x: auto; scrollbar-width: none;
+    background: var(--surface-2); border-radius: 12px; box-shadow: 0 0 0 8px var(--page);
   }
+  .settings-nav.more-right { mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+  .settings-sections > .card { scroll-margin-top: calc(var(--topbar-h, 0px) + 72px); }
+  /* The section list right above already names the first card. */
+  .settings-sections > .card:first-child > h2 { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .section-link { flex: none; border: 0; border-radius: 9px; padding: 6px 12px; font-size: 0.875rem; white-space: nowrap; }
   .section-link[aria-current] { background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 }
@@ -441,6 +452,12 @@ svg.pickable { cursor: pointer; }
 .switch input:checked::after { transform: translateX(18px); }
 .warning { color: var(--ink); background: var(--surface-2); border-left: 3px solid var(--sun); padding: 8px 12px; border-radius: 6px; }
 .form-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.form-actions > p:empty { display: none; }
+/* With changes to save, Save stays at the bottom of the screen while its card is on it. */
+.card .form-actions:has([data-dirty='true']) {
+  position: sticky; bottom: 0; z-index: 4; margin: 0 -22px; padding: 12px 22px;
+  background: var(--surface); border-top: 1px solid var(--grid);
+}
 .survey-message textarea {
   font: inherit; color: var(--ink); background: var(--surface); width: 100%; resize: vertical; min-height: 96px;
   border: 1px solid var(--control-border); border-radius: 10px; padding: 9px 12px;
@@ -552,6 +569,7 @@ svg.pickable { cursor: pointer; }
 }
 .skip-link:focus { transform: none; }
 main:focus { outline: none; }
+.nowrap { white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .access-form, .survey-roles-form { display: grid; gap: 20px; }
 .combo { position: relative; }
@@ -694,9 +712,11 @@ main:focus { outline: none; }
 .subsection:first-of-type { border-top: 0; padding-top: 0; }
 .subsection h3 { margin: 0; font-family: var(--display); font-size: 1rem; }
 .gear-label { margin-left: 6px; }
-@media (max-width: 640px) { .gear-label { display: none; } }
-.privacy-note { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.875rem; }
-.privacy-note svg { width: 16px; height: 16px; flex: none; }
+/* On a phone only the gear shows; screen readers still read «Settings». */
+@media (max-width: 640px) { .gear-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+.privacy-note { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 0.875rem; }
+/* Level with the first line when the note runs to several. */
+.privacy-note svg { width: 16px; height: 16px; flex: none; margin-top: calc((1.5em - 16px) / 2); }
 .rank-num { color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; min-width: 1.5em; }
 .me-dates { color: var(--muted); margin: 4px 0 0; }
 .demo-banner .btn-sun { background: #fff; color: var(--primary); }
@@ -737,6 +757,12 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
 .canvas-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .canvas-tool[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .canvas-tool[hidden], .canvas-dock .canvas-fab { display: none; }
+.canvas-dock-label { display: grid; place-items: center; width: 34px; height: 28px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.canvas-dock-label svg { width: 20px; height: 20px; }
+.canvas-hint {
+  position: absolute; left: calc(100% + 12px); top: 12px; margin: 0; width: max-content; max-width: 340px; padding: 8px 14px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--dc-shadow); font-size: 0.875rem;
+}
 .canvas-pen { width: 20px; height: 20px; border-radius: 50%; background: var(--pen); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.08); flex: none; }
 .canvas-pen-small { width: 12px; height: 12px; }
 .canvas-sep { display: block; width: 20px; border-top: 1px solid var(--border); margin: 2px 0; }
@@ -768,6 +794,9 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
   .canvas-dock:not(.open) > :not(.canvas-fab) { display: none; }
   .canvas-dock .canvas-fab { display: grid; color: var(--accent); }
   .canvas-dock.open .canvas-fab { order: 99; }
+  .canvas-dock .canvas-dock-label { display: none; }
+  .canvas-dock:not(.open) > .canvas-hint { display: block; }
+  .canvas-hint { left: auto; right: 0; top: auto; bottom: calc(100% + 8px); max-width: calc(100vw - 32px); }
   .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
   .canvas-bar { top: auto; bottom: 76px; }
   /* Room under the page, so the corner dock never covers its last lines. */
@@ -778,6 +807,9 @@ body:has(.settings-page) .canvas-dock { top: auto; bottom: 16px; left: auto; rig
 body:has(.settings-page) .canvas-dock:not(.open) > :not(.canvas-fab) { display: none; }
 body:has(.settings-page) .canvas-dock .canvas-fab { display: grid; color: var(--accent); }
 body:has(.settings-page) .canvas-dock.open .canvas-fab { order: 99; }
+body:has(.settings-page) .canvas-dock .canvas-dock-label { display: none; }
+body:has(.settings-page) .canvas-dock:not(.open) > .canvas-hint { display: block; }
+body:has(.settings-page) .canvas-hint { left: auto; right: 0; top: auto; bottom: calc(100% + 8px); max-width: calc(100vw - 32px); }
 body:has(.settings-page) .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
 body:has(.settings-page) .canvas-bar { top: auto; bottom: 76px; }
 body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
@@ -794,6 +826,13 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .to-watch h2 { margin: 0; font-size: 1rem; }
 .to-watch ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .health-alert a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; }
+/* «To review»: the circle stays beside the text however long it is; on a phone «See →» goes under the text. */
+.to-watch .health-alert { display: grid; grid-template-columns: 1em minmax(0, 1fr) auto; gap: 4px 10px; }
+@media (max-width: 560px) {
+  .to-watch .health-alert { grid-template-columns: 1em minmax(0, 1fr); }
+  .to-watch .health-alert a { grid-column: 2; justify-self: start; margin-left: 0; }
+  .to-watch .health-alert .watch-ask { grid-column: 2; }
+}
 /* Logged out on an app page: one line and the login button. */
 .signin { margin-top: 48px; justify-items: start; }
 .signin h1 { font-size: 1.5rem; margin: 0; }
@@ -818,6 +857,21 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 @media (max-width: 560px) {
   .topbar .btn, .topbar .lang-picker, .topbar .nav-link { min-height: 44px; min-width: 44px; }
   .topbar .nav-link { display: inline-flex; align-items: center; justify-content: center; }
+}
+/* The page's small controls keep their look, but what a finger can hit is 44 px tall. */
+@media (max-width: 560px) {
+  .chip, .seg, .card-head > .btn-ghost, .todo a, .health-alert a { position: relative; }
+  .chip::after, .seg::after, .card-head > .btn-ghost::after, .todo a::after, .health-alert a::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%);
+  }
+  .settings-nav .section-link { padding: 12px 14px; }
+}
+/* On a phone the closed pencil sits at the end of the page, in the room left for it, so it never
+   covers a card while scrolling. Open, it floats again so the tools stay at hand while drawing. */
+@media (max-width: 560px) {
+  body.has-canvas { position: relative; min-height: 100vh; }
+  .canvas-dock:not(.open) { position: absolute; }
+  .canvas-dock .canvas-fab { width: 44px; height: 44px; }
 }
 
 /* «Who's who?» history, and your own score in «My evolution» */

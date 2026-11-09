@@ -9,6 +9,7 @@ import { h } from './dom'
 import { showSaveError } from './errors'
 import * as icons from './icons'
 import { t } from './i18n'
+import { unsavedNote } from './unsaved'
 
 export const filterModes: api.RoleFilterMode[] = ['all', 'except', 'only']
 
@@ -154,7 +155,7 @@ function surveyRolesForm(g: api.Guild, roles: api.Role[], onSaved: (g: api.Guild
     { class: 'survey-roles-form', novalidate: true },
     editor.el,
     h('p', { class: 'muted small' }, icons.inline(icons.info), t('surveyRoles.note')),
-    h('div', { class: 'form-actions' }, save, status),
+    h('div', { class: 'form-actions' }, save, unsavedNote(save), status),
   )
   form.addEventListener('submit', async (e) => {
     e.preventDefault()

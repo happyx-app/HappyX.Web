@@ -1,11 +1,11 @@
 import './style.css'
 import * as api from './api'
-import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
-import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
@@ -85,7 +85,7 @@ async function route() {
   }
   if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
-  if (settingsID) return renderSettings(me, settingsID)
+  if (settingsID) return renderSettings(me, settingsID, new URLSearchParams(query).get('f'))
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
     const q = new URLSearchParams(query)
@@ -421,12 +421,13 @@ function renderGuilds(m: api.Me) {
                 'span',
                 { class: 'guild-text' },
                 h('strong', {}, g.name),
-                h('span', { class: 'muted small' }, [
+                // Each part stays on one line, so a narrow card breaks only between them.
+                h('span', { class: 'muted small guild-meta' }, ...[
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
                   g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
                   pausedIn(m, g.discord_guild_id).length ? t('guilds.paused') : '',
-                ].filter(Boolean).join(' · ')),
+                ].filter(Boolean).flatMap((x, i) => [...(i ? [' · '] : []), h('span', {}, x)])),
               ),
             ),
           ),
@@ -541,7 +542,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const range = rangeFor(preset, todayIn(g.timezone))
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
-  const dates = h('p', { class: 'muted' }, formatRange(range.from, range.to))
+  const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('period.label') },
@@ -632,24 +633,28 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
-  if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
+  if (old) dates.append(' · ', nowrap(t('range.compared', { range: formatRange(before.from, before.to, false) })))
   const week = preset === 'this-week' || preset === 'last-week'
-  const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
+  // Over 90 days one point a day can't be read: the chart and its table go by week.
+  const byWeek = preset === 'last-90'
+  const points = byWeek ? weeklyStats(r.days) : r.days
+  const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
   const notes = [
-    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
-    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
+    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(points[peaks.high].average, 1) }) }] : []),
+    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(points[peaks.low].average, 1) }), below: true }] : []),
   ]
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
   const messages = messagesCard(r)
-  // From a day on the chart or its table to that day's comments.
-  const comments = (i: number) => messages.countOn(r.days[i].day)
+  // From a point of the chart or a row of its table (a day, or a week) to its comments.
+  const span = (i: number) => (byWeek ? { from: points[i].day, to: addDays(points[i].day, 6) } : { from: points[i].day, to: points[i].day })
+  const comments = (i: number) => messages.countIn(span(i).from, span(i).to)
   const pickDay = (i: number) => {
-    messages.showDay(r.days[i].day)
+    messages.showDays(span(i).from, span(i).to)
     focusCard(messages.card)
   }
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days, comments, pickDay))
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek, comments, pickDay))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -687,9 +692,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'section',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
+      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(r.days, old?.days, notes, comments, pickDay),
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       tableWrap,
     ),
     week
@@ -725,7 +730,7 @@ function toWatch(items: (Watch | null)[]) {
       'ul',
       {},
       ...shown.map((w) =>
-        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small' }, t('watch.ask')) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
+        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small watch-ask' }, t('watch.ask')) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
       ),
     ),
   )
@@ -749,8 +754,8 @@ function firstSteps(g: api.Guild) {
       'ul',
       { class: 'todo' },
       g.survey_enabled === false ? item(false, t('health.survey.off'), t('health.start'), 'survey-on') : null,
-      item(null, t('first.language', { language }), t('first.change')),
-      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
+      item(null, t('first.language', { language }), t('first.change'), 'language'),
+      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change'), 'hour'),
       item(null, t('first.assistant')),
     ),
   )
@@ -802,12 +807,12 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
     h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
-  if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
-  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
+  if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [`${settings}?f=survey-on`, t('health.start')]))
+  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [`${settings}?f=${surveyRolesSection}`, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
-  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
+  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   return h(
     'section',
     { class: 'card' },
@@ -1007,7 +1012,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
     })
     .catch(() => {})
-  const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
+  const dates = h('p', { class: 'me-dates' }, nowrap(formatRange(range.from, range.to)))
   const periods = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
@@ -1190,7 +1195,7 @@ function swatch(color: string) {
   return el
 }
 
-function renderSettings(m: api.Me, guildID: string) {
+function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
@@ -1198,7 +1203,7 @@ function renderSettings(m: api.Me, guildID: string) {
   }
   const back = h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
-    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
+    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
     return
   }
   // Who has access, the server export and deleting it are for owners only. The demo can show who
@@ -1252,7 +1257,18 @@ function renderSettings(m: api.Me, guildID: string) {
       ),
     ),
   )
+  stickUnderTopbar()
+  // «Start →», «Change →» and the like open the page on the control they are about.
+  const target = focus ? document.getElementById(focus) : null
+  if (target) {
+    target.scrollIntoView({ block: 'center' })
+    if (target.tabIndex < 0 && !target.matches('input, select, textarea, button')) target.tabIndex = -1
+    target.focus({ preventScroll: true })
+  }
 }
+
+// The «Who gets the survey» card, for links that lead to it (see renderSettings' sections).
+const surveyRolesSection = 'section-2'
 
 // sectionNav lists the settings cards beside them on a wide screen and above them on a phone.
 // The links scroll instead of changing the hash, which the router owns, and the one being read
@@ -1264,7 +1280,17 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   )
   let pinned = -1
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
-  const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))
+  // On a phone the list is one scrolling row: the marked section stays in view, and the edge fades
+  // while there are more sections to the right.
+  const fade = () => nav.classList.toggle('more-right', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2)
+  nav.addEventListener('scroll', fade, { passive: true })
+  requestAnimationFrame(fade)
+  const mark = (i: number) =>
+    links.forEach((l, j) => {
+      if (j !== i) return l.removeAttribute('aria-current')
+      l.setAttribute('aria-current', 'true')
+      if (nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: l.offsetLeft - nav.clientWidth / 2 + l.offsetWidth / 2 })
+    })
   mark(0)
   const visible = new Set<Element>()
   const spy = new IntersectionObserver(
@@ -1283,6 +1309,16 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   addEventListener('wheel', () => (pinned = -1), { passive: true })
   addEventListener('touchmove', () => (pinned = -1), { passive: true })
   return nav
+}
+
+// The settings list sticks under the top bar, whose height depends on the width (on a phone the
+// links wrap to a second row). The demo's head stops sticking on a phone, and then counts as 0.
+function stickUnderTopbar() {
+  const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
+  if (!bar) return
+  const set = () => document.documentElement.style.setProperty('--topbar-h', getComputedStyle(bar).position === 'sticky' ? `${bar.offsetHeight}px` : '0px')
+  new ResizeObserver(set).observe(bar)
+  set()
 }
 
 // refreshAfterHandover reloads what the user can do once they gave the main admin to someone
@@ -1453,8 +1489,9 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
-  // A day picked on the chart or its table: only its comments, whatever the mood.
-  let day: string | null = null
+  // A day or week picked on the chart or its table: only its comments, whatever the mood.
+  let days: { from: string; to: string } | null = null
+  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
@@ -1464,7 +1501,7 @@ function messagesCard(r: api.Report) {
     draw()
   })
   const draw = () => {
-    const matching = [...(day ? r.messages.filter((msg) => msg.day === day) : filterMessages(r.messages, current))].reverse()
+    const matching = [...(days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current))].reverse()
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
@@ -1487,32 +1524,32 @@ function messagesCard(r: api.Report) {
     )
     chips.replaceChildren(
       ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const on = !day && f === current
+        const on = !days && f === current
         const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
-          day = null
+          days = null
           all = false
           draw()
         })
         return b
       }),
-      ...(day ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${formatDay(day, { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatNumber(matching.length)}`)] : []),
+      ...(days ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) })} · ${formatNumber(matching.length)}`)] : []),
     )
   }
   draw()
   const show = (f: MoodFilter) => {
     current = f
-    day = null
+    days = null
     all = false
     draw()
   }
-  const showDay = (d: string) => {
-    day = d
+  const showDays = (from: string, to: string) => {
+    days = { from, to }
     all = true
     draw()
   }
-  const countOn = (d: string) => r.messages.filter((msg) => msg.day === d).length
+  const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
@@ -1526,7 +1563,7 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
-  return { card, show, showDay, countOn }
+  return { card, show, showDays, countIn }
 }
 
 // A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
@@ -1555,6 +1592,11 @@ function renderError(err: unknown) {
     h('main', { class: 'container narrow' }, errorCard(err)),
     landingFooter(),
   )
+}
+
+// A date range that breaks only before or after it, never inside («26–30 / oct»).
+function nowrap(text: string) {
+  return h('span', { class: 'nowrap' }, text)
 }
 
 function discordLogo() {

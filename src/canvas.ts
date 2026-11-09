@@ -69,6 +69,7 @@ let pens: HTMLButtonElement[] = []
 let eraseBtn: HTMLButtonElement
 let moderateBtn: HTMLButtonElement
 let pop: HTMLElement | null = null
+let hint: HTMLElement | null = null
 let modal: HTMLElement | null = null
 
 const icon = (d: string) =>
@@ -93,7 +94,9 @@ function build(): HTMLCanvasElement {
   )
   eraseBtn = tool(t('canvas.erase'), eraserIcon(), () => setMode(mode === 'erase' ? null : 'erase'))
   moderateBtn = tool(t('canvas.moderate'), shieldIcon(), () => setMode(mode === 'moderate' ? null : 'moderate'))
-  dock.append(fab, ...pens, h('span', { class: 'canvas-sep', 'aria-hidden': 'true' }), eraseBtn, moderateBtn)
+  // Where there's room for the whole dock, a pencil at its top says what the colours are for.
+  const label = h('span', { class: 'canvas-dock-label', role: 'img', title: t('canvas.open'), 'aria-label': t('canvas.open') }, pencilIcon())
+  dock.append(fab, label, ...pens, h('span', { class: 'canvas-sep', 'aria-hidden': 'true' }), eraseBtn, moderateBtn)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && wanted && !drawing) void load()
   })
@@ -282,9 +285,34 @@ function notify() {
 function mount() {
   const layer = build()
   if (!layer.isConnected) document.body.prepend(layer)
-  if (!dock.isConnected) document.body.append(dock, bar)
+  if (!dock.isConnected) {
+    document.body.append(dock, bar)
+    firstHint()
+  }
   document.body.classList.add('has-canvas')
   fit()
+}
+
+// firstHint says, next to the dock, what the canvas is the first time someone sees it.
+const seenKey = 'happyx.canvas.seen'
+function firstHint() {
+  try {
+    if (localStorage.getItem(seenKey)) return
+    localStorage.setItem(seenKey, '1')
+  } catch {
+    return
+  }
+  hint = h('p', { class: 'canvas-hint' }, t('canvas.firstHint'))
+  dock.append(hint)
+  // It goes at the first tap or click anywhere, so it never stays over the page.
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      hint?.remove()
+      hint = null
+    },
+    { once: true, capture: true },
+  )
 }
 
 function unmount() {

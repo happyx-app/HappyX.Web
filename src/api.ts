@@ -40,6 +40,8 @@ export interface Guild {
   created_at?: string
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
+  // The main admin's username, for viewers who aren't owners; only in /me, and older APIs leave it out.
+  admin_username?: string
 }
 
 // view: reports. manage: reports and settings. owner: also who has access, and deleting.
