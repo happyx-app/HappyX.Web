@@ -419,11 +419,12 @@ function renderGuilds(m: api.Me) {
                 'span',
                 { class: 'guild-text' },
                 h('strong', {}, g.name),
-                h('span', { class: 'muted small' }, [
+                // Each part stays on one line, so a narrow card breaks only between them.
+                h('span', { class: 'muted small guild-meta' }, ...[
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
                   g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
-                ].filter(Boolean).join(' · ')),
+                ].filter(Boolean).flatMap((x, i) => [...(i ? [' · '] : []), h('span', {}, x)])),
               ),
             ),
           ),
@@ -538,7 +539,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const range = rangeFor(preset, todayIn(g.timezone))
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
-  const dates = h('p', { class: 'muted' }, formatRange(range.from, range.to))
+  const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('period.label') },
@@ -627,7 +628,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
-  if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
+  if (old) dates.append(' · ', nowrap(t('range.compared', { range: formatRange(before.from, before.to, false) })))
   const week = preset === 'this-week' || preset === 'last-week'
   const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
   const notes = [
@@ -999,7 +1000,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
     })
     .catch(() => {})
-  const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
+  const dates = h('p', { class: 'me-dates' }, nowrap(formatRange(range.from, range.to)))
   const periods = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
@@ -1533,6 +1534,11 @@ function errorCard(err: unknown) {
 
 function renderError(err: unknown) {
   page(h('main', { class: 'container' }, errorCard(err)))
+}
+
+// A date range that breaks only before or after it, never inside («26–30 / oct»).
+function nowrap(text: string) {
+  return h('span', { class: 'nowrap' }, text)
 }
 
 function discordLogo() {
