@@ -234,7 +234,27 @@ export interface GameBoard {
   name: string
   current: GameRound | null
   previous: GameRound | null
+  // The finished rounds before last week's, newest first. Older APIs leave it out.
+  history?: GameHistoryRound[]
   proposal?: GameProposal
+}
+
+// A finished round in the history: the team's total, your own score and who wrote what. It
+// carries nobody else's score, so the history adds up to no ranking.
+export interface GameHistoryRound {
+  week: string
+  last_day: string
+  question: string
+  proposed_by?: GamePlayer
+  played: boolean // false when too few answered to play
+  answer_count: number
+  min_answers: number
+  players: number
+  guesses: number // every guess the team made
+  correct: number // the right ones among them
+  mine?: { correct: number; guesses: number } // only when you guessed
+  my_guesses: Record<string, string> // answer ID -> who you said
+  answers: GameAnswer[] // empty when the round wasn't played
 }
 
 // avatarURL is the user's Discord picture, or Discord's own default one for users without a
@@ -297,6 +317,20 @@ export const report = (guildID: string, from: string, to: string) =>
   getJSON<Report>(`/guilds/${encodeURIComponent(guildID)}/report?from=${from}&to=${to}`)
 
 export const myMoods = (from: string, to: string) => getJSON<MyMoods>(`/me/moods?from=${from}&to=${to}`)
+
+// Your own «Who's who?» score per server: one entry per finished round you guessed in, oldest
+// first, for rounds whose week starts between from and to.
+export interface MyGameWeek {
+  week: string
+  correct: number
+  guesses: number
+}
+export interface MyGames {
+  from: string
+  to: string
+  guilds: { discord_guild_id: string; name: string; weeks: MyGameWeek[] }[]
+}
+export const myGames = (from: string, to: string) => getJSON<MyGames>(`/me/games?from=${from}&to=${to}`)
 
 export const game = (guildID: string) => getJSON<GameBoard>(`/guilds/${encodeURIComponent(guildID)}/game`)
 

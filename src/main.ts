@@ -4,7 +4,7 @@ import { answers, distributionChart, lineChart, trendChart, trendTable, type Ser
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
-import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
+import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
 import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
@@ -77,7 +77,8 @@ async function route() {
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
-  if (gameID) return renderGame(me, gameID)
+  // ?history (from «My evolution») scrolls to the past rounds.
+  if (gameID) return renderGame(me, gameID, new URLSearchParams(query).has('history'))
   if (path === '/games') {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
@@ -983,6 +984,15 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const myGamesSlot = h('div', { class: 'dashboard' })
+  // Your game score is extra: if it fails to load, the rest of the page still works.
+  api
+    .myGames(range.from, range.to)
+    .then((r) => {
+      const played = r.guilds.filter((g) => g.weeks.some((w) => w.guesses > 0))
+      myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
+    })
+    .catch(() => {})
   const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
   const periods = h(
     'div',
@@ -1001,6 +1011,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       periods,
       body,
       // Vacations are for people in a server with HappyX, not for someone who has none yet.
+      myGamesSlot,
       inAnyServer(m) ? myVacationCard(() => renderLanding(null)) : null,
     ),
   )
@@ -1383,7 +1394,7 @@ function renderGames(m: api.Me) {
   page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
 }
 
-async function renderGame(m: api.Me, guildID: string) {
+async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
@@ -1413,6 +1424,7 @@ async function renderGame(m: api.Me, guildID: string) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
+  if (toHistory) document.getElementById('history')?.scrollIntoView()
 }
 
 function stat(label: string, value: Node | string, note?: Node | string) {
@@ -1535,3 +1547,29 @@ window.addEventListener('beforeunload', (e) => {
 route()
 
 const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)
+
+// myGamesCard is your own «Who's who?» score in one server, for the period picked above. The
+// bars only show from three rounds on: with fewer, the total says it all.
+function myGamesCard(g: api.MyGames['guilds'][number], many: boolean) {
+  const { weeks, correct, guesses, bars: recent } = gameTotals(g.weeks)
+  const list = recent.length === 0 ? null : h(
+    'ol',
+    { class: 'mygames-bars' },
+    ...recent.map((w) => {
+      const day = formatDay(w.week, { day: 'numeric', month: 'short' })
+      const score = t('game.history.score', { correct: w.correct, guesses: w.guesses })
+      const fill = h('span', { class: 'mygames-fill' })
+      // A sliver even at 0, so a round with no right guesses still shows as played.
+      fill.style.height = `${Math.max(4, share(w.correct, w.guesses))}%`
+      return h('li', {}, h('span', { class: 'sr-only' }, `${day}: ${score}`), h('span', { class: 'mygames-col', 'aria-hidden': 'true' }, fill), h('span', { class: 'small mygames-score', 'aria-hidden': 'true' }, score), h('span', { class: 'muted small', 'aria-hidden': 'true' }, day))
+    }),
+  )
+  // A long period shows only the latest rounds: say so, so the bars don't read as all of them.
+  const bars = list && (recent.length < weeks.length ? h('div', { class: 'mygames-recent' }, h('p', { class: 'muted small' }, t('me.games.bars', { n: recent.length })), list) : list)
+  return h(
+    'section',
+    { class: 'card mygames' },
+    h('h2', {}, many ? t('me.games.title.guild', { guild: g.name }) : t('me.games.title')),
+    h('div', { class: bars ? 'mygames-body' : 'mygames-body mygames-solo' }, h('div', { class: 'mygames-total' }, h('strong', { class: 'stat-value' }, t('me.games.total', { correct, guesses })), h('span', { class: 'muted small' }, weeks.length === 1 ? t('me.games.rounds.one') : t('me.games.rounds', { n: weeks.length })), h('a', { href: `#/game/${g.discord_guild_id}?history`, class: 'small' }, `${t('me.games.link')} →`)), bars),
+  )
+}

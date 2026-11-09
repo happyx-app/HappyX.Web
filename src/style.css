@@ -810,3 +810,52 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
   .topbar .btn, .topbar .lang-picker, .topbar .nav-link { min-height: 44px; min-width: 44px; }
   .topbar .nav-link { display: inline-flex; align-items: center; justify-content: center; }
 }
+
+/* «Who's who?» history, and your own score in «My evolution» */
+#history { scroll-margin-top: 88px; }
+.history { list-style: none; margin: -8px 0 0; padding: 0; display: grid; }
+.history-row { border-bottom: 1px solid var(--grid); }
+.history-row:last-child { border-bottom: 0; }
+.history-row summary, .history-off { display: grid; grid-template-columns: 96px minmax(0, 1fr) 190px 90px 16px; gap: 6px 16px; align-items: center; padding: 12px 0; }
+.history-row summary { cursor: pointer; list-style: none; border-radius: 8px; }
+.history-row summary::-webkit-details-marker { display: none; }
+.history-row summary::after { content: '›' / ''; color: var(--muted); font-size: 1.25rem; line-height: 1; justify-self: end; }
+.history-row details[open] summary::after { transform: rotate(90deg); }
+.history-row summary:hover strong { color: var(--accent); }
+.history-row summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.history-row details > .reveal { margin: 0 0 12px 112px; padding-left: 16px; border-left: 2px solid var(--grid); }
+.history-main { display: grid; gap: 2px; min-width: 0; }
+.history-main strong { font-weight: 600; overflow-wrap: anywhere; }
+.history-off strong { font-weight: 500; color: var(--ink-2); }
+.history-team { display: grid; gap: 4px; }
+.history-team-text { font-weight: 500; font-size: 0.875rem; color: var(--ink-2); }
+.history-bar { display: block; height: 6px; border-radius: 999px; background: var(--track, var(--surface-2)); overflow: hidden; }
+.history-bar > span { display: block; height: 100%; background: var(--series); border-radius: 999px; }
+.history-mine { text-align: right; }
+.mygames { gap: 16px; }
+.mygames-body { display: grid; grid-template-columns: minmax(180px, 240px) 1fr; gap: 24px; align-items: end; }
+.mygames-solo { grid-template-columns: 1fr; }
+.mygames-total { display: grid; gap: 4px; }
+.mygames-total .stat-value { font-size: 1.5rem; }
+.mygames-recent { display: grid; gap: 8px; }
+.mygames-recent > p { margin: 0; }
+.mygames-bars { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 72px; justify-content: start; gap: 8px; }
+.mygames-score { color: var(--ink-2); font-weight: 600; }
+.mygames-bars li { display: grid; justify-items: center; gap: 2px; white-space: nowrap; }
+.mygames-col { display: flex; align-items: flex-end; width: 100%; max-width: 36px; height: 72px; background: var(--track, var(--surface-2)); border-radius: 6px; overflow: hidden; }
+.mygames-fill { display: block; width: 100%; background: var(--series); border-radius: 6px 6px 0 0; }
+:root { --track: #e2e2e7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --track: #34343b; } }
+:root[data-theme='dark'] { --track: #34343b; }
+@media (max-width: 760px) {
+  .history-row summary, .history-off { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  .history-when { grid-column: 1 / -1; grid-row: 1; }
+  .history-main { grid-column: 1; grid-row: 2; }
+  .history-row summary::after { grid-column: 2; grid-row: 2; }
+  .history-team { grid-column: 1; grid-row: 3; }
+  .history-mine { grid-column: 2; grid-row: 3; align-self: start; }
+  .history-row details > .reveal { margin-left: 0; }
+  .mygames-bars { grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+  .mygames-bars li { font-size: 0.75rem; }
+  .mygames-body { grid-template-columns: 1fr; }
+}

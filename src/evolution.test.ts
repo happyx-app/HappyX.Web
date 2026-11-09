@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { MyGuildMoods } from './api'
-import { evolutionRange, latestMessages, seriesColor, toPoints } from './evolution'
+import { evolutionRange, gameTotals, latestMessages, seriesColor, share, toPoints } from './evolution'
 
 const guild = (id: string, entries: MyGuildMoods['entries']): MyGuildMoods => ({
   discord_guild_id: id, name: id, timezone: 'UTC', responses: entries.length, average: 0, streak: 0, entries,
@@ -55,4 +55,19 @@ it('gives each of the first 8 servers its own colour', () => {
   expect(seriesColor(0)).toBe('var(--cat-1)')
   expect(seriesColor(7)).toBe('var(--cat-8)')
   expect(seriesColor(8)).toBeNull()
+})
+
+it('adds up your game rounds and shows bars from three on', () => {
+  const w = (week: string, correct: number, guesses: number) => ({ week, correct, guesses })
+  expect(gameTotals([w('2026-10-05', 2, 5), w('2026-10-12', 0, 0)])).toEqual({ weeks: [w('2026-10-05', 2, 5)], correct: 2, guesses: 5, bars: [] })
+  const three = gameTotals([w('2026-10-05', 2, 5), w('2026-10-12', 0, 4), w('2026-10-19', 5, 6)])
+  expect([three.correct, three.guesses, three.bars.length]).toEqual([7, 15, 3])
+  const many = gameTotals(Array.from({ length: 12 }, (_, i) => w(`2026-0${1 + Math.floor(i / 4)}-0${1 + (i % 4)}`, 1, 2)))
+  expect([many.weeks.length, many.correct, many.bars.length, many.bars[0].week]).toEqual([12, 12, 6, '2026-02-03'])
+})
+
+it('rounds the share of right guesses', () => {
+  expect(share(5, 7)).toBe(71)
+  expect(share(0, 0)).toBe(0)
+  expect(share(3, 3)).toBe(100)
 })
