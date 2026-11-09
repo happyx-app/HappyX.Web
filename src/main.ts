@@ -4,8 +4,8 @@ import { answers, distributionChart, lineChart, trendChart, trendTable, weeklySt
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
-import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
-import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
+import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
@@ -77,7 +77,8 @@ async function route() {
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
-  if (gameID) return renderGame(me, gameID)
+  // ?history (from «My evolution») scrolls to the past rounds.
+  if (gameID) return renderGame(me, gameID, new URLSearchParams(query).has('history'))
   if (path === '/games') {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
@@ -639,7 +640,15 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek))
+  const messages = messagesCard(r)
+  // From a point of the chart or a row of its table (a day, or a week) to its comments.
+  const span = (i: number) => (byWeek ? { from: points[i].day, to: addDays(points[i].day, 6) } : { from: points[i].day, to: points[i].day })
+  const comments = (i: number) => messages.countIn(span(i).from, span(i).to)
+  const pickDay = (i: number) => {
+    messages.showDays(span(i).from, span(i).to)
+    focusCard(messages.card)
+  }
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek, comments, pickDay))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -648,7 +657,6 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   })
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
-  const messages = messagesCard(r)
 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
@@ -679,7 +687,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek),
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       tableWrap,
     ),
     week
@@ -986,6 +994,15 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const myGamesSlot = h('div', { class: 'dashboard' })
+  // Your game score is extra: if it fails to load, the rest of the page still works.
+  api
+    .myGames(range.from, range.to)
+    .then((r) => {
+      const played = r.guilds.filter((g) => g.weeks.some((w) => w.guesses > 0))
+      myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
+    })
+    .catch(() => {})
   const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
   const periods = h(
     'div',
@@ -1004,6 +1021,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       periods,
       body,
       // Vacations are for people in a server with HappyX, not for someone who has none yet.
+      myGamesSlot,
       inAnyServer(m) ? myVacationCard(() => renderLanding(null)) : null,
     ),
   )
@@ -1386,7 +1404,7 @@ function renderGames(m: api.Me) {
   page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
 }
 
-async function renderGame(m: api.Me, guildID: string) {
+async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
@@ -1416,6 +1434,7 @@ async function renderGame(m: api.Me, guildID: string) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
+  if (toHistory) document.getElementById('history')?.scrollIntoView()
 }
 
 function stat(label: string, value: Node | string, note?: Node | string) {
@@ -1426,6 +1445,9 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
+  // A day or week picked on the chart or its table: only its comments, whatever the mood.
+  let days: { from: string; to: string } | null = null
+  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
@@ -1435,7 +1457,7 @@ function messagesCard(r: api.Report) {
     draw()
   })
   const draw = () => {
-    const matching = [...filterMessages(r.messages, current)].reverse()
+    const matching = [...(days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current))].reverse()
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
@@ -1458,22 +1480,32 @@ function messagesCard(r: api.Report) {
     )
     chips.replaceChildren(
       ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const b = h('button', { type: 'button', 'aria-pressed': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
+        const on = !days && f === current
+        const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
+          days = null
           all = false
           draw()
         })
         return b
       }),
+      ...(days ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) })} · ${formatNumber(matching.length)}`)] : []),
     )
   }
   draw()
   const show = (f: MoodFilter) => {
     current = f
+    days = null
     all = false
     draw()
   }
+  const showDays = (from: string, to: string) => {
+    days = { from, to }
+    all = true
+    draw()
+  }
+  const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
@@ -1487,7 +1519,7 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
-  return { card, show }
+  return { card, show, showDays, countIn }
 }
 
 function skeleton() {
@@ -1538,3 +1570,29 @@ window.addEventListener('beforeunload', (e) => {
 route()
 
 const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)
+
+// myGamesCard is your own «Who's who?» score in one server, for the period picked above. The
+// bars only show from three rounds on: with fewer, the total says it all.
+function myGamesCard(g: api.MyGames['guilds'][number], many: boolean) {
+  const { weeks, correct, guesses, bars: recent } = gameTotals(g.weeks)
+  const list = recent.length === 0 ? null : h(
+    'ol',
+    { class: 'mygames-bars' },
+    ...recent.map((w) => {
+      const day = formatDay(w.week, { day: 'numeric', month: 'short' })
+      const score = t('game.history.score', { correct: w.correct, guesses: w.guesses })
+      const fill = h('span', { class: 'mygames-fill' })
+      // A sliver even at 0, so a round with no right guesses still shows as played.
+      fill.style.height = `${Math.max(4, share(w.correct, w.guesses))}%`
+      return h('li', {}, h('span', { class: 'sr-only' }, `${day}: ${score}`), h('span', { class: 'mygames-col', 'aria-hidden': 'true' }, fill), h('span', { class: 'small mygames-score', 'aria-hidden': 'true' }, score), h('span', { class: 'muted small', 'aria-hidden': 'true' }, day))
+    }),
+  )
+  // A long period shows only the latest rounds: say so, so the bars don't read as all of them.
+  const bars = list && (recent.length < weeks.length ? h('div', { class: 'mygames-recent' }, h('p', { class: 'muted small' }, t('me.games.bars', { n: recent.length })), list) : list)
+  return h(
+    'section',
+    { class: 'card mygames' },
+    h('h2', {}, many ? t('me.games.title.guild', { guild: g.name }) : t('me.games.title')),
+    h('div', { class: bars ? 'mygames-body' : 'mygames-body mygames-solo' }, h('div', { class: 'mygames-total' }, h('strong', { class: 'stat-value' }, t('me.games.total', { correct, guesses })), h('span', { class: 'muted small' }, weeks.length === 1 ? t('me.games.rounds.one') : t('me.games.rounds', { n: weeks.length })), h('a', { href: `#/game/${g.discord_guild_id}?history`, class: 'small' }, `${t('me.games.link')} →`)), bars),
+  )
+}

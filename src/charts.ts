@@ -28,6 +28,9 @@ interface LineChartOptions {
   dots?: boolean
   // A faint vertical line where a new week starts (xs are days).
   weekLines?: boolean
+  // Whether point i can be picked, and what picking it does (a click or tap on the chart).
+  pickable?: (i: number) => boolean
+  pick?: (i: number) => void
 }
 
 // Mood over time, one line per series, redrawn to fit its container.
@@ -47,8 +50,9 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 // Average mood per day of a server, with gaps on days without answers. With previous (the
 // days of the period before), the n-th day of that period is drawn under the n-th day of this
 // one as a dashed line: matching by position keeps both lines on working days.
-// With byWeek, days are weeks (see weeklyStats), each with a dot.
-export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false): HTMLElement {
+// With byWeek, days are weeks (see weeklyStats), each with a dot. With comments(i) > 0, the
+// tooltip says point i has comments and a click shows them (pick).
+export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void): HTMLElement {
   const title = (d: string) => (byWeek ? t('me.weekOf', { day: formatDay(d, { day: 'numeric', month: 'short' }) }) : formatDay(d, { weekday: 'short', day: 'numeric', month: 'short' }))
   const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
   const series: Series[] = []
@@ -64,6 +68,8 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       notes,
       dots: byWeek,
       weekLines: !byWeek,
+      pickable: (i) => !!comments && comments(i) > 0,
+      pick,
       tooltip: (i) => {
         const d = days[i]
         const p = prevOf(i)
@@ -74,6 +80,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
           d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
           p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: title(p.day), value: formatNumber(p.average, 1) })) : null,
+          comments && comments(i) > 0 ? h('div', { class: 'tooltip-action' }, comments(i) === 1 ? t('chart.comments.one') : t('chart.comments', { n: formatNumber(comments(i)) })) : null,
         ].filter((n): n is HTMLDivElement => n !== null)
       },
     },
@@ -263,9 +270,13 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   })
   svg.append(cross, ...focus)
   const hit = s('rect', { x: m.left - step / 2, y: 0, width: iw + step, height, fill: 'transparent' })
-  const show = (clientX: number) => {
+  const at = (clientX: number) => {
     const box = svg.getBoundingClientRect()
-    const i = Math.max(0, Math.min(n - 1, Math.round((clientX - box.left - m.left) / (step || 1))))
+    return Math.max(0, Math.min(n - 1, Math.round((clientX - box.left - m.left) / (step || 1))))
+  }
+  const show = (clientX: number) => {
+    const i = at(clientX)
+    svg.classList.toggle('pickable', !!opts.pickable?.(i))
     cross.setAttribute('x1', String(x(i)))
     cross.setAttribute('x2', String(x(i)))
     cross.setAttribute('visibility', 'visible')
@@ -297,6 +308,10 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   hit.addEventListener('pointermove', (e) => show(e.clientX))
   hit.addEventListener('pointerdown', (e) => show(e.clientX))
   hit.addEventListener('pointerleave', hide)
+  hit.addEventListener('click', (e) => {
+    const i = at(e.clientX)
+    if (opts.pick && opts.pickable?.(i)) opts.pick(i)
+  })
   svg.append(hit)
   // The label says what the chart shows; its tick and note texts would only be read as a jumble.
   svg.querySelectorAll('text').forEach((el) => el.setAttribute('aria-hidden', 'true'))
@@ -321,21 +336,30 @@ export function weeklyStats(days: DayStat[]): DayStat[] {
   return out
 }
 
-export function trendTable(days: DayStat[], byWeek = false): HTMLTableElement {
+// With comments, a last column gives each row's comments, as a button that shows them (pick).
+export function trendTable(days: DayStat[], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void): HTMLTableElement {
+  const commentCell = (i: number) => {
+    const n = comments!(i)
+    if (n === 0 || !pick) return h('td', { class: 'num' }, '–')
+    const b = h('button', { type: 'button', class: 'link-btn' }, formatNumber(n))
+    b.addEventListener('click', () => pick(i))
+    return h('td', { class: 'num' }, b)
+  }
   return h(
     'table',
     { class: 'table' },
-    h('thead', {}, h('tr', {}, h('th', {}, t(byWeek ? 'chart.week' : 'chart.day')), h('th', { class: 'num' }, t('stat.average')), h('th', { class: 'num' }, t('stat.responses')))),
+    h('thead', {}, h('tr', {}, h('th', {}, t(byWeek ? 'chart.week' : 'chart.day')), h('th', { class: 'num' }, t('stat.average')), h('th', { class: 'num' }, t('stat.responses')), comments ? h('th', { class: 'num' }, t('messages.title')) : null)),
     h(
       'tbody',
       {},
-      ...days.map((d) =>
+      ...days.map((d, i) =>
         h(
           'tr',
           {},
           h('td', {}, byWeek ? t('me.weekOf', { day: formatDay(d.day, { day: 'numeric', month: 'short' }) }) : formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
           h('td', { class: 'num' }, d.responses > 0 ? `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}` : '–'),
           h('td', { class: 'num' }, formatNumber(d.responses)),
+          comments ? commentCell(i) : null,
         ),
       ),
     ),
