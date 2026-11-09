@@ -1166,13 +1166,15 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     h(
       'div',
       { class: 'my-guild-stats' },
+      // Labelled «Your average», so the number under the server's name isn't read as the team's.
+      g.responses > 0 ? h('span', { class: 'stat-label' }, t('me.yourAverage')) : null,
       g.responses > 0
         ? h('span', { class: 'stat-value' }, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(g.average)), formatNumber(g.average, 1), h('span', { class: 'stat-unit' }, ' / 5'))
         : h('span', { class: 'stat-value muted' }, '–'),
       h(
         'span',
         { class: 'my-guild-meta' },
-        h('span', {}, g.responses > 0 ? `${t('me.yourAverage', { mood: moodLabel(g.average) })} · ${answers(g.responses)}` : t('chart.noAnswers')),
+        h('span', {}, g.responses > 0 ? `${moodLabel(g.average)} · ${answers(g.responses)}` : t('chart.noAnswers')),
         h('span', { class: g.streak > 0 ? 'streak streak-on' : 'streak' }, streak),
       ),
     ),

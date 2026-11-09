@@ -27,6 +27,7 @@ interface LineChartOptions {
   notes?: { index: number; text: string; below?: boolean }[]
   // A dot on every point (default). Without, only lone points get one.
   dots?: boolean
+  marked?: (i: number) => boolean // with dots off, these points still get one (e.g. days with comments)
   // A faint vertical line where a new week starts (xs are days).
   weekLines?: boolean
   // Whether point i can be picked, and what picking it does (a click or tap on the chart).
@@ -70,6 +71,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       dots: byWeek,
       weekLines: !byWeek,
       pickable: (i) => !!comments && comments(i) > 0,
+      marked: (i) => !!comments && comments(i) > 0,
       pick,
       tooltip: (i) => {
         const d = days[i]
@@ -79,7 +81,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
           d.responses > 0
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), d.recipients ? null : ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
-          d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
+          d.recipients ? h('div', { class: 'muted' }, t(byWeek ? 'chart.participation.week' : 'chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
           p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: title(p), value: formatNumber(p.average, 1) })) : null,
           comments && comments(i) > 0 ? h('div', { class: 'tooltip-action' }, comments(i) === 1 ? t('chart.comments.one') : t('chart.comments', { n: formatNumber(comments(i)) })) : null,
         ].filter((n): n is HTMLDivElement => n !== null)
@@ -241,7 +243,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     se.values.forEach((v, i) => {
       // Without a dot on every day, a lone day between gaps still needs one to be seen.
       const lone = (se.values[i - 1] ?? null) === null && (se.values[i + 1] ?? null) === null
-      if (v === null || (opts.dots === false && !lone)) return
+      if (v === null || (opts.dots === false && !lone && !opts.marked?.(i))) return
       const dot = s('circle', { cx: x(i), cy: y(v), r: 4, class: 'dot' })
       dot.style.fill = se.color
       svg.append(dot)

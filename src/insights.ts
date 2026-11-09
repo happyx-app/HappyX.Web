@@ -141,7 +141,8 @@ export function extremeDays(days: DayStat[], average: number): { high: number | 
   const counts = answered.map(({ d }) => d.responses).sort((a, b) => a - b)
   const mid = Math.floor(counts.length / 2)
   const median = counts.length % 2 ? counts[mid] : (counts[mid - 1] + counts[mid]) / 2
-  const solid = answered.filter(({ d }) => d.responses >= 3 && d.responses >= median / 2)
+  // A week still in progress isn't comparable with whole ones.
+  const solid = answered.filter(({ d }) => d.responses >= 3 && d.responses >= median / 2 && !(d as { partial?: boolean }).partial)
   const round = (v: number) => Math.round(v * 10) / 10
   let high: number | null = null
   let low: number | null = null

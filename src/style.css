@@ -761,7 +761,7 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
 .canvas-dock-label svg { width: 20px; height: 20px; }
 .canvas-hint {
   /* Under the dock, in the free margin beside the page, so it never covers the content. */
-  position: absolute; left: 0; top: calc(100% + 8px); margin: 0; width: clamp(120px, calc((100vw - 1040px) / 2 - 16px), 220px); padding: 8px 12px;
+  position: absolute; left: 0; top: calc(100% + 8px); margin: 0; width: clamp(140px, calc((100vw - 1040px) / 2 - 8px), 220px); padding: 8px 12px;
   background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--dc-shadow); font-size: 0.875rem;
 }
 .tap-hint { display: none; margin: 4px 0 0; }
@@ -792,7 +792,8 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
 .canvas-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 .canvas-count { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .canvas-count[hidden] { display: none; }
-@media (max-width: 1180px) {
+/* The side dock only where the margin beside the page fits it and its first-time hint. */
+@media (max-width: 1320px) {
   .canvas-dock { top: auto; bottom: 16px; left: auto; right: 16px; transform: none; grid-auto-flow: column; padding: 8px 12px; }
   .canvas-dock:not(.open) > :not(.canvas-fab) { display: none; }
   .canvas-dock .canvas-fab { display: grid; color: var(--accent); }
