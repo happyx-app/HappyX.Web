@@ -1,6 +1,6 @@
 // Data shaping for "My evolution": the logged-in person's own answers, one line per server.
 
-import type { MyGuildMoods } from './api'
+import type { MyGameWeek, MyGuildMoods } from './api'
 import { addDays, type Range } from './periods'
 
 export const evolutionPeriods = ['week', 'month', 'year'] as const
@@ -60,4 +60,23 @@ export function toPoints(guilds: MyGuildMoods[], range: Range, period: Evolution
 // The most recent comments first.
 export function latestMessages(g: MyGuildMoods, limit = 3) {
   return g.entries.filter((e) => e.message).slice(-limit).reverse()
+}
+
+// share is the percentage of right guesses, rounded; 0 when there were none.
+export const share = (correct: number, guesses: number) => (guesses > 0 ? Math.round((correct / guesses) * 100) : 0)
+
+// Bars per round only start at this many rounds: with fewer, the total says it all. A long
+// period shows the latest maxGameBars rounds, so the bars stay readable on a phone.
+export const minGameBars = 3
+export const maxGameBars = 8
+
+// gameTotals adds up your «Who's who?» rounds, leaving out any where you didn't guess.
+export function gameTotals(weeks: MyGameWeek[]) {
+  const played = weeks.filter((w) => w.guesses > 0)
+  return {
+    weeks: played,
+    correct: played.reduce((n, w) => n + w.correct, 0),
+    guesses: played.reduce((n, w) => n + w.guesses, 0),
+    bars: played.length >= minGameBars ? played.slice(-maxGameBars) : [],
+  }
 }
