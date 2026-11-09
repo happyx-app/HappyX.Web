@@ -753,6 +753,12 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
 .canvas-tool:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .canvas-tool[aria-pressed='true'] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .canvas-tool[hidden], .canvas-dock .canvas-fab { display: none; }
+.canvas-dock-label { display: grid; place-items: center; width: 34px; height: 28px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.canvas-dock-label svg { width: 20px; height: 20px; }
+.canvas-hint {
+  position: absolute; left: calc(100% + 12px); top: 12px; margin: 0; width: max-content; max-width: 340px; padding: 8px 14px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--dc-shadow); font-size: 0.875rem;
+}
 .canvas-pen { width: 20px; height: 20px; border-radius: 50%; background: var(--pen); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.08); flex: none; }
 .canvas-pen-small { width: 12px; height: 12px; }
 .canvas-sep { display: block; width: 20px; border-top: 1px solid var(--border); margin: 2px 0; }
@@ -784,6 +790,9 @@ body.canvas-active #app > :not(.topbar):not(.demo-head) { opacity: 0.22; pointer
   .canvas-dock:not(.open) > :not(.canvas-fab) { display: none; }
   .canvas-dock .canvas-fab { display: grid; color: var(--accent); }
   .canvas-dock.open .canvas-fab { order: 99; }
+  .canvas-dock .canvas-dock-label { display: none; }
+  .canvas-dock:not(.open) > .canvas-hint { display: block; }
+  .canvas-hint { left: auto; right: 0; top: auto; bottom: calc(100% + 8px); max-width: calc(100vw - 32px); }
   .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
   .canvas-bar { top: auto; bottom: 76px; }
   /* Room under the page, so the corner dock never covers its last lines. */
@@ -794,6 +803,9 @@ body:has(.settings-page) .canvas-dock { top: auto; bottom: 16px; left: auto; rig
 body:has(.settings-page) .canvas-dock:not(.open) > :not(.canvas-fab) { display: none; }
 body:has(.settings-page) .canvas-dock .canvas-fab { display: grid; color: var(--accent); }
 body:has(.settings-page) .canvas-dock.open .canvas-fab { order: 99; }
+body:has(.settings-page) .canvas-dock .canvas-dock-label { display: none; }
+body:has(.settings-page) .canvas-dock:not(.open) > .canvas-hint { display: block; }
+body:has(.settings-page) .canvas-hint { left: auto; right: 0; top: auto; bottom: calc(100% + 8px); max-width: calc(100vw - 32px); }
 body:has(.settings-page) .canvas-sep { width: 0; height: 20px; border-top: 0; border-left: 1px solid var(--border); margin: 0 2px; }
 body:has(.settings-page) .canvas-bar { top: auto; bottom: 76px; }
 body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
