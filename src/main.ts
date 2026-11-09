@@ -808,7 +808,7 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
   if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [`${settings}?f=survey-on`, t('health.start')]))
-  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(surveyOn ? 'health.audience' : 'health.audience.off', { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [`${settings}?f=${surveyRolesSection}`, t('health.review')]))
+  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(`${surveyOn ? 'health.audience' : 'health.audience.off'}${x.audience === 1 ? '.one' : ''}`, { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [`${settings}?f=${surveyRolesSection}`, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
@@ -829,7 +829,7 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
       // Without answers there is no report to send, so while the survey is off there is no date.
       surveyOn
         ? tile(t('health.nextReport'), formatDay(nextReportDay(g.report_frequency, g.timezone), long), t(g.report_dm === false ? 'health.report.web' : 'health.report.dm'))
-        : tile(t('health.nextReport'), t('health.report.none'), t('health.survey.offNote')),
+        : tile(t('health.nextReport'), t('health.report.none'), ''),
     ),
     h('ul', { class: 'todo' }, ...todo),
   )

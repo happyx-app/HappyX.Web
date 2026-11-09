@@ -38,7 +38,7 @@ export function privacyPage(m: api.Me, onErased: () => void, onLoggedOut: () => 
     { class: 'card' },
     h('h2', {}, t('privacy.kept.title')),
     h('p', { class: 'secondary small' }, t('privacy.kept.body')),
-    bullets(['privacy.kept.moods', 'privacy.kept.kudos', 'privacy.kept.game', 'privacy.kept.member']),
+    bullets(['privacy.kept.moods', 'privacy.kept.kudos', 'privacy.kept.game', 'privacy.kept.canvas', 'privacy.kept.vacation', 'privacy.kept.member']),
     h('p', { class: 'muted small' }, icons.inline(icons.lock), t('privacy.kept.not')),
   )
 
@@ -60,7 +60,7 @@ export function privacyPage(m: api.Me, onErased: () => void, onLoggedOut: () => 
     'form',
     { class: 'danger-confirm', hidden: true },
     h('p', { class: 'small' }, t('privacy.erase.lose')),
-    bullets(['privacy.erase.moods', 'privacy.erase.kudos', 'privacy.erase.game']),
+    bullets(['privacy.erase.moods', 'privacy.erase.kudos', 'privacy.erase.game', 'privacy.erase.canvas', 'privacy.erase.vacation']),
     h('p', { class: 'small' }, `⏸️ ${t('privacy.erase.paused')}`),
     m.guilds.some((g) => g.active) ? h('p', { class: 'warning small' }, t('privacy.erase.admin')) : null,
     h('div', { class: 'field' }, h('label', { for: 'confirm-user' }, before, h('strong', {}, m.user.username), after), input),
@@ -116,7 +116,7 @@ export function guildExport(g: api.Guild, onLoggedOut: () => void): HTMLElement 
     { class: 'card export' },
     h('h2', {}, t('export.title')),
     h('p', { class: 'secondary small' }, t('export.body')),
-    bullets(['export.has.moods', 'export.has.members', 'export.has.kudos', 'export.has.game']),
+    bullets(['export.has.moods', 'export.has.members', 'export.has.kudos', 'export.has.game', 'export.has.canvas']),
     h('p', { class: 'muted small' }, icons.inline(icons.lock), t(g.anonymous ? 'export.anonymous' : 'export.named')),
     downloadButton(t('export.button'), () => api.downloadGuildData(g.discord_guild_id), onLoggedOut),
   )

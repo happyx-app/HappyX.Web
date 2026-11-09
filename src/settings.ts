@@ -481,7 +481,7 @@ export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () 
     h(
       'ul',
       { class: 'danger-list small' },
-      ...(['danger.lose.moods', 'danger.lose.members', 'danger.lose.kudos', 'danger.lose.game', 'danger.lose.settings'] as const).map((k) => h('li', {}, t(k))),
+      ...(['danger.lose.moods', 'danger.lose.members', 'danger.lose.kudos', 'danger.lose.game', 'danger.lose.canvas', 'danger.lose.vacation', 'danger.lose.settings'] as const).map((k) => h('li', {}, t(k))),
     ),
     h('p', { class: 'small' }, icons.inline(icons.logOut), t('danger.bot')),
     h('div', { class: 'field' }, h('label', { for: 'confirm-name' }, before, name, after), input),
