@@ -1,11 +1,11 @@
 import './style.css'
 import * as api from './api'
-import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
-import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
@@ -630,22 +630,26 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   // The comparison is said once, here; the deltas below don't repeat it.
   if (old) dates.append(' · ', nowrap(t('range.compared', { range: formatRange(before.from, before.to, false) })))
   const week = preset === 'this-week' || preset === 'last-week'
-  const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
+  // Over 90 days one point a day can't be read: the chart and its table go by week.
+  const byWeek = preset === 'last-90'
+  const points = byWeek ? weeklyStats(r.days) : r.days
+  const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
   const notes = [
-    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
-    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
+    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(points[peaks.high].average, 1) }) }] : []),
+    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(points[peaks.low].average, 1) }), below: true }] : []),
   ]
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
   const messages = messagesCard(r)
-  // From a day on the chart or its table to that day's comments.
-  const comments = (i: number) => messages.countOn(r.days[i].day)
+  // From a point of the chart or a row of its table (a day, or a week) to its comments.
+  const span = (i: number) => (byWeek ? { from: points[i].day, to: addDays(points[i].day, 6) } : { from: points[i].day, to: points[i].day })
+  const comments = (i: number) => messages.countIn(span(i).from, span(i).to)
   const pickDay = (i: number) => {
-    messages.showDay(r.days[i].day)
+    messages.showDays(span(i).from, span(i).to)
     focusCard(messages.card)
   }
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days, comments, pickDay))
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek, comments, pickDay))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -682,9 +686,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'section',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
+      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(r.days, old?.days, notes, comments, pickDay),
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       tableWrap,
     ),
     week
@@ -1473,8 +1477,9 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
-  // A day picked on the chart or its table: only its comments, whatever the mood.
-  let day: string | null = null
+  // A day or week picked on the chart or its table: only its comments, whatever the mood.
+  let days: { from: string; to: string } | null = null
+  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
@@ -1484,7 +1489,7 @@ function messagesCard(r: api.Report) {
     draw()
   })
   const draw = () => {
-    const matching = [...(day ? r.messages.filter((msg) => msg.day === day) : filterMessages(r.messages, current))].reverse()
+    const matching = [...(days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current))].reverse()
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
@@ -1507,32 +1512,32 @@ function messagesCard(r: api.Report) {
     )
     chips.replaceChildren(
       ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const on = !day && f === current
+        const on = !days && f === current
         const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
-          day = null
+          days = null
           all = false
           draw()
         })
         return b
       }),
-      ...(day ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${formatDay(day, { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatNumber(matching.length)}`)] : []),
+      ...(days ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) })} · ${formatNumber(matching.length)}`)] : []),
     )
   }
   draw()
   const show = (f: MoodFilter) => {
     current = f
-    day = null
+    days = null
     all = false
     draw()
   }
-  const showDay = (d: string) => {
-    day = d
+  const showDays = (from: string, to: string) => {
+    days = { from, to }
     all = true
     draw()
   }
-  const countOn = (d: string) => r.messages.filter((msg) => msg.day === d).length
+  const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
@@ -1546,7 +1551,7 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
-  return { card, show, showDay, countOn }
+  return { card, show, showDays, countIn }
 }
 
 function skeleton() {
