@@ -636,7 +636,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days))
+  const messages = messagesCard(r)
+  // From a day on the chart or its table to that day's comments.
+  const comments = (i: number) => messages.countOn(r.days[i].day)
+  const pickDay = (i: number) => {
+    messages.showDay(r.days[i].day)
+    focusCard(messages.card)
+  }
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days, comments, pickDay))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -645,7 +652,6 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   })
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
-  const messages = messagesCard(r)
 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
@@ -676,7 +682,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       { class: 'card' },
       h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(r.days, old?.days, notes),
+      trendChart(r.days, old?.days, notes, comments, pickDay),
       tableWrap,
     ),
     week
@@ -1423,6 +1429,8 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
+  // A day picked on the chart or its table: only its comments, whatever the mood.
+  let day: string | null = null
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
@@ -1432,7 +1440,7 @@ function messagesCard(r: api.Report) {
     draw()
   })
   const draw = () => {
-    const matching = [...filterMessages(r.messages, current)].reverse()
+    const matching = [...(day ? r.messages.filter((msg) => msg.day === day) : filterMessages(r.messages, current))].reverse()
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
@@ -1455,22 +1463,32 @@ function messagesCard(r: api.Report) {
     )
     chips.replaceChildren(
       ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const b = h('button', { type: 'button', 'aria-pressed': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
+        const on = !day && f === current
+        const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
+          day = null
           all = false
           draw()
         })
         return b
       }),
+      ...(day ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${formatDay(day, { weekday: 'short', day: 'numeric', month: 'short' })} · ${formatNumber(matching.length)}`)] : []),
     )
   }
   draw()
   const show = (f: MoodFilter) => {
     current = f
+    day = null
     all = false
     draw()
   }
+  const showDay = (d: string) => {
+    day = d
+    all = true
+    draw()
+  }
+  const countOn = (d: string) => r.messages.filter((msg) => msg.day === d).length
   const card = h(
     'section',
     { class: 'card' },
@@ -1484,7 +1502,7 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
-  return { card, show }
+  return { card, show, showDay, countOn }
 }
 
 function skeleton() {

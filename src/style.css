@@ -291,6 +291,10 @@ a { color: var(--accent); }
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); white-space: nowrap;
 }
 .tooltip-title { color: var(--ink-2); font-size: 0.8125rem; }
+.tooltip-action { color: var(--accent); font-size: 0.8125rem; margin-top: 2px; }
+svg.pickable { cursor: pointer; }
+.link-btn { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
 .bars { display: grid; gap: 10px; }
 .bar-row { display: grid; grid-template-columns: minmax(96px, auto) 1fr auto; gap: 12px; align-items: center; font-size: 0.875rem; }
