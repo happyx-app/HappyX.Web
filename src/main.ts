@@ -1189,7 +1189,7 @@ function renderSettings(m: api.Me, guildID: string, focus: string | null = null)
   }
   const back = h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
-    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
+    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
     return
   }
   // Who has access, the server export and deleting it are for owners only. The demo can show who
