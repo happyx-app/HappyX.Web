@@ -304,15 +304,15 @@ function firstHint() {
   }
   hint = h('p', { class: 'canvas-hint' }, t('canvas.firstHint'))
   dock.append(hint)
-  // It goes at the first tap or click anywhere, so it never stays over the page.
-  document.addEventListener(
-    'pointerdown',
-    () => {
-      hint?.remove()
-      hint = null
-    },
-    { once: true, capture: true },
-  )
+  // It goes at the first tap or click anywhere, or when the page changes, so it never stays over the page.
+  const drop = () => {
+    hint?.remove()
+    hint = null
+    document.removeEventListener('pointerdown', drop, true)
+    window.removeEventListener('hashchange', drop)
+  }
+  document.addEventListener('pointerdown', drop, true)
+  window.addEventListener('hashchange', drop)
 }
 
 function unmount() {

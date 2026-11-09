@@ -106,6 +106,11 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
 
   const reportDM = h('input', { id: 'report-dm', type: 'checkbox', role: 'switch', checked: saved.report_dm })
   const surveyOn = h('input', { id: 'survey-on', type: 'checkbox', role: 'switch', checked: saved.survey_enabled })
+  // The help follows the switch: «if you turn it off» makes no sense when it is already off.
+  const surveyHelp = h('p', { class: 'muted small' })
+  const sayHelp = () => { surveyHelp.textContent = t(surveyOn.checked ? 'settings.surveyOn.help' : 'settings.surveyOn.help.off') }
+  sayHelp()
+  surveyOn.addEventListener('change', sayHelp)
 
   const days = [1, 2, 3, 4, 5, 6, 7].map((d) =>
     h(
@@ -220,7 +225,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         'div',
         { class: 'field' },
         h('label', { class: 'switch', for: 'survey-on' }, surveyOn, h('span', {}, t('settings.surveyOn'))),
-        h('p', { class: 'muted small' }, t('settings.surveyOn.help')),
+        surveyHelp,
       ),
       // Short fields sit side by side when the card is wide enough.
       h('div', { class: 'field-row' },

@@ -563,7 +563,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
         'div',
         { class: 'title-row' },
         h('div', {}, h('h1', {}, g.name), dates),
-        api.canManage(g) ? h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, icons.gear(), h('span', { class: 'gear-label' }, t('settings.link'))) : null,
+        // Also for who can only look: the settings page then says whom to ask.
+        h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, icons.gear(), h('span', { class: 'gear-label' }, t('settings.link'))),
       ),
       picker,
       body,
@@ -636,8 +637,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   if (old) dates.append(' · ', nowrap(t('range.compared', { range: formatRange(before.from, before.to, false) })))
   const week = preset === 'this-week' || preset === 'last-week'
   // Over 90 days one point a day can't be read: the chart and its table go by week.
+  // Who can only look is told whom to tell, instead of a link to settings they can't change.
+  const ask = api.canManage(g) ? undefined : g.admin_username ? t('watch.ask.named', { name: g.admin_username }) : t('watch.ask')
   const byWeek = preset === 'last-90'
-  const points = byWeek ? weeklyStats(r.days) : r.days
+  const points = byWeek ? weeklyStats(r.days, range.to) : r.days
   const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
   const notes = [
     ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(points[peaks.high].average, 1) }) }] : []),
@@ -667,10 +670,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
-      ...(health && healthSection ? [healthAlert(health, healthSection, !api.canManage(g))] : []),
+      ...(health && healthSection ? [healthAlert(health, healthSection, ask)] : []),
       lowComments(r, messages),
       rate !== null && oldRate !== null && oldRate - rate >= participationDrop && healthSection
-        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection), ask: !api.canManage(g) }
+        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection), ask }
         : null,
     ])].filter((n): n is HTMLElement => n !== null),
     h(
@@ -695,6 +698,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
       trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
+      // Without hover nothing says the points open their comments; the CSS shows this only on touch screens.
+      points.some((_, i) => comments(i) > 0) ? h('p', { class: 'muted small tap-hint' }, t('chart.tapHint')) : null,
       tableWrap,
     ),
     week
@@ -713,8 +718,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 
 // «To review»: at most three lines under the summary, from fixed rules on the team's own numbers,
 // each leading to where to look. Without any, the section is left out.
-// ask: the viewer can only look, and what it leads to is for whoever can change the settings.
-type Watch = { text: string; go: () => void; ask?: boolean }
+// ask: the viewer can only look, and what it leads to is for whoever can change the settings; it
+// says whom to tell.
+type Watch = { text: string; go: () => void; ask?: string }
 
 // A drop in participation of at least this many points is worth a look.
 const participationDrop = 15
@@ -730,7 +736,7 @@ function toWatch(items: (Watch | null)[]) {
       'ul',
       {},
       ...shown.map((w) =>
-        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small watch-ask' }, t('watch.ask')) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
+        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small watch-ask' }, w.ask) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
       ),
     ),
   )
@@ -762,13 +768,16 @@ function firstSteps(g: api.Guild) {
 }
 
 function focusCard(card: HTMLElement) {
+  // Stop below the sticky top bar, so it doesn't cover the card's title. CSSOM: the CSP forbids style attributes.
+  const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
+  card.style.scrollMarginTop = `${bar && getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight + 12 : 12}px`
   card.tabIndex = -1
   card.scrollIntoView({ block: 'start' })
   card.focus({ preventScroll: true })
 }
 
 // When the last survey didn't reach everyone, or reaches nobody: «Server status», at the bottom.
-function healthAlert(x: api.Health, card: HTMLElement, ask = false): Watch | null {
+function healthAlert(x: api.Health, card: HTMLElement, ask?: string): Watch | null {
   const last = x.last_survey
   const text =
     x.audience === 0
@@ -1157,6 +1166,8 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     h(
       'div',
       { class: 'my-guild-stats' },
+      // Labelled «Your average», so the number under the server's name isn't read as the team's.
+      g.responses > 0 ? h('span', { class: 'stat-label' }, t('me.yourAverage')) : null,
       g.responses > 0
         ? h('span', { class: 'stat-value' }, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(g.average)), formatNumber(g.average, 1), h('span', { class: 'stat-unit' }, ' / 5'))
         : h('span', { class: 'stat-value muted' }, '–'),

@@ -4,6 +4,7 @@
 import type { DayStat, Report } from './api'
 import { h, s } from './dom'
 import { monday } from './evolution'
+import { addDays } from './periods'
 import { formatDay, formatNumber, moodEmoji, moodLabel, t } from './i18n'
 
 export interface Series {
@@ -26,6 +27,7 @@ interface LineChartOptions {
   notes?: { index: number; text: string; below?: boolean }[]
   // A dot on every point (default). Without, only lone points get one.
   dots?: boolean
+  marked?: (i: number) => boolean // with dots off, these points still get one (e.g. days with comments)
   // A faint vertical line where a new week starts (xs are days).
   weekLines?: boolean
   // Whether point i can be picked, and what picking it does (a click or tap on the chart).
@@ -53,7 +55,7 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 // With byWeek, days are weeks (see weeklyStats), each with a dot. With comments(i) > 0, the
 // tooltip says point i has comments and a click shows them (pick).
 export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void): HTMLElement {
-  const title = (d: string) => (byWeek ? t('me.weekOf', { day: formatDay(d, { day: 'numeric', month: 'short' }) }) : formatDay(d, { weekday: 'short', day: 'numeric', month: 'short' }))
+  const title = (d: DayStat) => weekOrDay(d, byWeek)
   const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
   const series: Series[] = []
   if (days.some((_, i) => prevOf(i))) {
@@ -69,17 +71,18 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       dots: byWeek,
       weekLines: !byWeek,
       pickable: (i) => !!comments && comments(i) > 0,
+      marked: (i) => !!comments && comments(i) > 0,
       pick,
       tooltip: (i) => {
         const d = days[i]
         const p = prevOf(i)
         return [
-          h('div', { class: 'tooltip-title' }, title(d.day)),
+          h('div', { class: 'tooltip-title' }, title(d)),
           d.responses > 0
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), d.recipients ? null : ` · ${answers(d.responses)}`)
             : h('div', { class: 'muted' }, t('chart.noAnswers')),
-          d.recipients ? h('div', { class: 'muted' }, t('chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
-          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: title(p.day), value: formatNumber(p.average, 1) })) : null,
+          d.recipients ? h('div', { class: 'muted' }, t(byWeek ? 'chart.participation.week' : 'chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
+          p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: title(p), value: formatNumber(p.average, 1) })) : null,
           comments && comments(i) > 0 ? h('div', { class: 'tooltip-action' }, comments(i) === 1 ? t('chart.comments.one') : t('chart.comments', { n: formatNumber(comments(i)) })) : null,
         ].filter((n): n is HTMLDivElement => n !== null)
       },
@@ -240,7 +243,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     se.values.forEach((v, i) => {
       // Without a dot on every day, a lone day between gaps still needs one to be seen.
       const lone = (se.values[i - 1] ?? null) === null && (se.values[i + 1] ?? null) === null
-      if (v === null || (opts.dots === false && !lone)) return
+      if (v === null || (opts.dots === false && !lone && !opts.marked?.(i))) return
       const dot = s('circle', { cx: x(i), cy: y(v), r: 4, class: 'dot' })
       dot.style.fill = se.color
       svg.append(dot)
@@ -318,9 +321,19 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   return svg
 }
 
-// Each day's answers added up by week (Monday to Sunday), with the week's Monday as the day.
-export function weeklyStats(days: DayStat[]): DayStat[] {
-  const out: DayStat[] = []
+// A point's name: its day, or «Week of 2 Nov», with «(in progress)» while that week isn't over.
+function weekOrDay(d: WeekStat, byWeek: boolean): string {
+  if (!byWeek) return formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })
+  const week = t('me.weekOf', { day: formatDay(d.day, { day: 'numeric', month: 'short' }) })
+  return d.partial ? t('chart.week.partial', { week }) : week
+}
+
+export type WeekStat = DayStat & { partial?: boolean }
+
+// Each day's answers added up by week (Monday to Sunday), with the week's Monday as the day. With
+// until (the period's last day), a week that ends after it is marked partial.
+export function weeklyStats(days: DayStat[], until?: string): WeekStat[] {
+  const out: WeekStat[] = []
   for (const d of days) {
     const day = monday(d.day)
     let w = out[out.length - 1]
@@ -333,6 +346,8 @@ export function weeklyStats(days: DayStat[]): DayStat[] {
     // Unknown for the week if the bot didn't report it for one of its days.
     w.recipients = w.recipients === undefined || d.recipients === undefined ? undefined : w.recipients + d.recipients
   }
+  const last = out[out.length - 1]
+  if (last && until && addDays(last.day, 6) > until) last.partial = true
   return out
 }
 
@@ -356,7 +371,7 @@ export function trendTable(days: DayStat[], byWeek = false, comments?: (i: numbe
         h(
           'tr',
           {},
-          h('td', {}, byWeek ? t('me.weekOf', { day: formatDay(d.day, { day: 'numeric', month: 'short' }) }) : formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })),
+          h('td', {}, weekOrDay(d, byWeek)),
           h('td', { class: 'num' }, d.responses > 0 ? `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}` : '–'),
           h('td', { class: 'num' }, formatNumber(d.responses)),
           comments ? commentCell(i) : null,
