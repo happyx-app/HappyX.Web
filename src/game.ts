@@ -7,6 +7,7 @@ import { h } from './dom'
 import * as icons from './icons'
 import { showSaveError } from './errors'
 import { formatDay, formatNumber, t } from './i18n'
+import { share } from './evolution'
 
 export const maxAnswer = 200
 export const maxProposal = 200
@@ -43,6 +44,7 @@ export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLEle
   else out.push(guessCard(board.discord_guild_id, cur, onLoggedOut))
   if (board.proposal?.open) out.push(proposalCard(board.discord_guild_id, board.proposal, onLoggedOut))
   if (board.previous) out.push(resultsCard(board.previous))
+  if (board.history?.length) out.push(historyCard(board.history))
   return out
 }
 
@@ -273,25 +275,7 @@ function resultsCard(r: api.GameRound) {
   const reveal = h(
     'ul',
     { class: 'reveal' },
-    ...r.answers.map((a) => {
-      const guess = r.my_guesses[a.id]
-      const mine = guess === undefined ? null : guess === a.discord_user_id
-        ? h('span', { class: 'pill pill-right' }, `✓ ${t('game.yourGuess.right')}`)
-        : h('span', { class: 'pill pill-wrong' }, `✗ ${t('game.yourGuess.wrong', { name: r.answers.find((x) => x.discord_user_id === guess)?.username ?? '?' })}`)
-      const right = a.right ?? 0
-      return h(
-        'li',
-        {},
-        h('p', { class: 'msg-text' }, a.answer),
-        h(
-          'div',
-          { class: 'reveal-meta' },
-          h('strong', {}, a.mine ? `${a.username} (${t('game.you')})` : a.username ?? ''),
-          h('span', { class: 'muted small' }, right === 0 ? t('game.right.none') : right === 1 ? t('game.right.one') : t('game.right', { n: right })),
-          mine,
-        ),
-      )
-    }),
+    ...r.answers.map((a) => revealItem(a, r.answers, r.my_guesses[a.id])),
   )
   return h(
     'section',
@@ -301,10 +285,83 @@ function resultsCard(r: api.GameRound) {
   )
 }
 
+// revealItem is one answer once the round is over: who wrote it, how many guessed it and, if
+// you guessed, whether you got it.
+function revealItem(a: api.GameAnswer, answers: api.GameAnswer[], guess: string | undefined) {
+  const mine = guess === undefined ? null : guess === a.discord_user_id
+    ? h('span', { class: 'pill pill-right' }, `✓ ${t('game.yourGuess.right')}`)
+    : h('span', { class: 'pill pill-wrong' }, `✗ ${t('game.yourGuess.wrong', { name: answers.find((x) => x.discord_user_id === guess)?.username ?? '?' })}`)
+  const right = a.right ?? 0
+  return h(
+    'li',
+    {},
+    h('p', { class: 'msg-text' }, a.answer),
+    h(
+      'div',
+      { class: 'reveal-meta' },
+      h('strong', {}, a.mine ? `${a.username} (${t('game.you')})` : a.username ?? ''),
+      h('span', { class: 'muted small' }, right === 0 ? t('game.right.none') : right === 1 ? t('game.right.one') : t('game.right', { n: right })),
+      mine,
+    ),
+  )
+}
+
 function showError(status: HTMLElement, err: unknown) {
   if (err instanceof api.DemoReadOnly) return showSaveError(status, err)
   status.className = 'small error'
   if (err instanceof api.ApiError && err.status === 409) status.textContent = t('game.closed')
   else if (err instanceof api.ApiError && err.status === 400) status.textContent = `${t('settings.error')}: ${err.message}`
   else status.textContent = t('error.generic')
+}
+
+
+// The rounds before last week's, as the team played them. No ranking that adds up: the team's
+// share of right guesses leads, your own score sits beside it, and opening a round shows who was
+// who and what you said.
+const historyPage = 5
+
+function historyCard(rounds: api.GameHistoryRound[]) {
+  const list = h('ul', { class: 'history' })
+  let shown = 0
+  const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' }, t('game.history.more'))
+  const showMore = () => {
+    const next = rounds.slice(shown, shown + historyPage).map(historyRow)
+    list.append(...next)
+    if (shown > 0) next[0]?.querySelector<HTMLElement>('summary')?.focus()
+    shown += next.length
+    more.hidden = shown >= rounds.length
+  }
+  more.addEventListener('click', showMore)
+  showMore()
+  return h('section', { class: 'card game-card', id: 'history' }, h('h2', { class: 'history-title' }, t('game.history')), list, more)
+}
+
+function historyRow(r: api.GameHistoryRound) {
+  const when = h('span', { class: 'history-when muted small' }, `${formatDay(r.week)}–${formatDay(r.last_day)}`)
+  if (!r.played) {
+    return h('li', { class: 'history-row history-off' }, when, h('div', { class: 'history-main' }, h('strong', {}, r.question), h('span', { class: 'muted small' }, t('game.history.notHeld', { n: r.answer_count, min: r.min_answers }))))
+  }
+  const p = share(r.correct, r.guesses)
+  const bar = h('span', { class: 'history-bar', 'aria-hidden': 'true' }, h('span', {}))
+  ;(bar.firstChild as HTMLElement).style.width = `${p}%`
+  const team = r.guesses === 0
+    ? h('span', { class: 'history-team muted' }, t('game.history.none'))
+    : h('span', { class: 'history-team' }, h('span', { class: 'history-team-text' }, t('game.history.team', { p })), bar)
+  const mine = h('span', { class: 'history-mine small muted' }, r.mine ? t('game.history.mine', { correct: r.mine.correct, guesses: r.mine.guesses }) : t(r.answers.some((a) => a.mine) ? 'game.history.notGuessed' : 'game.history.notPlayed'))
+  const guesses = r.my_guesses ?? {}
+  const myID = r.answers.find((a) => a.mine)?.discord_user_id
+  const players = r.players === 1 ? t('game.history.players.one') : t('game.history.players', { n: r.players })
+  const by = r.proposed_by ? (r.proposed_by.discord_user_id === myID ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })) : null
+  const reveal = h(
+    'ul',
+    { class: 'reveal' },
+    ...r.answers.map((a) => {
+      return revealItem(a, r.answers, guesses[a.id])
+    }),
+  )
+  return h(
+    'li',
+    { class: 'history-row' },
+    h('details', {}, h('summary', {}, when, h('span', { class: 'history-main' }, h('strong', {}, r.question), h('span', { class: 'muted small' }, by ? `${players} · ${by}` : players)), team, mine), reveal),
+  )
 }

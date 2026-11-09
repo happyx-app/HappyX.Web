@@ -1,11 +1,11 @@
 import './style.css'
 import * as api from './api'
-import { answers, distributionChart, lineChart, trendChart, trendTable, type Series } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
-import { evolutionPeriods, evolutionRange, isEvolutionPeriod, latestMessages, seriesColor, toPoints, type EvolutionPeriod } from './evolution'
-import { defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
+import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
+import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
 import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
@@ -77,14 +77,15 @@ async function route() {
   if (api.isDemo && (path === '/about' || path === '/privacy')) return location.replace('#/')
   if (path === '/about') return renderLanding(me)
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
-  if (gameID) return renderGame(me, gameID)
+  // ?history (from «My evolution») scrolls to the past rounds.
+  if (gameID) return renderGame(me, gameID, new URLSearchParams(query).has('history'))
   if (path === '/games') {
     if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
     return renderGames(me)
   }
   if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
-  if (settingsID) return renderSettings(me, settingsID)
+  if (settingsID) return renderSettings(me, settingsID, new URLSearchParams(query).get('f'))
   const guildID = path.match(/^\/g\/(\d+)$/)?.[1]
   if (guildID) {
     const q = new URLSearchParams(query)
@@ -193,6 +194,8 @@ const brand = () =>
     api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
     h('img', { class: 'brand-mark', src: logoURL, alt: '' }),
     h('span', { class: 'brand-text' }, 'HappyX'),
+    // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
+    api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
   )
 
 function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
@@ -385,7 +388,7 @@ const memberGuilds = (m: api.Me) => m.member_guilds ?? []
 
 // A server where the user is a member without access to the dashboard: its name, and its page
 // shows the team canvas.
-const memberGuildCard = (g: api.GameGuild) =>
+const memberGuildCard = (g: api.GameGuild, paused = false) =>
   h(
     'li',
     {},
@@ -393,7 +396,7 @@ const memberGuildCard = (g: api.GameGuild) =>
       'a',
       { class: 'card guild-card', href: `#/g/${g.discord_guild_id}` },
       h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
-      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, t('guilds.access.none'))),
+      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, [t('guilds.access.none'), paused ? t('guilds.paused') : ''].filter(Boolean).join(' · '))),
     ),
   )
 
@@ -418,16 +421,18 @@ function renderGuilds(m: api.Me) {
                 'span',
                 { class: 'guild-text' },
                 h('strong', {}, g.name),
-                h('span', { class: 'muted small' }, [
+                // Each part stays on one line, so a narrow card breaks only between them.
+                h('span', { class: 'muted small guild-meta' }, ...[
                   t(g.report_frequency === 'monthly' ? 'guilds.monthly' : 'guilds.weekly'),
                   t(g.anonymous ? 'guilds.anonymous' : 'guilds.named'),
                   g.access === 'view' || g.access === 'manage' ? t(`access.level.${g.access}`) : '',
-                ].filter(Boolean).join(' · ')),
+                  pausedIn(m, g.discord_guild_id).length ? t('guilds.paused') : '',
+                ].filter(Boolean).flatMap((x, i) => [...(i ? [' · '] : []), h('span', {}, x)])),
               ),
             ),
           ),
         ),
-        ...memberGuilds(m).map(memberGuildCard),
+        ...memberGuilds(m).map((g) => memberGuildCard(g, pausedIn(m, g.discord_guild_id).length > 0)),
       )
     : h(
         'div',
@@ -480,7 +485,7 @@ async function renderConnecting(m: api.Me, guildID: string) {
 // in Discord. Afterwards the page is drawn again without it.
 function pausedNotice(g: api.GameGuild) {
   const note = h('p', { class: 'alert small', role: 'alert', hidden: true }, t('paused.failed'))
-  const button = h('button', { class: 'btn', type: 'button' }, t('paused.resume'))
+  const button = h('button', { class: 'btn btn-primary', type: 'button' }, t('paused.resume'))
   button.addEventListener('click', async () => {
     button.disabled = true
     note.hidden = true
@@ -493,7 +498,7 @@ function pausedNotice(g: api.GameGuild) {
       note.hidden = false
     }
   })
-  return h('div', { class: 'card paused-notice' }, h('p', {}, t('paused.text', { server: g.name })), button, note)
+  return h('div', { class: 'card paused-notice' }, h('div', {}, h('p', {}, h('strong', {}, t('paused.text', { server: g.name }))), h('p', { class: 'secondary small' }, t('paused.body'))), button, note)
 }
 
 const inAnyServer = (m: api.Me) => m.guilds.length > 0 || m.games.length > 0 || memberGuilds(m).length > 0 || pausedIn(m).length > 0
@@ -519,8 +524,8 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
         h(
           'p',
           { class: 'no-access-links' },
-          h('a', { class: 'btn', href: '#/me' }, t('nav.me')),
-          plays ? h('a', { class: 'btn', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
+          h('a', { class: 'btn btn-primary', href: '#/me' }, t('nav.me')),
+          plays ? h('a', { class: 'btn btn-outline', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
         ),
       ),
     ),
@@ -537,7 +542,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const range = rangeFor(preset, todayIn(g.timezone))
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
-  const dates = h('p', { class: 'muted' }, formatRange(range.from, range.to))
+  const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('period.label') },
@@ -596,7 +601,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
   if (r.responses === 0 && isNewGuild(g.created_at)) {
-    body.replaceChildren(firstSteps(g), ...extra)
+    // «First steps» starts with starting the survey, so «Server status» doesn't repeat it.
+    const status = health ? healthCard(g, health, false) : null
+    body.replaceChildren(firstSteps(g), ...(status ? [status] : []))
     return
   }
   if (r.responses === 0) {
@@ -626,17 +633,28 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   }
   const old = comparable(prev) ? prev : null
   // The comparison is said once, here; the deltas below don't repeat it.
-  if (old) dates.append(` · ${t('range.compared', { range: formatRange(before.from, before.to, false) })}`)
+  if (old) dates.append(' · ', nowrap(t('range.compared', { range: formatRange(before.from, before.to, false) })))
   const week = preset === 'this-week' || preset === 'last-week'
-  const peaks = week ? { high: null, low: null } : extremeDays(r.days, r.average)
+  // Over 90 days one point a day can't be read: the chart and its table go by week.
+  const byWeek = preset === 'last-90'
+  const points = byWeek ? weeklyStats(r.days) : r.days
+  const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
   const notes = [
-    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(r.days[peaks.high].average, 1) }) }] : []),
-    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(r.days[peaks.low].average, 1) }), below: true }] : []),
+    ...(peaks.high !== null ? [{ index: peaks.high, text: t('chart.highest', { value: formatNumber(points[peaks.high].average, 1) }) }] : []),
+    ...(peaks.low !== null ? [{ index: peaks.low, text: t('chart.lowest', { value: formatNumber(points[peaks.low].average, 1) }), below: true }] : []),
   ]
   const rate = participationRate(r.participation)
   const oldRate = participationRate(old?.participation)
 
-  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(r.days))
+  const messages = messagesCard(r)
+  // From a point of the chart or a row of its table (a day, or a week) to its comments.
+  const span = (i: number) => (byWeek ? { from: points[i].day, to: addDays(points[i].day, 6) } : { from: points[i].day, to: points[i].day })
+  const comments = (i: number) => messages.countIn(span(i).from, span(i).to)
+  const pickDay = (i: number) => {
+    messages.showDays(span(i).from, span(i).to)
+    focusCard(messages.card)
+  }
+  const tableWrap = h('div', { class: 'table-wrap', hidden: true }, trendTable(points, byWeek, comments, pickDay))
   const toggle = h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-expanded': 'false' }, t('chart.table.show'))
   toggle.addEventListener('click', () => {
     tableWrap.hidden = !tableWrap.hidden
@@ -645,15 +663,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   })
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
-  const messages = messagesCard(r)
 
   body.replaceChildren(
     summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
-      ...(health && healthSection ? [healthAlert(health, healthSection)] : []),
+      ...(health && healthSection ? [healthAlert(health, healthSection, !api.canManage(g))] : []),
       lowComments(r, messages),
       rate !== null && oldRate !== null && oldRate - rate >= participationDrop && healthSection
-        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection) }
+        ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection), ask: !api.canManage(g) }
         : null,
     ])].filter((n): n is HTMLElement => n !== null),
     h(
@@ -667,16 +684,17 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
         t('stat.respondents'),
         h('span', {}, formatNumber(r.respondents), health && health.audience > 0 ? h('span', { class: 'stat-unit' }, ` ${t('stat.of', { n: formatNumber(health.audience) })}`) : null),
         // «At least once», so «10 of 10» doesn't read as the opposite of the participation figure.
-        old ? h('span', { class: 'stat-notes' }, t('stat.respondents.note'), deltaNote(r.respondents, old.respondents)) : t('stat.respondents.note'),
+        // The delta first, level with the others; «at least once» under it.
+        old ? h('span', { class: 'stat-notes' }, deltaNote(r.respondents, old.respondents), t('stat.respondents.note')) : t('stat.respondents.note'),
       ),
       stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
     ),
     h(
       'section',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, t('chart.trend')), toggle),
+      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(r.days, old?.days, notes),
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       tableWrap,
     ),
     week
@@ -695,7 +713,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 
 // «To review»: at most three lines under the summary, from fixed rules on the team's own numbers,
 // each leading to where to look. Without any, the section is left out.
-type Watch = { text: string; go: () => void }
+// ask: the viewer can only look, and what it leads to is for whoever can change the settings.
+type Watch = { text: string; go: () => void; ask?: boolean }
 
 // A drop in participation of at least this many points is worth a look.
 const participationDrop = 15
@@ -711,7 +730,7 @@ function toWatch(items: (Watch | null)[]) {
       'ul',
       {},
       ...shown.map((w) =>
-        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
+        h('li', { class: 'health-alert' }, h('span', { class: 'todo-open', 'aria-hidden': 'true' }, '○'), h('span', {}, w.text), w.ask ? h('span', { class: 'muted small watch-ask' }, t('watch.ask')) : h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), w.go()) }, `${t('health.alert.see')} →`)),
       ),
     ),
   )
@@ -724,8 +743,8 @@ function firstSteps(g: api.Guild) {
   const settings = `#/g/${g.discord_guild_id}/settings`
   const manage = api.canManage(g)
   const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
-  const item = (done: boolean | null, text: string, link?: string) =>
-    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: settings }, `${link} →`) : null)
+  const item = (done: boolean | null, text: string, link?: string, field?: string) =>
+    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && manage ? h('a', { href: field ? `${settings}?f=${field}` : settings }, `${link} →`) : null)
   const language = botLanguages.find(([code]) => code === g.language)?.[1] ?? g.language
   return h(
     'section',
@@ -734,8 +753,9 @@ function firstSteps(g: api.Guild) {
     h(
       'ul',
       { class: 'todo' },
-      item(null, t('first.language', { language }), t('first.change')),
-      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change')),
+      g.survey_enabled === false ? item(false, t('health.survey.off'), t('health.start'), 'survey-on') : null,
+      item(null, t('first.language', { language }), t('first.change'), 'language'),
+      item(null, t('first.time', { days: daysLabel(g.working_days ?? [1, 2, 3, 4, 5]), time: hour, timezone: g.timezone }), t('first.change'), 'hour'),
       item(null, t('first.assistant')),
     ),
   )
@@ -748,7 +768,7 @@ function focusCard(card: HTMLElement) {
 }
 
 // When the last survey didn't reach everyone, or reaches nobody: «Server status», at the bottom.
-function healthAlert(x: api.Health, card: HTMLElement): Watch | null {
+function healthAlert(x: api.Health, card: HTMLElement, ask = false): Watch | null {
   const last = x.last_survey
   const text =
     x.audience === 0
@@ -756,7 +776,7 @@ function healthAlert(x: api.Health, card: HTMLElement): Watch | null {
       : last && last.failed > 0
         ? t(last.failed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(last.failed), day: formatDay(last.day, { weekday: 'long' }) })
         : null
-  return text ? { text, go: () => focusCard(card) } : null
+  return text ? { text, go: () => focusCard(card), ask } : null
 }
 
 // Comments of Bad or Awful in the period: the comments card, filtered to them.
@@ -773,7 +793,7 @@ function lowComments(r: api.Report, messages: { card: HTMLElement; show: (f: Moo
 }
 
 // When the next survey and report go out, how the last survey went, and what is left to set up.
-function healthCard(g: api.Guild, x: api.Health) {
+function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   const days = g.working_days ?? [1, 2, 3, 4, 5]
   const next = nextSurveyDay(g.timezone, g.survey_hour, days)
   const hour = `${String(g.survey_hour).padStart(2, '0')}:00`
@@ -787,12 +807,12 @@ function healthCard(g: api.Guild, x: api.Health) {
     h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
-  if (!surveyOn) todo.push(item(false, t('health.survey.off'), [settings, t('health.start')]))
-  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(`${surveyOn ? 'health.audience' : 'health.audience.off'}${x.audience === 1 ? '.one' : ''}`, { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [settings, t('health.review')]))
+  if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [`${settings}?f=survey-on`, t('health.start')]))
+  todo.push(item(x.audience > 0 && surveyOn ? true : x.audience > 0 ? null : false, x.audience > 0 ? t(`${surveyOn ? 'health.audience' : 'health.audience.off'}${x.audience === 1 ? '.one' : ''}`, { n: formatNumber(x.audience) }) : t('health.audience.none'), x.audience > 0 ? undefined : [`${settings}?f=${surveyRolesSection}`, t('health.review')]))
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
-  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [settings, t('health.turnOn')]))
+  todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   return h(
     'section',
     { class: 'card' },
@@ -969,7 +989,7 @@ function noServerCard() {
 function surveyOffCard(m: api.Me) {
   if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
   const one = m.guilds.length === 1 ? m.guilds[0] : null
-  const start = one && api.canManage(one) ? h('a', { class: 'btn', href: `#/g/${one.discord_guild_id}/settings` }, t('health.start')) : !one ? h('a', { class: 'btn', href: '#/' }, t('nav.servers')) : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn btn-primary', href: `#/g/${one.discord_guild_id}/settings?f=survey-on` }, t('health.start')) : !one ? h('a', { class: 'btn btn-primary', href: '#/' }, t('nav.servers')) : null
   return h(
     'div',
     { class: 'card empty' },
@@ -982,8 +1002,17 @@ function surveyOffCard(m: api.Me) {
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
-  const dates = h('p', { class: 'me-dates' }, formatRange(range.from, range.to))
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('me'))
+  const myGamesSlot = h('div', { class: 'dashboard' })
+  // Your game score is extra: if it fails to load, the rest of the page still works.
+  api
+    .myGames(range.from, range.to)
+    .then((r) => {
+      const played = r.guilds.filter((g) => g.weeks.some((w) => w.guesses > 0))
+      myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
+    })
+    .catch(() => {})
+  const dates = h('p', { class: 'me-dates' }, nowrap(formatRange(range.from, range.to)))
   const periods = h(
     'div',
     { class: 'segmented', role: 'navigation', 'aria-label': t('me.period.label') },
@@ -997,10 +1026,12 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       'main',
       { class: 'container' },
       h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), dates),
-      ...pausedIn(m).map(pausedNotice),
       periods,
+      // Under the periods, where «the survey is off» also shows.
+      ...pausedIn(m).map(pausedNotice),
       body,
       // Vacations are for people in a server with HappyX, not for someone who has none yet.
+      myGamesSlot,
       inAnyServer(m) ? myVacationCard(() => renderLanding(null)) : null,
     ),
   )
@@ -1018,12 +1049,13 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     // Someone with no server to manage or play in, and no answer in the last year, most likely
     // has no server with HappyX: say how to add it instead.
     const noServer = !api.isDemo && m.guilds.length === 0 && m.games.length === 0 && memberGuilds(m).length === 0 && (await neverAnswered(period, data))
-    // Without a single answer, the period and its dates say nothing.
-    if (noServer) {
+    const off = noServer ? null : surveyOffCard(m)
+    // Without a single answer, and none coming, the period and its dates say nothing.
+    if (noServer || off) {
       dates.remove()
       periods.remove()
     }
-    body.replaceChildren(noServer ? noServerCard() : surveyOffCard(m) ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    body.replaceChildren(noServer ? noServerCard() : off ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
@@ -1163,7 +1195,7 @@ function swatch(color: string) {
   return el
 }
 
-function renderSettings(m: api.Me, guildID: string) {
+function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
@@ -1171,7 +1203,7 @@ function renderSettings(m: api.Me, guildID: string) {
   }
   const back = h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
-    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, t('settings.readonly')))))
+    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
     return
   }
   // Who has access, the server export and deleting it are for owners only. The demo can show who
@@ -1225,7 +1257,18 @@ function renderSettings(m: api.Me, guildID: string) {
       ),
     ),
   )
+  stickUnderTopbar()
+  // «Start →», «Change →» and the like open the page on the control they are about.
+  const target = focus ? document.getElementById(focus) : null
+  if (target) {
+    target.scrollIntoView({ block: 'center' })
+    if (target.tabIndex < 0 && !target.matches('input, select, textarea, button')) target.tabIndex = -1
+    target.focus({ preventScroll: true })
+  }
 }
+
+// The «Who gets the survey» card, for links that lead to it (see renderSettings' sections).
+const surveyRolesSection = 'section-2'
 
 // sectionNav lists the settings cards beside them on a wide screen and above them on a phone.
 // The links scroll instead of changing the hash, which the router owns, and the one being read
@@ -1237,7 +1280,17 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   )
   let pinned = -1
   const nav = h('nav', { class: 'settings-nav', 'aria-label': t('settings.sections') }, ...links)
-  const mark = (i: number) => links.forEach((l, j) => (j === i ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')))
+  // On a phone the list is one scrolling row: the marked section stays in view, and the edge fades
+  // while there are more sections to the right.
+  const fade = () => nav.classList.toggle('more-right', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2)
+  nav.addEventListener('scroll', fade, { passive: true })
+  requestAnimationFrame(fade)
+  const mark = (i: number) =>
+    links.forEach((l, j) => {
+      if (j !== i) return l.removeAttribute('aria-current')
+      l.setAttribute('aria-current', 'true')
+      if (nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: l.offsetLeft - nav.clientWidth / 2 + l.offsetWidth / 2 })
+    })
   mark(0)
   const visible = new Set<Element>()
   const spy = new IntersectionObserver(
@@ -1256,6 +1309,16 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
   addEventListener('wheel', () => (pinned = -1), { passive: true })
   addEventListener('touchmove', () => (pinned = -1), { passive: true })
   return nav
+}
+
+// The settings list sticks under the top bar, whose height depends on the width (on a phone the
+// links wrap to a second row). The demo's head stops sticking on a phone, and then counts as 0.
+function stickUnderTopbar() {
+  const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
+  if (!bar) return
+  const set = () => document.documentElement.style.setProperty('--topbar-h', getComputedStyle(bar).position === 'sticky' ? `${bar.offsetHeight}px` : '0px')
+  new ResizeObserver(set).observe(bar)
+  set()
 }
 
 // refreshAfterHandover reloads what the user can do once they gave the main admin to someone
@@ -1325,6 +1388,8 @@ function renderSignIn(path: string, reason: string) {
         { class: 'card signin' },
         h('h1', {}, reason),
         h('p', {}, h('a', { class: 'btn btn-discord', href: `${api.loginURL}?next=${encodeURIComponent(path)}` }, discordLogo(), t('landing.login'))),
+        // Someone who got the link from a colleague may not know HappyX yet.
+        h('p', { class: 'signin-more small' }, h('a', { href: '#/about' }, t('signin.what')), h('a', { href: '/demo' }, t('landing.demo'))),
       ),
     ),
     landingFooter(),
@@ -1383,9 +1448,9 @@ function renderGames(m: api.Me) {
   page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
 }
 
-async function renderGame(m: api.Me, guildID: string) {
+async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('game'))
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
   page(
     header(m, 'games'),
@@ -1413,6 +1478,7 @@ async function renderGame(m: api.Me, guildID: string) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
+  if (toHistory) document.getElementById('history')?.scrollIntoView()
 }
 
 function stat(label: string, value: Node | string, note?: Node | string) {
@@ -1423,6 +1489,9 @@ function stat(label: string, value: Node | string, note?: Node | string) {
 function messagesCard(r: api.Report) {
   const list = h('ul', { class: 'messages' })
   let current: MoodFilter = 'all'
+  // A day or week picked on the chart or its table: only its comments, whatever the mood.
+  let days: { from: string; to: string } | null = null
+  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
@@ -1432,7 +1501,7 @@ function messagesCard(r: api.Report) {
     draw()
   })
   const draw = () => {
-    const matching = [...filterMessages(r.messages, current)].reverse()
+    const matching = [...(days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current))].reverse()
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
@@ -1455,22 +1524,32 @@ function messagesCard(r: api.Report) {
     )
     chips.replaceChildren(
       ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const b = h('button', { type: 'button', 'aria-pressed': String(f === current), class: f === current ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
+        const on = !days && f === current
+        const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
         b.addEventListener('click', () => {
           current = f
+          days = null
           all = false
           draw()
         })
         return b
       }),
+      ...(days ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) })} · ${formatNumber(matching.length)}`)] : []),
     )
   }
   draw()
   const show = (f: MoodFilter) => {
     current = f
+    days = null
     all = false
     draw()
   }
+  const showDays = (from: string, to: string) => {
+    days = { from, to }
+    all = true
+    draw()
+  }
+  const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
@@ -1484,10 +1563,13 @@ function messagesCard(r: api.Report) {
     list,
     more,
   )
-  return { card, show }
+  return { card, show, showDays, countIn }
 }
 
-function skeleton() {
+// A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
+function skeleton(shape: 'dashboard' | 'me' | 'game' = 'dashboard') {
+  if (shape === 'me') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-chart' }), h('div', { class: 'grid-2' }, h('div', { class: 'sk sk-card' })))
+  if (shape === 'game') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-steps' }), h('div', { class: 'sk sk-card' }))
   return h('div', { class: 'skeleton' }, h('div', { class: 'sk-row' }, ...[0, 1, 2, 3].map(() => h('div', { class: 'sk sk-stats' }))), h('div', { class: 'sk sk-chart' }))
 }
 
@@ -1501,8 +1583,20 @@ function errorCard(err: unknown) {
   )
 }
 
+// The API didn't answer: a top bar without the user's links, the error with «Try again», and
+// the footer, so the legal pages and the landing stay a click away.
 function renderError(err: unknown) {
-  page(h('main', { class: 'container' }, errorCard(err)))
+  me = null
+  page(
+    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true))),
+    h('main', { class: 'container narrow' }, errorCard(err)),
+    landingFooter(),
+  )
+}
+
+// A date range that breaks only before or after it, never inside («26–30 / oct»).
+function nowrap(text: string) {
+  return h('span', { class: 'nowrap' }, text)
 }
 
 function discordLogo() {
@@ -1535,3 +1629,29 @@ window.addEventListener('beforeunload', (e) => {
 route()
 
 const capitalize = (x: string) => x.charAt(0).toLocaleUpperCase() + x.slice(1)
+
+// myGamesCard is your own «Who's who?» score in one server, for the period picked above. The
+// bars only show from three rounds on: with fewer, the total says it all.
+function myGamesCard(g: api.MyGames['guilds'][number], many: boolean) {
+  const { weeks, correct, guesses, bars: recent } = gameTotals(g.weeks)
+  const list = recent.length === 0 ? null : h(
+    'ol',
+    { class: 'mygames-bars' },
+    ...recent.map((w) => {
+      const day = formatDay(w.week, { day: 'numeric', month: 'short' })
+      const score = t('game.history.score', { correct: w.correct, guesses: w.guesses })
+      const fill = h('span', { class: 'mygames-fill' })
+      // A sliver even at 0, so a round with no right guesses still shows as played.
+      fill.style.height = `${Math.max(4, share(w.correct, w.guesses))}%`
+      return h('li', {}, h('span', { class: 'sr-only' }, `${day}: ${score}`), h('span', { class: 'mygames-col', 'aria-hidden': 'true' }, fill), h('span', { class: 'small mygames-score', 'aria-hidden': 'true' }, score), h('span', { class: 'muted small', 'aria-hidden': 'true' }, day))
+    }),
+  )
+  // A long period shows only the latest rounds: say so, so the bars don't read as all of them.
+  const bars = list && (recent.length < weeks.length ? h('div', { class: 'mygames-recent' }, h('p', { class: 'muted small' }, t('me.games.bars', { n: recent.length })), list) : list)
+  return h(
+    'section',
+    { class: 'card mygames' },
+    h('h2', {}, many ? t('me.games.title.guild', { guild: g.name }) : t('me.games.title')),
+    h('div', { class: bars ? 'mygames-body' : 'mygames-body mygames-solo' }, h('div', { class: 'mygames-total' }, h('strong', { class: 'stat-value' }, t('me.games.total', { correct, guesses })), h('span', { class: 'muted small' }, weeks.length === 1 ? t('me.games.rounds.one') : t('me.games.rounds', { n: weeks.length })), h('a', { href: `#/game/${g.discord_guild_id}?history`, class: 'small' }, `${t('me.games.link')} →`)), bars),
+  )
+}
