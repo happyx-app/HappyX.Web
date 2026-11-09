@@ -33,3 +33,9 @@ it('adds days up by week, weighting each day by its answers', () => {
   ])
   expect(trendSummary(weeks, true)).toBe('Average mood per week, from October 5 to October 12: between 2.0 and 3.0, average 2.5. Use «Show as table» for the data.')
 })
+
+it('marks the last week as partial when the period ends before its Sunday', () => {
+  const days = [{ day: '2026-10-12', responses: 2, average: 4 }]
+  expect(weeklyStats(days, '2026-10-14')[0].partial).toBe(true)
+  expect(weeklyStats(days, '2026-10-18')[0].partial).toBeUndefined()
+})
