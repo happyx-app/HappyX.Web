@@ -29,6 +29,7 @@ import reportEn from './landing/report-en.jpg'
 import reportEs from './landing/report-es.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
+import { face, react } from './face'
 import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -159,7 +160,7 @@ const footer = () =>
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
 const landingFooter = () =>
-  h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
+  h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -187,12 +188,15 @@ function themeToggle() {
   return btn
 }
 
-// In the demo the logo leaves it for the real site: on a phone «Back to HappyX» doesn't fit.
-const brand = () =>
+// Clicking the logo makes it stick its tongue out, also while it takes you home (not in the demo,
+// where it leaves for the real site: on a phone «Back to HappyX» doesn't fit).
+const brand = (slot = 'header') =>
   h(
     'a',
-    api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
-    h('img', { class: 'brand-mark', src: logoURL, alt: '' }),
+    api.isDemo
+      ? { class: 'brand', href: '/', 'aria-label': t('demo.home') }
+      : { class: 'brand', href: '#/', onclick: () => react('tongue') },
+    face('brand-mark', slot),
     h('span', { class: 'brand-text' }, 'HappyX'),
     // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
     api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
@@ -586,6 +590,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   // A default period without answers, when this week has some (a new server, early in the
@@ -947,7 +952,11 @@ function kudosCard(k: api.KudosSummary) {
         h('blockquote', {}, `«${x.message}»`),
         h('figcaption', { class: 'muted small' }, `${x.from_username || '?'} → ${x.to_username || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
       )
-      kudo.addEventListener('click', (e) => confetti(e.clientX, e.clientY))
+      kudo.addEventListener('click', (e) => {
+        confetti(e.clientX, e.clientY)
+        // The logo blows a kiss.
+        react('kiss')
+      })
       return kudo
     }),
   )
@@ -1051,6 +1060,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   body.removeAttribute('aria-busy')
@@ -1484,6 +1494,7 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
       return
     }
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   subtitle.textContent = t('game.subtitle', { guild: board.name })

@@ -8,6 +8,7 @@ import * as icons from './icons'
 import { showSaveError } from './errors'
 import { formatDay, formatNumber, t } from './i18n'
 import { share } from './evolution'
+import { react } from './face'
 
 export const maxAnswer = 200
 export const maxProposal = 200
@@ -32,6 +33,50 @@ export function places(ranking: api.GameScore[]): number[] {
   })
 }
 
+// How many of your guesses in a finished round were right, out of how many you made.
+export function myScore(r: api.GameRound): { right: number; guesses: number } {
+  const byID = new Map(r.answers.map((a) => [a.id, a.discord_user_id]))
+  const guesses = Object.entries(r.my_guesses ?? {})
+  return { right: guesses.filter(([id, who]) => byID.get(id) === who).length, guesses: guesses.length }
+}
+
+// Which gesture the logo makes for your result: a look over the glasses when you got some right,
+// with a glint and a hop when you got them all (out of two or more). Nothing when you got none.
+export function celebration(right: number, guesses: number): 'peek' | 'peek-all' | null {
+  if (right === 0) return null
+  return right === guesses && guesses >= 2 ? 'peek-all' : 'peek'
+}
+
+// The first time the results of a round where you got some right come into view, the logo
+// makes its gesture. Once per round in this browser, and not in the demo.
+function celebrate(guildID: string, r: api.GameRound, card: HTMLElement) {
+  const mood = api.isDemo ? null : celebration(myScore(r).right, myScore(r).guesses)
+  if (!mood || typeof IntersectionObserver === 'undefined') return
+  const key = `happyx.game.seen.${guildID}.${r.week}`
+  try {
+    if (localStorage.getItem(key)) return
+  } catch {
+    return // without storage it would play on every visit: better not at all
+  }
+  let timer = 0
+  const seen = new IntersectionObserver(([e]) => {
+    clearTimeout(timer)
+    if (!e.isIntersecting) return
+    timer = window.setTimeout(() => {
+      // Only spent when it can actually be seen.
+      if (!card.isConnected || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+      seen.disconnect()
+      try {
+        localStorage.setItem(key, '1')
+      } catch {
+        return
+      }
+      react(mood)
+    }, 400)
+  }, { threshold: 0.5 })
+  seen.observe(card)
+}
+
 const longDay = (day: string) => formatDay(day, { weekday: 'long', day: 'numeric', month: 'long' })
 
 export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLElement[] {
@@ -43,7 +88,11 @@ export function gamePage(board: api.GameBoard, onLoggedOut: () => void): HTMLEle
   else if (cur.phase === 'answering') out.push(answerCard(board.discord_guild_id, cur, onLoggedOut))
   else out.push(guessCard(board.discord_guild_id, cur, onLoggedOut))
   if (board.proposal?.open) out.push(proposalCard(board.discord_guild_id, board.proposal, onLoggedOut))
-  if (board.previous) out.push(resultsCard(board.previous))
+  if (board.previous) {
+    const card = resultsCard(board.previous)
+    out.push(card)
+    celebrate(board.discord_guild_id, board.previous, card)
+  }
   if (board.history?.length) out.push(historyCard(board.history))
   return out
 }
