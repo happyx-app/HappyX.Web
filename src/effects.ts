@@ -94,14 +94,14 @@ export function sparksAt(x: number, y: number, nx: number, ny: number, count = 6
 }
 
 // A sleeping face: one «z» that floats up and to the right, swaying, growing and fading. In the
-// brand's violet, which shows on both the light and the dark page.
+// brand's violet, darker on a light page and lighter on a dark one (style.css).
 export function zzzFrom(x: number, y: number) {
   if (reduced()) return
-  const z = s('path', { d: 'M-3-3h6l-6 6h6', stroke: '#9b72f8', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
-  piece(x, y, 12, z, [
+  const z = s('path', { d: 'M-3-3h6l-6 6h6', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
+  piece(x, y, 14, z, [
     { transform: 'translate(0, 0) scale(.5) rotate(-10deg)', opacity: 0 },
     { transform: 'translate(6px, -10px) scale(.9) rotate(6deg)', opacity: 1, offset: 0.3 },
     { transform: 'translate(10px, -22px) scale(1.1) rotate(-8deg)', opacity: 0.9, offset: 0.7 },
     { transform: 'translate(16px, -32px) scale(1.25) rotate(4deg)', opacity: 0 },
-  ], 2200, 'linear')
+  ], 2200, 'linear').classList.add('fx-z')
 }

@@ -198,7 +198,10 @@ const brand = (slot = 'header') =>
     'a',
     api.isDemo
       ? { class: 'brand', href: '/', 'aria-label': t('demo.home') }
-      : { class: 'brand', href: '#/', onclick: () => poke() },
+      : { class: 'brand', href: '#/', onclick: (e: Event) => {
+          // Repeated quick clicks on the home page don't reload it again and again.
+          if (poke() > 1 && (location.hash === '#/' || !location.hash)) e.preventDefault()
+        } },
     face('brand-mark', slot),
     h('span', { class: 'brand-text' }, 'HappyX'),
     // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.

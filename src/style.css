@@ -650,6 +650,9 @@ main:focus { outline: none; }
 .confetti { position: fixed; z-index: 50; width: 10px; height: 14px; border-radius: 2px; pointer-events: none; }
 /* What flies out of the live logo (effects.ts), and the logo itself while it is out of its square. */
 .fx { position: fixed; z-index: 60; pointer-events: none; overflow: visible; }
+.fx-z { color: #7c3aed; }
+:root[data-theme='dark'] .fx-z { color: #c4b5fd; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .fx-z { color: #c4b5fd; } }
 .brand-mark { touch-action: manipulation; cursor: grab; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* Out of its square: only the face flies, with a soft shadow under it. */
 /* Above the page and its sticky bars, below dialogs (.canvas-modal-back is 30). */
