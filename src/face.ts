@@ -5,8 +5,9 @@
 // Styles are set through SVG attributes only: the production CSP blocks style attributes.
 
 import { s } from './dom'
+import { confettiFrom, heartsFrom, sparksAt, starsFrom } from './effects'
 
-export type Mood = 'happy' | 'proud' | 'kiss' | 'tongue' | 'peek' | 'peek-all'
+export type Mood = 'happy' | 'proud' | 'kiss' | 'tongue' | 'peek' | 'peek-all' | 'dizzy'
 
 // What the page tells the face. Anything can send it: react('happy').
 export const react = (mood: Mood) => document.dispatchEvent(new CustomEvent<Mood>('happyx:mood', { detail: mood }))
@@ -25,11 +26,13 @@ type Pose = {
   mx: number // sideways shift of the mouth, for a pucker or a «hmm» to one side
   eyes: number // how much the eyes under the glasses show, 0 to 1
   brow: number // how far the eyes lift, for a «well, well»
+  dizzy: number // spiral eyes, 0 to 1
+  wave: number // a wavy mouth instead of the smile, 0 to 1
 }
-const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly', 'tongue', 'mx', 'eyes', 'brow']
-const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0 }
-const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0 }
-const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open', 'tongue', 'mx', 'eyes', 'brow'])
+const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly', 'tongue', 'mx', 'eyes', 'brow', 'dizzy', 'wave']
+const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0, dizzy: 0, wave: 0 }
+const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0, dizzy: 0, wave: 0 }
+const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open', 'tongue', 'mx', 'eyes', 'brow', 'dizzy', 'wave'])
 
 // How far the glasses may travel towards the pointer: about two pixels at 28 px, enough to read
 // where the face looks. Chosen by eye over a smaller travel that nobody noticed.
@@ -71,6 +74,27 @@ type Face = {
   hover: boolean
   lens: SVGPathElement // the right half's lens, hidden while facing front
   still?: boolean // drawn at rest for reduced motion
+  bg: SVGRectElement // the violet square, left behind when the face is taken out
+  spirals: SVGGElement[] // the dizzy eyes, one per side, so each can spin
+  stars: SVGPathElement[] // the stars that circle a dizzy head
+  hole: SVGSVGElement // what stays in the header while the face is out: the square and a dent
+  free: Free | null // out of its square, held or flying around the screen
+}
+
+// A face out of its square. (x, y) is its centre on the screen; speeds are in pixels per step.
+type Free = {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  angle: number
+  spin: number
+  scale: number
+  held: number | null // the pointer holding it
+  off: { x: number; y: number } // where it was grabbed, from its centre
+  samples: { x: number; y: number; t: number }[] // the last moves, for the speed of a throw
+  home: { from: { x: number; y: number; angle: number; scale: number }; at: number } | null // flying back
+  bounced: number // when it last hit an edge hard
 }
 
 const faces = new Set<Face>()
@@ -91,7 +115,8 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     old.hover = false
     faces.add(old)
     wake()
-    return old.svg
+    // Out of its square: the new header gets the empty square, and the face stays where it is.
+    return old.free ? old.hole : old.svg
   }
   const id = `face-${++uid}`
   const shineOf = (d: string) => s('path', { d, stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
@@ -126,6 +151,12 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     'paint-order': 'stroke',
     visibility: 'hidden',
   })
+  // Dizzy eyes: two little spirals, under the lenses like the smiling ones.
+  const spirals = [19.5, 44.5].map((x) =>
+    s('g', { opacity: 0 }, s('path', { d: 'M0 0a.75.75 0 0 1 1.5 0a1.5 1.5 0 0 1-3 0a2.25 2.25 0 0 1 4.5 0a3 3 0 0 1-6 0', transform: `translate(${x} 21.6) scale(1.15)`, stroke: '#352310', 'stroke-width': 1.8, 'stroke-linecap': 'round', fill: 'none' })),
+  )
+  const stars = [0, 1].map(() => s('path', { d: 'M0-3.4L.9-.9 3.4 0 .9.9 0 3.4-.9.9-3.4 0-.9-.9z', fill: '#fde68a', stroke: '#352310', 'stroke-width': 0.9, 'stroke-linejoin': 'round', 'paint-order': 'stroke', visibility: 'hidden' }))
+  const bg = s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' })
   const svg = s(
     'svg',
     { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
@@ -138,20 +169,31 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
       s('clipPath', { id: `${id}-l` }, s('rect', { x: 0, y: 0, width: 33.5, height: 64 })),
       s('clipPath', { id: `${id}-r` }, s('rect', { x: 30.5, y: 0, width: 33.5, height: 64 })),
     ),
-    s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' }),
+    bg,
     shade,
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: `url(#${id})` }),
     eyes,
+    ...spirals,
     glasses,
     mouth,
     tongue,
     heart,
+    ...stars,
   )
-  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
+  // The square the face leaves behind: the same violet, with the round dent where the face sat.
+  const hole = s(
+    'svg',
+    { class: `${cls} brand-hole`, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
+    s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' }),
+    s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: '#5a2fc4' }),
+    s('circle', { cx: 32, cy: 34.6, r: 22.2, fill: '#7346e0' }),
+  )
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null }
   faces.add(f)
   if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
   svg.addEventListener('pointerleave', () => setHover(f, false))
+  grabbable(f)
   start()
   return svg
 }
@@ -161,11 +203,234 @@ function setHover(f: Face, on: boolean) {
   wake()
 }
 
+// --- Taking the face out of its square: drag it, throw it, put it back. ---
+
+const freeSize = 44 // px on screen while it is out, so it reads as a thing you hold
+const dragAfter = 6 // px the mouse must move before a press becomes a drag (a plain click is a link)
+const pressMs = 450 // a long press picks it up on a touch screen, where dragging would scroll
+const friction = 0.975
+const bounce = 0.62
+const hardHit = 9 // px per step against an edge: sparks and a dizzy face
+const homeMs = 450
+const snapAt = 32 // px from the square: let go there and it goes back in
+
+let dragged = false // the last press became a drag, so its click is not a link click
+
+function grabbable(f: Face) {
+  const svg = f.svg
+  // Grabbing the face never drags the link, selects text or opens the touch menu.
+  svg.addEventListener('dragstart', (e) => e.preventDefault())
+  svg.addEventListener('contextmenu', (e) => f.free && e.preventDefault())
+  svg.addEventListener('click', (e) => {
+    if (!dragged) return
+    dragged = false
+    e.preventDefault()
+    e.stopPropagation()
+  }, true)
+  svg.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || reducedMotion?.matches) return
+    dragged = false
+    if (f.free) {
+      // Caught again, in flight or at rest.
+      e.preventDefault()
+      hold(f, e)
+      return
+    }
+    const x0 = e.clientX
+    const y0 = e.clientY
+    const id = e.pointerId
+    const touch = e.pointerType === 'touch'
+    if (!touch) e.preventDefault()
+    let press = 0
+    const done = () => {
+      clearTimeout(press)
+      removeEventListener('pointermove', move)
+      removeEventListener('pointerup', done)
+      removeEventListener('pointercancel', done)
+    }
+    const go = (ev: PointerEvent) => {
+      done()
+      dragged = true
+      takeOut(f)
+      hold(f, ev)
+    }
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return
+      const far = Math.hypot(ev.clientX - x0, ev.clientY - y0)
+      if (touch) {
+        if (far > 12) done() // a swipe, not a long press
+      } else if (far > dragAfter) go(ev)
+    }
+    if (touch) press = window.setTimeout(() => go(e), pressMs)
+    addEventListener('pointermove', move)
+    addEventListener('pointerup', done)
+    addEventListener('pointercancel', done)
+  })
+  f.hole.addEventListener('click', (e) => {
+    // The empty square is inside the logo's link: a click on it brings the face home instead.
+    e.preventDefault()
+    e.stopPropagation()
+    sendHome(f)
+  })
+}
+
+// Out of the square: the face moves to the top of the page, the empty square stays in the header.
+function takeOut(f: Face) {
+  const r = f.svg.getBoundingClientRect()
+  f.free = { x: r.left + r.width / 2, y: r.top + r.height / 2, vx: 0, vy: 0, angle: 0, spin: 0, scale: r.width / freeSize, held: null, off: { x: 0, y: 0 }, samples: [], home: null, bounced: -1e9 }
+  f.svg.replaceWith(f.hole)
+  document.body.append(f.svg)
+  f.svg.classList.add('face-free')
+  f.bg.setAttribute('visibility', 'hidden')
+  f.center = null
+  place(f)
+}
+
+function hold(f: Face, e: PointerEvent) {
+  const fr = f.free!
+  fr.held = e.pointerId
+  fr.home = null
+  fr.vx = fr.vy = 0
+  fr.off = { x: e.clientX - fr.x, y: e.clientY - fr.y }
+  fr.samples = [{ x: fr.x, y: fr.y, t: performance.now() }]
+  f.svg.classList.add('face-held')
+  const move = (ev: PointerEvent) => {
+    if (ev.pointerId !== fr.held) return
+    fr.x = ev.clientX - fr.off.x
+    fr.y = ev.clientY - fr.off.y
+    const now = performance.now()
+    fr.samples.push({ x: fr.x, y: fr.y, t: now })
+    while (fr.samples.length > 2 && now - fr.samples[0].t > 90) fr.samples.shift()
+    wake()
+  }
+  const up = (ev: PointerEvent) => {
+    if (ev.pointerId !== fr.held) return
+    removeEventListener('pointermove', move)
+    removeEventListener('pointerup', up)
+    removeEventListener('pointercancel', up)
+    fr.held = null
+    f.svg.classList.remove('face-held')
+    if (Math.hypot(fr.x - homeAt(f).x, fr.y - homeAt(f).y) < snapAt && f.hole.isConnected) return sendHome(f)
+    // Thrown with the speed of its last moves, capped so it stays on screen long enough to see.
+    const first = fr.samples[0]
+    const dt = performance.now() - first.t
+    if (dt > 0 && dt < 200) {
+      const k = step / dt
+      fr.vx = clamp((fr.x - first.x) * k, -60, 60)
+      fr.vy = clamp((fr.y - first.y) * k, -60, 60)
+    }
+    wake()
+  }
+  addEventListener('pointermove', move)
+  addEventListener('pointerup', up)
+  addEventListener('pointercancel', up)
+  wake()
+}
+
+function homeAt(f: Face) {
+  const r = f.hole.getBoundingClientRect()
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2, size: r.width }
+}
+
+function sendHome(f: Face) {
+  const fr = f.free
+  if (!fr || !f.hole.isConnected) return
+  fr.held = null
+  fr.home = { from: { x: fr.x, y: fr.y, angle: ((fr.angle % 360) + 540) % 360 - 180, scale: fr.scale }, at: performance.now() }
+  wake()
+}
+
+// Back in: the face takes the empty square's place again.
+function landHome(f: Face) {
+  f.hole.replaceWith(f.svg)
+  f.svg.classList.remove('face-free', 'face-held')
+  f.svg.style.left = f.svg.style.top = f.svg.style.transform = ''
+  f.bg.setAttribute('visibility', 'visible')
+  f.free = null
+  f.center = null
+}
+
+// One physics step of a face that is out: it flies, slows down, bounces off the edges of the
+// window, and spins a little with its speed.
+function fly(f: Face, now: number) {
+  const fr = f.free!
+  if (fr.home) {
+    const t = Math.min(1, (now - fr.home.at) / homeMs)
+    const e = easeInOut(t)
+    const to = homeAt(f)
+    const a = fr.home.from
+    fr.x = a.x + (to.x - a.x) * e
+    fr.y = a.y + (to.y - a.y) * e
+    fr.angle = a.angle * (1 - e)
+    fr.scale = a.scale + (to.size / freeSize - a.scale) * e
+    if (t >= 1) landHome(f)
+    return
+  }
+  fr.scale += ((fr.held !== null ? 1.08 : 1) - fr.scale) * 0.25
+  if (fr.held !== null) {
+    fr.spin *= 0.8
+    fr.angle += fr.spin
+    fr.angle *= 0.9
+    return
+  }
+  fr.x += fr.vx
+  fr.y += fr.vy
+  fr.vx *= friction
+  fr.vy *= friction
+  // A turn of about 10° a step at full speed, so the face can still be read while it flies.
+  fr.spin += (fr.vx * 0.25 - fr.spin) * 0.2
+  fr.angle += fr.spin
+  const half = freeSize / 2
+  const W = innerWidth
+  const H = innerHeight
+  const hit = (speed: number, x: number, y: number, nx: number, ny: number) => {
+    if (Math.abs(speed) < hardHit) return
+    sparksAt(x, y, nx, ny)
+    if (now - fr.bounced > 300) react('dizzy')
+    fr.bounced = now
+  }
+  if (fr.x < half) {
+    hit(fr.vx, 0, fr.y, 1, 0)
+    fr.x = half
+    fr.vx = -fr.vx * bounce
+  } else if (fr.x > W - half) {
+    hit(fr.vx, W, fr.y, -1, 0)
+    fr.x = W - half
+    fr.vx = -fr.vx * bounce
+  }
+  if (fr.y < half) {
+    hit(fr.vy, fr.x, 0, 0, 1)
+    fr.y = half
+    fr.vy = -fr.vy * bounce
+  } else if (fr.y > H - half) {
+    hit(fr.vy, fr.x, H, 0, -1)
+    fr.y = H - half
+    fr.vy = -fr.vy * bounce
+  }
+  // Once it has nearly stopped it settles straight, the way it is drawn.
+  const speed = Math.hypot(fr.vx, fr.vy)
+  if (speed < 0.6) fr.angle *= 0.9
+  if (speed < 0.05) fr.vx = fr.vy = 0
+}
+
+function place(f: Face) {
+  const fr = f.free!
+  const st = f.svg.style
+  st.left = `${fr.x - freeSize / 2}px`
+  st.top = `${fr.y - freeSize / 2}px`
+  st.transform = `rotate(${f2(fr.angle)}deg) scale(${f2(fr.scale)})`
+}
+
 // The mouth is a closed shape: the icon's curve on top and a second curve below it. With `open`
 // at 0 it is the icon's own path, so the resting face is the icon.
 function mouthPath(p: Pose) {
   const x0 = 32 - p.mouthW
   const w = p.mouthW * 2
+  // Dizzy: a wobbly line, its waves growing in as the smile goes.
+  if (p.wave > 0.5) {
+    const a = 2.4 * Math.min(1, (p.wave - 0.5) * 2)
+    return `M${f2(x0)} ${f2(p.mouthY)}q${f2(w / 8)} ${f2(-a)} ${f2(w / 4)} 0t${f2(w / 4)} 0t${f2(w / 4)} 0t${f2(w / 4)} 0`
+  }
   const top = `c${f2(w * 0.3036)} ${f2(p.smile)} ${f2(w * 0.6964)} ${f2(p.smile)} ${f2(w)} 0`
   if (p.open < 0.05) return `M${f2(x0)} ${f2(p.mouthY)}${top}`
   const d = p.smile + p.open * 1.6
@@ -188,7 +453,31 @@ let timer = 0
 let last = 0
 let acc = 0
 
-const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400, kiss: 1800, tongue: 1100, peek: 1500, 'peek-all': 2250 }
+const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400, kiss: 1800, tongue: 1100, peek: 1500, 'peek-all': 2250, dizzy: 2600 }
+
+// What flies out of the face, and when in its mood: hearts after the kiss's own heart, stars with
+// the glint, confetti on the hop of «all right».
+const outbursts: Partial<Record<Mood, [number, (r: DOMRect) => void][]>> = {
+  kiss: [[900, (r) => heartsFrom(r.left + r.width * 0.8, r.top + r.height * 0.25)]],
+  happy: [[220, (r) => starsFrom(r.right, r.top + r.height * 0.4)]],
+  'peek-all': [
+    [1420, (r) => starsFrom(r.right, r.top + r.height * 0.4)],
+    [1480, (r) => confettiFrom(r.left + r.width / 2, r.top + r.height / 2)],
+  ],
+}
+let outburstTimers: number[] = []
+
+// The face on screen that effects come out of: the one out of its square, else the first in view.
+function shownFace(): DOMRect | null {
+  let best: DOMRect | null = null
+  for (const f of faces) {
+    if (!f.svg.isConnected) continue
+    const r = f.svg.getBoundingClientRect()
+    if (f.free) return r
+    if (!best && r.width && r.bottom > 0 && r.top < innerHeight) best = r
+  }
+  return best
+}
 
 function start() {
   if (started) return
@@ -228,6 +517,14 @@ function start() {
     const name = (e as CustomEvent<Mood>).detail
     if (!(name in moodMs)) return
     mood = { name, at: performance.now() }
+    outburstTimers.forEach(clearTimeout)
+    outburstTimers = (outbursts[name] ?? []).map(([ms, burst]) =>
+      window.setTimeout(() => {
+        if (mood?.name !== name) return
+        const r = shownFace()
+        if (r) burst(r)
+      }, ms),
+    )
     lastInput = performance.now()
     asleep = false
     wake()
@@ -264,7 +561,8 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
   const quiet = now - lastInput
   // On a phone the face looks at a tap for a few seconds, then ahead again.
   if (pointer && (!touchOnly() || quiet < 3000)) {
-    if (!f.center) {
+    if (f.free) f.center = { x: f.free.x, y: f.free.y }
+    else if (!f.center) {
       const r = f.svg.getBoundingClientRect()
       f.center = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
     }
@@ -311,9 +609,25 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
     p.gy = -1.2
     p.tilt = 0
   }
+  // Out of its square: a big smile while held, an «oh» while it flies.
+  const fr = f.free
+  if (fr && !fr.home && !(mood?.name === 'dizzy')) {
+    if (fr.held !== null) Object.assign(p, { mouthW: 12, mouthY: 40.3, smile: 6.6 })
+    else if (Math.hypot(fr.vx, fr.vy) > 3) Object.assign(p, { mouthW: 4.2, mouthY: 41.6, smile: 1.6, open: 2.6 })
+  }
   if (mood) {
     const t = now - mood.at
-    if (mood.name === 'happy') {
+    if (mood.name === 'dizzy') {
+      // Hit an edge hard: the glasses slip down crooked and wobble over spinning eyes, the mouth
+      // goes wavy and two stars circle the head; then it shakes it off.
+      if (t < 2100) {
+        p.gx = 0
+        p.ly = 0
+        p.gy = 6.4
+        p.tilt = 7 + 3 * Math.sin(t / 150)
+        Object.assign(p, { dizzy: 1, wave: 1, mouthW: 8, mouthY: 47.6, smile: 0, eyes: 0 })
+      } else if (t < 2400) p.tilt = 4 * Math.sin(((t - 2100) / 300) * Math.PI * 3) // the shake
+    } else if (mood.name === 'happy') {
       // Crouch, hop, land; the mouth opens just after take-off; the shine sweeps across once.
       if (t < 90) p.gy += 0.8
       else if (t < 330) p.gy -= 3 * Math.sin(((t - 90) / 240) * (Math.PI / 2))
@@ -379,6 +693,7 @@ function still() {
   if (drawnStill && ![...faces].some((f) => !f.still)) return
   drawnStill = true
   for (const f of faces) {
+    if (f.free && f.hole.isConnected) landHome(f)
     f.still = true
     f.pose = { ...rest }
     f.speed = { ...zero }
@@ -411,6 +726,12 @@ function frame(ts: number) {
       continue
     }
     f.still = false
+    if (f.free) {
+      for (let i = 0; i < steps && f.free; i++) fly(f, now)
+      const fr = f.free as Free | null
+      if (fr) place(f)
+      if (!fr || fr.held !== null || fr.home || Math.hypot(fr.vx, fr.vy) > 0.05 || Math.abs(fr.spin) > 0.05 || Math.abs(fr.angle) > 0.2 || Math.abs(fr.scale - 1) > 0.005) moving = true
+    }
     const { pose: goal, doze, glint, shine, heart } = target(f, now)
     dozing ||= doze
     for (let i = 0; i < steps; i++) {
@@ -420,7 +741,8 @@ function frame(ts: number) {
         f.pose[k] += f.speed[k]
       }
       // They lean a touch into a sideways move.
-      f.pose.tilt = clamp(f.pose.tilt + f.speed.gx * 3, -4, 4)
+      const lean = goal.dizzy > 0.5 ? 12 : 4
+      f.pose.tilt = clamp(f.pose.tilt + f.speed.gx * 3, -lean, lean)
       // The shine follows the glasses a beat late.
       const sh = f.shineAt
       sh.vx = (sh.vx + (f.pose.gx * 0.35 - sh.x) * springs.shine.k) * springs.shine.damp
@@ -499,6 +821,21 @@ function draw(f: Face, glint: number, shine: number, heart: number) {
     f.heart.setAttribute('opacity', f2(heart < 0.6 ? 1 : (1 - heart) / 0.4))
     f.heart.setAttribute('visibility', 'visible')
   } else f.heart.setAttribute('visibility', 'hidden')
+  // Dizzy eyes spin; like the smiling ones they show only as far as the glasses are down.
+  const spin = (performance.now() / 2.2) % 360
+  for (const [i, g] of f.spirals.entries()) {
+    g.setAttribute('opacity', f2(clamp((p.dizzy - 0.5) * 2, 0, 1) * clamp((p.gy - 1) / 1.5, 0, 1)))
+    if (p.dizzy > 0.01) g.setAttribute('transform', `${f.eyes.getAttribute('transform')} rotate(${f2(i ? spin : -spin)} ${i ? 44.9 : 19.9} 21.6)`)
+  }
+  // Two stars circle the head, the one behind smaller.
+  for (const [i, st] of f.stars.entries()) {
+    if (p.dizzy > 0.3) {
+      const a = performance.now() / 260 + i * Math.PI
+      const z = Math.sin(a)
+      st.setAttribute('transform', `translate(${f2(32 + 15 * Math.cos(a))} ${f2(9 + 3.5 * z)}) scale(${f2((0.8 + 0.25 * z) * Math.min(1, (p.dizzy - 0.3) * 2))})`)
+      st.setAttribute('visibility', 'visible')
+    } else st.setAttribute('visibility', 'hidden')
+  }
   f.light.setAttribute('cx', f2(0.42 - 0.05 * r))
   f.light.setAttribute('cy', f2(0.35 - 0.03 * v))
   f.shade.setAttribute('cx', f2(32.8 - 0.3 * r))
