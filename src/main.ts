@@ -922,9 +922,6 @@ function fill(pct: number, warm = false) {
   return el
 }
 
-// Clicks on kudos make the logo react, alternating a kiss and a happy hop.
-let kudoClicks = 0
-
 function kudosCard(k: api.KudosSummary) {
   return h(
     'section',
@@ -957,7 +954,8 @@ function kudosCard(k: api.KudosSummary) {
       )
       kudo.addEventListener('click', (e) => {
         confetti(e.clientX, e.clientY)
-        react(kudoClicks++ % 2 ? 'happy' : 'kiss')
+        // The logo blows a kiss.
+        react('kiss')
       })
       return kudo
     }),
