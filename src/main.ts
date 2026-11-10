@@ -29,6 +29,7 @@ import reportEn from './landing/report-en.jpg'
 import reportEs from './landing/report-es.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
+import { face, react } from './face'
 import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -192,7 +193,7 @@ const brand = () =>
   h(
     'a',
     api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
-    h('img', { class: 'brand-mark', src: logoURL, alt: '' }),
+    face(),
     h('span', { class: 'brand-text' }, 'HappyX'),
     // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
     api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
@@ -947,7 +948,10 @@ function kudosCard(k: api.KudosSummary) {
         h('blockquote', {}, `«${x.message}»`),
         h('figcaption', { class: 'muted small' }, `${x.from_username || '?'} → ${x.to_username || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
       )
-      kudo.addEventListener('click', (e) => confetti(e.clientX, e.clientY))
+      kudo.addEventListener('click', (e) => {
+        confetti(e.clientX, e.clientY)
+        react('happy')
+      })
       return kudo
     }),
   )

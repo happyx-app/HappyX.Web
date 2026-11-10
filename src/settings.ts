@@ -7,6 +7,7 @@ import { showSaveError } from './errors'
 import * as icons from './icons'
 import { formatDay, t } from './i18n'
 import logoURL from './logo.svg'
+import { react } from './face'
 import * as survey from './surveyMessage'
 import { filterOf, needsRoles, type RoleFilterEditor, roleFilterEditor, toSave } from './surveyRoles'
 import { unsavedNote } from './unsaved'
@@ -311,6 +312,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       saved = settingsOf(updated)
       status.className = 'small success'
       status.replaceChildren(icons.inline(icons.check), t('settings.saved'))
+      react('proud')
       onSaved(updated)
     } catch (err) {
       if (err instanceof api.Unauthorized) return onLoggedOut()
