@@ -20,10 +20,11 @@ type Pose = {
   mouthY: number // y of the mouth corners
   smile: number // depth of the smile curve
   open: number // extra depth of the lower lip: 0 is the plain line of the icon
+  ly: number // the up/down part of the look alone, without hops, nods or the doze
 }
-const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open']
-const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0 }
-const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0 }
+const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly']
+const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0 }
+const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0 }
 const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open'])
 
 // How far the glasses may travel towards the pointer: about a pixel at 28 px, a glance. Less and
@@ -48,13 +49,20 @@ const touchOnly = () => typeof matchMedia === 'function' && matchMedia('(hover: 
 type Face = {
   svg: SVGSVGElement
   glasses: SVGGElement
-  shine: SVGPathElement
+  shine: SVGPathElement[]
+  halves: SVGGElement[] // left and right half of the glasses, warped apart to fake a head turn
+  cut: SVGGElement // the left half's cut, lifted while facing front
+  cutClip: string
+  shade: SVGCircleElement // the orange rim behind the face
+  light: SVGRadialGradientElement // the face's highlight
   mouth: SVGPathElement
   pose: Pose
   speed: Pose
   shineAt: { x: number; y: number; vx: number; vy: number }
   center: { x: number; y: number } | null
   hover: boolean
+  lens: SVGPathElement // the right half's lens, hidden while facing front
+  still?: boolean // drawn at rest for reduced motion
 }
 
 const faces = new Set<Face>()
@@ -65,13 +73,21 @@ const lensPath =
 
 export function face(cls = 'brand-mark'): SVGSVGElement {
   const id = `face-${++uid}`
-  const shine = s('path', { d: 'M13.4 27.6c.4-1.6 1.6-2.6 3-2.6M43.4 27.6c.4-1.6 1.6-2.6 3-2.6', stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
-  const glasses = s(
-    'g',
-    {},
-    s('path', { d: lensPath, fill: '#352310' }),
-    // The shine stays inside the lenses whatever it does.
-    s('g', { 'clip-path': `url(#${id}-lens)` }, shine),
+  const shineOf = (d: string) => s('path', { d, stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
+  const shine = [shineOf('M13.4 27.6c.4-1.6 1.6-2.6 3-2.6'), shineOf('M43.4 27.6c.4-1.6 1.6-2.6 3-2.6')]
+  // The glasses are drawn twice, each copy cut at the bridge, so each lens can be squeezed on its
+  // own while they still meet at the bridge. The shine stays inside the lenses whatever it does.
+  const halves = [0, 1].map((i) =>
+    s('g', {}, s('g', { 'clip-path': `url(#${id}-${i ? 'r' : 'l'})` }, s('path', { d: lensPath, fill: '#352310' }), s('g', { 'clip-path': `url(#${id}-lens)` }, shine[i]))),
+  )
+  const glasses = s('g', {}, ...halves)
+  const shade = s('circle', { cx: 32.8, cy: 33.6, r: 23.6, fill: '#f29a0c' })
+  const light = s(
+    'radialGradient',
+    { id, cx: 0.42, cy: 0.35, r: 0.7 },
+    s('stop', { offset: 0, 'stop-color': '#ffe74a' }),
+    s('stop', { offset: 0.6, 'stop-color': '#fdd225' }),
+    s('stop', { offset: 1, 'stop-color': '#f7b51c' }),
   )
   const mouth = s('path', { d: mouthPath(rest), stroke: '#352310', 'stroke-width': 2.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
   const svg = s(
@@ -80,22 +96,19 @@ export function face(cls = 'brand-mark'): SVGSVGElement {
     s(
       'defs',
       {},
-      s(
-        'radialGradient',
-        { id, cx: 0.42, cy: 0.35, r: 0.7 },
-        s('stop', { offset: 0, 'stop-color': '#ffe74a' }),
-        s('stop', { offset: 0.6, 'stop-color': '#fdd225' }),
-        s('stop', { offset: 1, 'stop-color': '#f7b51c' }),
-      ),
+      light,
       s('clipPath', { id: `${id}-lens` }, s('path', { d: lensPath })),
+      // The two cuts overlap by 3 units at the bridge: less and their soft edges leave a light seam.
+      s('clipPath', { id: `${id}-l` }, s('rect', { x: 0, y: 0, width: 33.5, height: 64 })),
+      s('clipPath', { id: `${id}-r` }, s('rect', { x: 30.5, y: 0, width: 33.5, height: 64 })),
     ),
     s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' }),
-    s('circle', { cx: 32.8, cy: 33.6, r: 23.6, fill: '#f29a0c' }),
+    shade,
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: `url(#${id})` }),
     glasses,
     mouth,
   )
-  const f: Face = { svg, glasses, shine, mouth, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false }
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
   faces.add(f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
   svg.addEventListener('pointerleave', () => setHover(f, false))
@@ -215,12 +228,14 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
     const k = Math.min(1, dist / 260)
     p.gx = (dx / dist) * k * reach.x
     p.gy = (dy / dist) * k * reach.y
+    p.ly = p.gy
   }
   // A long pause: the glasses slide straight down the nose and the smile softens. Kept level, as
   // tilted glasses read as a broken icon. Not on phones, where the screen sits still for long.
   const doze = quiet > sleepAfter && !mood && !touchOnly()
   if (doze) {
     p.gx = 0
+    p.ly = 0
     p.gy = 2.2
     p.smile = 4
     // On the way down the head drops and catches itself once.
@@ -232,7 +247,7 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
   if (!pointer && !doze && quiet > glanceAfter && !glance) glance = { dir: Math.random() < 0.5 ? -1 : 1, at: now }
   if (glance && now - glance.at < 700) {
     p.gx = glance.dir * 2
-    p.gy = 0.6
+    p.gy = p.ly = 0.6
   }
   // Woken up: a quick start upwards.
   if (now - woke < 120) {
@@ -264,10 +279,14 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
 }
 
 // Less motion asked for: the plain icon, drawn once, no frames.
+let drawnStill = false
 function still() {
   cancelAnimationFrame(raf)
   raf = 0
+  if (drawnStill && ![...faces].some((f) => !f.still)) return
+  drawnStill = true
   for (const f of faces) {
+    f.still = true
     f.pose = { ...rest }
     f.speed = { ...zero }
     f.shineAt = { x: 0, y: 0, vx: 0, vy: 0 }
@@ -283,6 +302,7 @@ function frame(ts: number) {
   raf = 0
   if (document.hidden) return
   if (reducedMotion?.matches) return still()
+  drawnStill = false
   const now = performance.now()
   if (mood && now - mood.at > moodMs[mood.name]) mood = null
   // Fixed 60 Hz steps, so the springs feel the same on a 120 Hz screen.
@@ -297,6 +317,7 @@ function frame(ts: number) {
       faces.delete(f)
       continue
     }
+    f.still = false
     const { pose: goal, doze, glint, shine } = target(f, now)
     dozing ||= doze
     for (let i = 0; i < steps; i++) {
@@ -333,9 +354,37 @@ function frame(ts: number) {
 
 function draw(f: Face, glint: number, shine: number) {
   const p = f.pose
-  f.glasses.setAttribute('transform', `translate(${f2(p.gx)} ${f2(p.gy)}) rotate(${f2(p.tilt)} 32 29)`)
-  f.shine.setAttribute('transform', `translate(${f2(f.shineAt.x + glint)} ${f2(f.shineAt.y)})`)
-  f.shine.setAttribute('opacity', f2(clamp(shine, 0, 1)))
-  f.mouth.setAttribute('d', mouthPath(p))
+  // A head turn, faked. r is how far the face looks sideways (-1 left … 1 right, up to ±1.2 while
+  // a spring overshoots), v the same up and down.
+  const r = clamp(p.gx / reach.x, -1.2, 1.2)
+  const v = clamp(p.ly / reach.y, -1.2, 1.2)
+  // Looking up or down the lenses foreshorten a little.
+  const sy = 1 - 0.06 * Math.abs(v)
+  f.glasses.setAttribute('transform', `translate(${f2(p.gx)} ${f2(p.gy)}) rotate(${f2(p.tilt)} 32 29) translate(0 29) scale(1 ${f2(sy)}) translate(0 -29)`)
+  // The bridge moves towards the look; the lens on that side squeezes as it goes round the face,
+  // the other stretches a little, and both ends of the bar keep hugging the head.
+  const bridge = 32 + 2.6 * r
+  for (const [i, half] of f.halves.entries()) {
+    const side = i ? 1 : -1 // -1 left half, 1 right half
+    const outer = side * r > 0 ? bridge + side * 24.4 * (1 - 0.22 * Math.abs(r)) : 32 + side * 24.4 - 1.6 * r
+    const sx = (outer - bridge) / (side * 24.4)
+    half.setAttribute('transform', `translate(${f2(bridge)} 0) scale(${(Math.round(sx * 1000) / 1000).toString()} 1) translate(-32 0)`)
+  }
+  // Facing front, one uncut copy, exactly the icon.
+  const front = Math.abs(r) < 0.005
+  f.lens.setAttribute('visibility', front ? 'hidden' : 'visible')
+  f.cut.setAttribute('clip-path', front ? 'none' : f.cutClip)
+  // The lens reflection belongs to the room, so it slides back a little inside the lens.
+  for (const sh of f.shine) {
+    sh.setAttribute('transform', `translate(${f2(f.shineAt.x + glint - 1.2 * r)} ${f2(f.shineAt.y)})`)
+    sh.setAttribute('opacity', f2(clamp(shine, 0, 1)))
+  }
+  // Depth: the mouth goes round with the head (a bit less than the bridge) and narrows as it turns;
+  // the light and the rim shadow stay with the room, so against the face they drift the other way.
+  f.mouth.setAttribute('transform', `translate(${f2(0.75 * (p.gx + 2.6 * r))} ${f2(0.6 * p.ly)})`)
+  f.mouth.setAttribute('d', mouthPath({ ...p, mouthW: p.mouthW * (1 - 0.08 * Math.abs(r)) }))
   f.mouth.setAttribute('fill', p.open < 0.05 ? 'none' : '#352310')
+  f.light.setAttribute('cx', f2(0.42 - 0.05 * r))
+  f.light.setAttribute('cy', f2(0.35 - 0.03 * v))
+  f.shade.setAttribute('cx', f2(32.8 - 0.3 * r))
 }
