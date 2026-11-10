@@ -650,9 +650,12 @@ main:focus { outline: none; }
 .confetti { position: fixed; z-index: 50; width: 10px; height: 14px; border-radius: 2px; pointer-events: none; }
 /* What flies out of the live logo (effects.ts), and the logo itself while it is out of its square. */
 .fx { position: fixed; z-index: 60; pointer-events: none; overflow: visible; }
-.brand-mark { touch-action: none; cursor: grab; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.brand-mark { touch-action: manipulation; cursor: grab; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* Out of its square: only the face flies, with a soft shadow under it. */
-.brand-mark.face-free { position: fixed; z-index: 55; width: 44px; height: 44px; border-radius: 0; filter: drop-shadow(0 6px 8px rgba(20, 20, 30, 0.28)); }
+/* Above the page and its sticky bars, below dialogs (.canvas-modal-back is 30). */
+.brand-mark.face-free { position: fixed; z-index: 25; width: 44px; height: 44px; border-radius: 0; touch-action: none; filter: drop-shadow(0 6px 8px rgba(20, 20, 30, 0.28)); }
+:root[data-theme='dark'] .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); } }
 .brand-mark.face-held { cursor: grabbing; }
 /* The square the face left (drawn in face.ts): a click puts the face back. */
 .brand-mark.brand-hole { cursor: pointer; }

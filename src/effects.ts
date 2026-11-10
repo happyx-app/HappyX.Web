@@ -22,7 +22,7 @@ function piece(x: number, y: number, size: number, child: SVGElement, frames: Ke
 const confettiColors = ['#fbbf24', '#8b5cf6', '#ff9ecf', '#60a5fa']
 
 // A burst of confetti from (x, y), thrown down and to the right: the logo lives in the top left.
-export function confettiFrom(x: number, y: number, pieces = 30) {
+export function confettiFrom(x: number, y: number, pieces = 40) {
   if (reduced()) return
   for (let i = 0; i < pieces; i++) {
     const angle = (-10 + Math.random() * 110) * (Math.PI / 180)
@@ -30,10 +30,13 @@ export function confettiFrom(x: number, y: number, pieces = 30) {
     const dx = Math.cos(angle) * dist
     const dy = Math.sin(angle) * dist + 90
     const rect = s('rect', { x: -3, y: -4, width: 6, height: 8, rx: 1.2, fill: confettiColors[i % confettiColors.length] })
-    piece(x, y, 10, rect, [
+    const turn = Math.random() * 720 - 360
+    // Out fast, then falling: the middle frame is high, the last one well below.
+    piece(x, y, 14, rect, [
       { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
-      { transform: `translate(${dx}px, ${dy}px) rotate(${Math.random() * 720 - 360}deg)`, opacity: 0 },
-    ], 1000 + Math.random() * 500)
+      { transform: `translate(${dx * 0.6}px, ${(dy - 90) * 0.6}px) rotate(${turn / 2}deg)`, opacity: 1, offset: 0.35, easing: 'ease-in' },
+      { transform: `translate(${dx}px, ${dy + 40}px) rotate(${turn}deg)`, opacity: 0 },
+    ], 1100 + Math.random() * 500, 'cubic-bezier(.15,.8,.4,1)')
   }
 }
 
@@ -47,7 +50,7 @@ export function heartsFrom(x: number, y: number, count = 4) {
     const dy = -(10 + Math.random() * 26)
     const sway = (Math.random() < 0.5 ? -1 : 1) * 6
     const heart = s('path', { d: heartPath, fill: '#f43f5e', stroke: ink, 'stroke-width': 1.1, 'stroke-linejoin': 'round', 'paint-order': 'stroke' })
-    piece(x, y, 14, heart, [
+    piece(x, y, 18, heart, [
       { transform: 'translate(0, 0) scale(.4)', opacity: 0 },
       { transform: `translate(${dx * 0.5 + sway}px, ${dy * 0.5}px) scale(1)`, opacity: 1, offset: 0.35 },
       { transform: `translate(${dx}px, ${dy}px) scale(.9)`, opacity: 0 },
@@ -62,7 +65,7 @@ export function starsFrom(x: number, y: number, count = 3) {
   if (reduced()) return
   for (let i = 0; i < count; i++) {
     const star = s('path', { d: starPath, fill: '#fde68a', stroke: ink, 'stroke-width': 0.8, 'stroke-linejoin': 'round', 'paint-order': 'stroke' })
-    piece(x + 4 + i * 9, y - 6 + (i % 2) * 8, 10 - i * 2, star, [
+    piece(x + 4 + i * 10, y - 6 + (i % 2) * 8, 13 - i * 2, star, [
       { transform: 'scale(0) rotate(0deg)', opacity: 1 },
       { transform: 'scale(1) rotate(45deg)', opacity: 1, offset: 0.4 },
       { transform: 'scale(0) rotate(90deg)', opacity: 0 },
@@ -72,17 +75,20 @@ export function starsFrom(x: number, y: number, count = 3) {
 
 // Electric sparks where the thrown logo hits an edge: short yellow zigzags flicking outwards.
 // (nx, ny) points away from the wall it hit.
-export function sparksAt(x: number, y: number, nx: number, ny: number, count = 5) {
+export function sparksAt(x: number, y: number, nx: number, ny: number, count = 6) {
   if (reduced()) return
   const base = Math.atan2(ny, nx)
   for (let i = 0; i < count; i++) {
     const a = base + ((i / (count - 1)) - 0.5) * 2.2
-    const zig = s('path', { d: 'M-5 0l2.5-2 2 3 2-3 2.5 2', stroke: '#facc15', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
-    const el = piece(x, y, 16, zig, [
+    // Yellow over a dark outline, like the rest of the logo, so it shows on a light page too.
+    const d = 'M-5 0l2.5-2 2 3 2-3 2.5 2'
+    const line = (stroke: string, width: number) => s('path', { d, stroke, 'stroke-width': width, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
+    const zig = s('g', {}, line(ink, 3.2), line('#facc15', 1.6))
+    const el = piece(x, y, 20, zig, [
       { transform: `rotate(${a}rad) translateX(6px) scaleX(.4)`, opacity: 1 },
       { transform: `rotate(${a}rad) translateX(22px) scaleX(1)`, opacity: 1, offset: 0.5 },
       { transform: `rotate(${a}rad) translateX(30px) scaleX(.6)`, opacity: 0 },
-    ], 260 + Math.random() * 120, 'steps(4, end)')
+    ], 340 + Math.random() * 120, 'steps(4, end)')
     el.style.filter = 'drop-shadow(0 0 2px #fde047)'
   }
 }
