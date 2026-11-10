@@ -137,23 +137,27 @@ a { color: var(--accent); }
 .user-id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
 .user-wrap { position: relative; min-width: 0; }
 .user-btn {
-  display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; min-height: 44px; padding: 4px 8px 4px 4px;
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; min-height: 36px; padding: 2px 8px 2px 2px;
   background: transparent; border: 0; border-radius: 999px; color: var(--ink); font: inherit; cursor: pointer;
 }
-.user-btn:hover { background: var(--surface-2); }
+.user-btn:hover, .user-btn[aria-expanded='true'] { background: var(--surface-2); }
+.user-btn .user-name { max-width: 16ch; }
+/* The open menu stays above the canvas bars, which sit over the page. */
+.topbar:has(.user-menu:not([hidden])) { z-index: 25; }
 .user-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.user-btn .icon { width: 16px; height: 16px; flex: none; color: var(--ink-2); }
+.user-btn .icon { width: 18px; height: 18px; flex: none; color: var(--ink); }
 .user-btn[aria-expanded='true'] .icon { transform: rotate(180deg); }
 .user-menu {
   position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; display: grid; min-width: 200px; padding: 6px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--dc-shadow);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--dc-shadow);
 }
 .user-menu[hidden] { display: none; }
 .user-menu-item {
-  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 8px;
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 10px;
   background: transparent; color: var(--ink); font: inherit; text-align: left; text-decoration: none; cursor: pointer; white-space: nowrap;
 }
 .user-menu-item:hover { background: var(--surface-2); }
+.user-menu-item:disabled { opacity: 0.6; cursor: progress; }
 .user-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .user-menu-item .icon { width: 18px; height: 18px; flex: none; color: var(--ink-2); }
 .avatar-initial { display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 0.875rem; }
@@ -161,6 +165,7 @@ a { color: var(--accent); }
   .user-name, .user-id .avatar { display: none; }
   .user { gap: 4px; }
   .user .btn { white-space: nowrap; padding: 6px 8px; }
+  .topbar .user-btn { min-height: 44px; }
   .lang-picker { padding: 5px 4px; }
 }
 /* On a phone the nav links get a row of their own under the logo and the toggles. */

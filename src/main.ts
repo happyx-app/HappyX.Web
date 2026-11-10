@@ -242,13 +242,19 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
 function userMenu(avatar: HTMLElement, name: string) {
   const btn = h('button', { class: 'user-btn', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'user-menu', 'aria-label': t('nav.account', { name }) },
     avatar, h('span', { class: 'user-name' }, name), icons.chevronDown())
-  const logout = h('button', {
+  const logout: HTMLButtonElement = h('button', {
     class: 'user-menu-item', type: 'button',
     onclick: async () => {
-      await api.logout()
-      me = null
-      location.hash = ''
-      route()
+      // Once is enough: a second tap while the request runs does nothing.
+      logout.disabled = true
+      logout.setAttribute('aria-busy', 'true')
+      try {
+        await api.logout()
+      } finally {
+        me = null
+        location.hash = ''
+        route()
+      }
     },
   }, icons.logOut(), t('nav.logout'))
   const menu = h('div', { class: 'user-menu', id: 'user-menu', hidden: true },
@@ -276,6 +282,8 @@ function userMenu(avatar: HTMLElement, name: string) {
     btn.focus()
   }
   btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'))
+  // Choosing «Your data» closes it even when that page is already open (no hashchange then).
+  menu.querySelector('a')!.addEventListener('click', close)
   // Tabbing out of the menu closes it, so it never stays open behind the focus.
   wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget as Node | null) && e.relatedTarget) close() })
   return wrap
