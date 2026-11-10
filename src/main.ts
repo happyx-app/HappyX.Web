@@ -160,7 +160,7 @@ const footer = () =>
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
 const landingFooter = () =>
-  h('footer', { class: 'landing-footer muted small' }, brand(), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
+  h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
 
 // The top bar shows short codes so it still fits on a phone.
 function languagePicker(short = false) {
@@ -188,12 +188,15 @@ function themeToggle() {
   return btn
 }
 
-// In the demo the logo leaves it for the real site: on a phone «Back to HappyX» doesn't fit.
-const brand = () =>
+// Clicking the logo makes it stick its tongue out, also while it takes you home (not in the demo,
+// where it leaves for the real site: on a phone «Back to HappyX» doesn't fit).
+const brand = (slot = 'header') =>
   h(
     'a',
-    api.isDemo ? { class: 'brand', href: '/', 'aria-label': t('demo.home') } : { class: 'brand', href: '#/' },
-    face(),
+    api.isDemo
+      ? { class: 'brand', href: '/', 'aria-label': t('demo.home') }
+      : { class: 'brand', href: '#/', onclick: () => react('tongue') },
+    face('brand-mark', slot),
     h('span', { class: 'brand-text' }, 'HappyX'),
     // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
     api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
@@ -587,6 +590,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   // A default period without answers, when this week has some (a new server, early in the
@@ -918,6 +922,9 @@ function fill(pct: number, warm = false) {
   return el
 }
 
+// Clicks on kudos make the logo react, alternating a kiss and a happy hop.
+let kudoClicks = 0
+
 function kudosCard(k: api.KudosSummary) {
   return h(
     'section',
@@ -950,7 +957,7 @@ function kudosCard(k: api.KudosSummary) {
       )
       kudo.addEventListener('click', (e) => {
         confetti(e.clientX, e.clientY)
-        react('happy')
+        react(kudoClicks++ % 2 ? 'happy' : 'kiss')
       })
       return kudo
     }),
@@ -1055,6 +1062,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   body.removeAttribute('aria-busy')
@@ -1488,6 +1496,7 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
       return
     }
     body.replaceChildren(errorCard(err))
+    body.removeAttribute('aria-busy')
     return
   }
   subtitle.textContent = t('game.subtitle', { guild: board.name })

@@ -6,7 +6,7 @@
 
 import { s } from './dom'
 
-export type Mood = 'happy' | 'proud'
+export type Mood = 'happy' | 'proud' | 'kiss' | 'tongue'
 
 // What the page tells the face. Anything can send it: react('happy').
 export const react = (mood: Mood) => document.dispatchEvent(new CustomEvent<Mood>('happyx:mood', { detail: mood }))
@@ -21,17 +21,20 @@ type Pose = {
   smile: number // depth of the smile curve
   open: number // extra depth of the lower lip: 0 is the plain line of the icon
   ly: number // the up/down part of the look alone, without hops, nods or the doze
+  tongue: number // how far the tongue is out, 0 to 1
+  mx: number // sideways shift of the mouth, for a pucker or a «hmm» to one side
 }
-const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly']
-const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0 }
-const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0 }
-const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open'])
+const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly', 'tongue', 'mx']
+const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0, tongue: 0, mx: 0 }
+const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0, tongue: 0, mx: 0 }
+const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open', 'tongue', 'mx'])
 
 // How far the glasses may travel towards the pointer: about two pixels at 28 px, enough to read
 // where the face looks. Chosen by eye over a smaller travel that nobody noticed.
 const reach = { x: 4.2, y: 2.6 }
 const sleepAfter = 120_000
 const glanceAfter = 20_000
+const thinkAfter = 600
 
 // Springs, one per part, so the parts don't move as one block: the glasses trail the look with a
 // small overshoot, the mouth is quicker, the lens shine lags behind the glasses.
@@ -56,6 +59,8 @@ type Face = {
   shade: SVGCircleElement // the orange rim behind the face
   light: SVGRadialGradientElement // the face's highlight
   mouth: SVGPathElement
+  tongue: SVGPathElement
+  heart: SVGPathElement
   pose: Pose
   speed: Pose
   shineAt: { x: number; y: number; vx: number; vy: number }
@@ -71,7 +76,20 @@ let uid = 0
 const lensPath =
   'M7.6 21.6h48.8v3.6l-1.4.6c-.4 4.6-1.6 8.6-4.8 10.6-3.4 2-8.6 1.8-11.6-.8-1.8-1.6-2.6-4-3.6-6.2-.8-1.6-1.8-2-3-2s-2.2.4-3 2c-1 2.2-1.8 4.6-3.6 6.2-3 2.6-8.2 2.8-11.6.8-3.2-2-4.4-6-4.8-10.6l-1.4-.6z'
 
-export function face(cls = 'brand-mark'): SVGSVGElement {
+// Each page render builds a new header. Passing a slot ('header', 'footer') hands back the same
+// face as last time, so an animation that started on a click (the tongue on the way to the home
+// page) carries on in the new header instead of restarting from the icon.
+const kept = new Map<string, Face>()
+
+export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
+  const old = slot ? kept.get(slot) : undefined
+  if (old) {
+    old.center = null
+    old.hover = false
+    faces.add(old)
+    wake()
+    return old.svg
+  }
   const id = `face-${++uid}`
   const shineOf = (d: string) => s('path', { d, stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
   const shine = [shineOf('M13.4 27.6c.4-1.6 1.6-2.6 3-2.6'), shineOf('M43.4 27.6c.4-1.6 1.6-2.6 3-2.6')]
@@ -90,6 +108,18 @@ export function face(cls = 'brand-mark'): SVGSVGElement {
     s('stop', { offset: 1, 'stop-color': '#f7b51c' }),
   )
   const mouth = s('path', { d: mouthPath(rest), stroke: '#352310', 'stroke-width': 2.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' })
+  // Drawn in the icon's own manner: a flat fill with the same dark outline.
+  const tongue = s('path', { d: '', fill: '#f2577a', stroke: '#352310', 'stroke-width': 2, 'stroke-linejoin': 'round', visibility: 'hidden' })
+  const heart = s('path', {
+    d: 'M0 3.2C-1.2 2.2-4.4 0-4.4-2c0-1.6 1.2-2.4 2.3-2.4 1 0 1.7.6 2.1 1.3.4-.7 1.1-1.3 2.1-1.3 1.1 0 2.3.8 2.3 2.4 0 2-3.2 4.2-4.4 5.2z',
+    fill: '#f43f5e',
+    // Outlined like the rest of the icon, or it melts into the violet.
+    stroke: '#352310',
+    'stroke-width': 1.2,
+    'stroke-linejoin': 'round',
+    'paint-order': 'stroke',
+    visibility: 'hidden',
+  })
   const svg = s(
     'svg',
     { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
@@ -107,17 +137,14 @@ export function face(cls = 'brand-mark'): SVGSVGElement {
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: `url(#${id})` }),
     glasses,
     mouth,
+    tongue,
+    heart,
   )
-  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
   faces.add(f)
+  if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
   svg.addEventListener('pointerleave', () => setHover(f, false))
-  // Keyboard focus on the logo's link smiles like the pointer does.
-  queueMicrotask(() => {
-    const link = svg.closest('a')
-    link?.addEventListener('focusin', () => setHover(f, true))
-    link?.addEventListener('focusout', () => setHover(f, false))
-  })
   start()
   return svg
 }
@@ -145,6 +172,7 @@ let started = false
 let pointer: { x: number; y: number } | null = null
 let lastInput = 0
 let mood: { name: Mood; at: number } | null = null
+let busySince = 0 // when the page started loading, 0 when it isn't
 let glance: { dir: number; at: number } | null = null
 let woke = -1e9 // when the face last woke from a doze, for its little start
 let asleep = false
@@ -153,7 +181,7 @@ let timer = 0
 let last = 0
 let acc = 0
 
-const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400 }
+const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400, kiss: 1800, tongue: 1100 }
 
 function start() {
   if (started) return
@@ -175,6 +203,9 @@ function start() {
     input()
   }, { passive: true })
   addEventListener('resize', () => faces.forEach((f) => (f.center = null)))
+  // Keyboard focus on the logo's link smiles like the pointer does.
+  document.addEventListener('focusin', (e) => faces.forEach((f) => (e.target as Element).contains?.(f.svg) && setHover(f, true)))
+  document.addEventListener('focusout', (e) => faces.forEach((f) => (e.target as Element).contains?.(f.svg) && setHover(f, false)))
   // The pointer left the window: look ahead again.
   document.addEventListener('pointerout', (e) => {
     if (!e.relatedTarget) {
@@ -195,6 +226,14 @@ function start() {
     wake()
   })
   document.addEventListener('visibilitychange', () => !document.hidden && wake())
+  // While a page is loading (it marks itself aria-busy) the face thinks.
+  const watchBusy = () => {
+    const now = !!document.querySelector('main [aria-busy="true"]')
+    if (now === !!busySince) return
+    busySince = now ? performance.now() : 0
+    wake()
+  }
+  new MutationObserver(watchBusy).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
   reducedMotion?.addEventListener('change', wake)
   wake()
 }
@@ -210,10 +249,11 @@ function wake() {
 }
 
 // Where each face wants to be right now.
-function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: number; shine: number } {
+function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: number; shine: number; heart: number } {
   const p = { ...rest }
   let glint = 0
   let shine = 1
+  let heart = -1 // where the kiss's heart is on its way up, 0 to 1; -1 none
   const quiet = now - lastInput
   // On a phone the face looks at a tap for a few seconds, then ahead again.
   if (pointer && (!touchOnly() || quiet < 3000)) {
@@ -249,6 +289,16 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
     p.gx = glance.dir * 2
     p.gy = p.ly = 0.6
   }
+  // Thinking while the page loads: after a wait (quick loads show nothing), it looks up to one side,
+  // holds, then the other, with a flat «hmm» mouth pulled to the side it looks at.
+  const thinking = busySince && now - busySince > thinkAfter && !mood
+  if (thinking) {
+    const side = Math.floor((now - busySince - thinkAfter) / 1400) % 2 ? -1 : 1
+    p.gx = side * 0.7 * reach.x
+    p.gy = p.ly = -0.8 * reach.y
+    p.tilt = 3 * side
+    Object.assign(p, { mouthW: 6, mouthY: 41.4, smile: 0.8, mx: 1.5 * side })
+  }
   // Woken up: a quick start upwards.
   if (now - woke < 120) {
     p.gy = -1.2
@@ -266,6 +316,24 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
       if (t > 120 && t < 400) glint = 4 * easeInOut((t - 120) / 280)
       if (t > 330 && t < 400) shine = 1 - (t - 330) / 70
       else if (t >= 400 && t < 550) shine = (t - 400) / 150
+    } else if (mood.name === 'kiss') {
+      // A kiss: it leans in, puckers to one side, and lets go of a little heart with a «muac»,
+      // back to its smile as the heart floats up.
+      if (t > 120 && t < 500) Object.assign(p, { mouthW: 2.2, mouthY: 41.6, smile: -0.4, open: 2.2, mx: 1.5 })
+      if (t > 120 && t < 900) {
+        p.tilt -= 4
+        p.gy -= 0.6
+      }
+      if (t > 450 && t < 1650) heart = (t - 450) / 1200
+    } else if (mood.name === 'tongue') {
+      // Cheeky: the mouth closes up for a beat, then opens and the tongue pops out to one side with
+      // a head tilt, and back in.
+      if (t < 90) Object.assign(p, { mouthW: 9, smile: 3 })
+      else if (t < 850) Object.assign(p, { mouthW: 10.5, mouthY: 40.6, smile: 4.6, open: 1 })
+      if (t > 110 && t < 750) {
+        p.tongue = 1
+        p.tilt += 5
+      }
     } else {
       // Proud: two little nods (down only, tipping one way then the other), then a broad smile.
       if (t < 700) {
@@ -275,7 +343,7 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
       if (t > 600) Object.assign(p, { mouthW: 12.4, mouthY: 40, smile: 7 })
     }
   }
-  return { pose: p, doze, glint, shine }
+  return { pose: p, doze, glint, shine, heart }
 }
 
 // Less motion asked for: the plain icon, drawn once, no frames.
@@ -290,7 +358,7 @@ function still() {
     f.pose = { ...rest }
     f.speed = { ...zero }
     f.shineAt = { x: 0, y: 0, vx: 0, vy: 0 }
-    draw(f, 0, 1)
+    draw(f, 0, 1, -1)
   }
 }
 
@@ -318,7 +386,7 @@ function frame(ts: number) {
       continue
     }
     f.still = false
-    const { pose: goal, doze, glint, shine } = target(f, now)
+    const { pose: goal, doze, glint, shine, heart } = target(f, now)
     dozing ||= doze
     for (let i = 0; i < steps; i++) {
       for (const k of keys) {
@@ -337,11 +405,12 @@ function frame(ts: number) {
     }
     for (const k of keys) if (Math.abs(goal[k] - f.pose[k]) > 0.01 || Math.abs(f.speed[k]) > 0.01) moving = true
     if (Math.abs(f.shineAt.vx) > 0.005 || Math.abs(f.shineAt.vy) > 0.005 || glint) moving = true
-    draw(f, glint, shine)
+    if (heart >= 0) moving = true
+    draw(f, glint, shine, heart)
   }
   asleep = dozing
   const quiet = now - lastInput
-  const timed = mood || now - woke < 200 || (glance && now - glance.at < 800) || (dozing && quiet - sleepAfter < 3000)
+  const timed = mood || busySince || now - woke < 200 || (glance && now - glance.at < 800) || (dozing && quiet - sleepAfter < 3000)
   if (moving || timed) {
     raf = requestAnimationFrame(frame)
     return
@@ -352,7 +421,7 @@ function frame(ts: number) {
   if (next.length) timer = window.setTimeout(wake, Math.min(...next) + 20)
 }
 
-function draw(f: Face, glint: number, shine: number) {
+function draw(f: Face, glint: number, shine: number, heart: number) {
   const p = f.pose
   // A head turn, faked. r is how far the face looks sideways (-1 left … 1 right, up to ±1.2 while
   // a spring overshoots), v the same up and down.
@@ -381,9 +450,26 @@ function draw(f: Face, glint: number, shine: number) {
   }
   // Depth: the mouth goes round with the head (a bit less than the bridge) and narrows as it turns;
   // the light and the rim shadow stay with the room, so against the face they drift the other way.
-  f.mouth.setAttribute('transform', `translate(${f2(0.75 * (p.gx + 2.6 * r))} ${f2(0.6 * p.ly)})`)
+  f.mouth.setAttribute('transform', `translate(${f2(0.75 * (p.gx + 2.6 * r) + p.mx)} ${f2(0.6 * p.ly)})`)
   f.mouth.setAttribute('d', mouthPath({ ...p, mouthW: p.mouthW * (1 - 0.08 * Math.abs(r)) }))
   f.mouth.setAttribute('fill', p.open < 0.05 ? 'none' : '#352310')
+  // The tongue hangs from just inside the lower lip, wherever the mouth is.
+  if (p.tongue > 0.05) {
+    const y0 = p.mouthY + 0.75 * (p.smile + p.open * 1.6) - 1.4
+    const len = Math.max(3.6, 7.5 * p.tongue)
+    f.tongue.setAttribute('d', `M29.9 ${f2(y0)}v${f2(len - 3.6)}a3.6 3.6 0 0 0 7.2 0v${f2(3.6 - len)}z`)
+    f.tongue.setAttribute('transform', f.mouth.getAttribute('transform')!)
+    f.tongue.setAttribute('visibility', 'visible')
+  } else f.tongue.setAttribute('visibility', 'hidden')
+  // The heart leaves the lips and rises to the top right, swaying, and fades at the end.
+  if (heart >= 0) {
+    const e = 1 - (1 - heart) ** 2
+    const x = 34 + 16 * e + Math.sin(heart * Math.PI * 3) * 1.2
+    const y = 40 - 25 * e
+    f.heart.setAttribute('transform', `translate(${f2(x)} ${f2(y)}) scale(${f2(0.6 + 0.7 * Math.min(1, heart * 3))})`)
+    f.heart.setAttribute('opacity', f2(heart < 0.6 ? 1 : (1 - heart) / 0.4))
+    f.heart.setAttribute('visibility', 'visible')
+  } else f.heart.setAttribute('visibility', 'hidden')
   f.light.setAttribute('cx', f2(0.42 - 0.05 * r))
   f.light.setAttribute('cy', f2(0.35 - 0.03 * v))
   f.shade.setAttribute('cx', f2(32.8 - 0.3 * r))
