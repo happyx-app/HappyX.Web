@@ -103,7 +103,7 @@ type Face = {
   swirl: { sum: number; at: number; a: number } // the pointer circling round it
   lastZ: number // when the last «z» left it while asleep
   eyesD: string // the eyes' path as drawn, to change it only when the wink changes
-  hat: SVGGElement | null // a seasonal hat, December only
+  hat: SVGGElement[] // a winter hat in winter: its crown under the glasses, its ear flaps over them
 }
 
 // A face out of its square. (x, y) is its centre on the screen; speeds are in pixels per step.
@@ -194,7 +194,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   const starPath = 'M0-5.6L1.6-1.9 5.4-1.7 2.5.8 3.4 4.6 0 2.5-3.4 4.6-2.5.8-5.4-1.7-1.6-1.9z'
   const starEyes = [0, 1].map(() => s('path', { d: starPath, fill: '#f97316', stroke: '#352310', 'stroke-width': 2.2, 'stroke-linejoin': 'round', 'paint-order': 'stroke', visibility: 'hidden' }))
   const bg = s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' })
-  const hat = new Date().getMonth() === 11 ? santaHat() : null
+  const hat = [11, 0, 1].includes(new Date().getMonth()) ? winterHat() : []
   const svg = s(
     'svg',
     { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
@@ -211,11 +211,12 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     shade,
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: `url(#${id})` }),
     // Under the glasses, so glasses pushed up rest on its brim.
-    ...(hat ? [hat] : []),
+    ...hat.slice(0, 1),
     eyes,
     ...spirals,
     ...starEyes,
     glasses,
+    ...hat.slice(1),
     mouth,
     tongue,
     heart,
@@ -239,17 +240,30 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   return svg
 }
 
-// December: a Christmas hat, drawn like the icon (flat colours, dark outline), tipped to one side.
+// December to February: a knitted winter hat with ear flaps, for every team whatever it celebrates.
+// Drawn like the icon (flat colours, dark outline). The crown sits on top of the head, so glasses
+// pushed up rest on its band; the ear flaps hang over the ends of the glasses, as on a real head.
 // It does not move on its own, so it shows with less motion too.
-function santaHat() {
+export function winterHat(): SVGGElement[] {
   const line = { stroke: '#352310', 'stroke-width': 1.8, 'stroke-linejoin': 'round' as const }
-  return s(
+  const knit = '#14a39a'
+  const wool = '#fbf7ee'
+  const ribs = Array.from({ length: 9 }, (_, i) => `M${15 + i * 4.25} 14.2v2.6`).join('')
+  const crown = s(
     'g',
-    { transform: 'translate(0 1.5)' },
-    s('path', { d: 'M15.5 13.5C17 4 29-1.5 39 .5c6.5 1.3 10 5.6 11.8 11.2L46 13z', fill: '#e5322d', ...line }),
-    s('rect', { x: 13, y: 9.2, width: 36, height: 7, rx: 3.5, fill: '#fbfaf7', transform: 'rotate(5 31 12.7)', ...line }),
-    s('circle', { cx: 51.6, cy: 13.6, r: 3.6, fill: '#fbfaf7', ...line }),
+    {},
+    s('path', { d: 'M12.6 14.6C12.6 6.6 21.2 2.8 32 2.8s19.4 3.8 19.4 11.8z', fill: knit, ...line }),
+    s('rect', { x: 11, y: 12.4, width: 42, height: 6.2, rx: 3.1, fill: wool, ...line }),
+    s('path', { d: ribs, stroke: '#352310', 'stroke-width': 0.9, 'stroke-linecap': 'round', opacity: 0.35 }),
+    s('circle', { cx: 32, cy: 3.6, r: 3.6, fill: wool, ...line }),
   )
+  const flaps = s(
+    'g',
+    {},
+    s('path', { d: 'M12.4 18.2L6.6 29.6q-1 4.6 3.2 4.6 2.6 0 3.8-3l3.4-12.6z', fill: knit, ...line }),
+    s('path', { d: 'M51.6 18.2l5.8 11.4q1 4.6-3.2 4.6-2.6 0-3.8-3L47 18.6z', fill: knit, ...line }),
+  )
+  return [crown, flaps]
 }
 
 function setHover(f: Face, on: boolean) {
@@ -1044,7 +1058,7 @@ function draw(f: Face, glint: number, shine: number, heart: number) {
     } else st.setAttribute('visibility', 'hidden')
   }
   // The hat sits on the head, so it turns and nods with it a little.
-  f.hat?.setAttribute('transform', `translate(${f2(0.35 * (p.gx + 2.6 * r))} ${f2(0.3 * p.ly)})`)
+  for (const h of f.hat) h.setAttribute('transform', `translate(${f2(0.35 * (p.gx + 2.6 * r))} ${f2(0.3 * p.ly)})`)
   f.light.setAttribute('cx', f2(0.42 - 0.05 * r))
   f.light.setAttribute('cy', f2(0.35 - 0.03 * v))
   f.shade.setAttribute('cx', f2(32.8 - 0.3 * r))
