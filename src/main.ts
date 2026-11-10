@@ -231,21 +231,54 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
       { class: 'user' },
       themeToggle(),
       languagePicker(true),
-      avatar,
-      h('span', { class: 'user-name' }, u.username),
-      api.isDemo
-        ? null
-        : h('button', {
-            class: 'btn btn-ghost', type: 'button',
-            onclick: async () => {
-              await api.logout()
-              me = null
-              location.hash = ''
-              route()
-            },
-          }, t('nav.logout')),
+      // The demo has no account: just who is «logged in».
+      api.isDemo ? h('span', { class: 'user-id' }, avatar, h('span', { class: 'user-name' }, u.username)) : userMenu(avatar, u.username),
     ),
   )
+}
+
+// userMenu groups «Your data» and «Log out» behind the avatar. It works from the keyboard: Esc closes
+// it and gives the focus back to the button; a click outside or a change of page closes it too.
+function userMenu(avatar: HTMLElement, name: string) {
+  const btn = h('button', { class: 'user-btn', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'user-menu', 'aria-label': t('nav.account', { name }) },
+    avatar, h('span', { class: 'user-name' }, name), icons.chevronDown())
+  const logout = h('button', {
+    class: 'user-menu-item', type: 'button',
+    onclick: async () => {
+      await api.logout()
+      me = null
+      location.hash = ''
+      route()
+    },
+  }, icons.logOut(), t('nav.logout'))
+  const menu = h('div', { class: 'user-menu', id: 'user-menu', hidden: true },
+    h('a', { class: 'user-menu-item', href: '#/privacy' }, icons.database(), t('privacy.title')),
+    logout)
+  const wrap = h('div', { class: 'user-wrap' }, btn, menu)
+  const set = (open: boolean) => {
+    menu.hidden = !open
+    btn.setAttribute('aria-expanded', String(open))
+    if (open) {
+      document.addEventListener('pointerdown', outside, true)
+      document.addEventListener('keydown', onKey)
+      window.addEventListener('hashchange', close)
+    } else {
+      document.removeEventListener('pointerdown', outside, true)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('hashchange', close)
+    }
+  }
+  const close = () => set(false)
+  const outside = (e: Event) => { if (!wrap.contains(e.target as Node)) close() }
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return
+    close()
+    btn.focus()
+  }
+  btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'))
+  // Tabbing out of the menu closes it, so it never stays open behind the focus.
+  wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget as Node | null) && e.relatedTarget) close() })
+  return wrap
 }
 
 const shots: Record<string, string> = { 'en-light': panelEnLight, 'en-dark': panelEnDark, 'es-light': panelEsLight, 'es-dark': panelEsDark }
