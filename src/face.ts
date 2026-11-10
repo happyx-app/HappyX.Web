@@ -6,7 +6,7 @@
 
 import { s } from './dom'
 
-export type Mood = 'happy' | 'proud' | 'kiss' | 'tongue'
+export type Mood = 'happy' | 'proud' | 'kiss' | 'tongue' | 'peek' | 'peek-all'
 
 // What the page tells the face. Anything can send it: react('happy').
 export const react = (mood: Mood) => document.dispatchEvent(new CustomEvent<Mood>('happyx:mood', { detail: mood }))
@@ -23,11 +23,13 @@ type Pose = {
   ly: number // the up/down part of the look alone, without hops, nods or the doze
   tongue: number // how far the tongue is out, 0 to 1
   mx: number // sideways shift of the mouth, for a pucker or a «hmm» to one side
+  eyes: number // how much the eyes under the glasses show, 0 to 1
+  brow: number // how far the eyes lift, for a «well, well»
 }
-const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly', 'tongue', 'mx']
-const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0, tongue: 0, mx: 0 }
-const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0, tongue: 0, mx: 0 }
-const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open', 'tongue', 'mx'])
+const keys: (keyof Pose)[] = ['gx', 'gy', 'tilt', 'mouthW', 'mouthY', 'smile', 'open', 'ly', 'tongue', 'mx', 'eyes', 'brow']
+const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0 }
+const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0, tongue: 0, mx: 0, eyes: 0, brow: 0 }
+const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open', 'tongue', 'mx', 'eyes', 'brow'])
 
 // How far the glasses may travel towards the pointer: about two pixels at 28 px, enough to read
 // where the face looks. Chosen by eye over a smaller travel that nobody noticed.
@@ -60,6 +62,7 @@ type Face = {
   light: SVGRadialGradientElement // the face's highlight
   mouth: SVGPathElement
   tongue: SVGPathElement
+  eyes: SVGPathElement
   heart: SVGPathElement
   pose: Pose
   speed: Pose
@@ -99,6 +102,9 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     s('g', {}, s('g', { 'clip-path': `url(#${id}-${i ? 'r' : 'l'})` }, s('path', { d: lensPath, fill: '#352310' }), s('g', { 'clip-path': `url(#${id}-lens)` }, shine[i]))),
   )
   const glasses = s('g', {}, ...halves)
+  // Smiling eyes, «^ ^», in the mouth's stroke, drawn under the lenses. They show only while the
+  // glasses are down the nose in the game's gesture; the rest of the time they are transparent.
+  const eyes = s('path', { d: 'M15.2 25.8q4.3-5 8.6 0M40.2 25.8q4.3-5 8.6 0', stroke: '#352310', 'stroke-width': 2.8, 'stroke-linecap': 'round', fill: 'none', opacity: 0 })
   const shade = s('circle', { cx: 32.8, cy: 33.6, r: 23.6, fill: '#f29a0c' })
   const light = s(
     'radialGradient',
@@ -135,12 +141,13 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' }),
     shade,
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: `url(#${id})` }),
+    eyes,
     glasses,
     mouth,
     tongue,
     heart,
   )
-  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')! }
   faces.add(f)
   if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
@@ -181,7 +188,7 @@ let timer = 0
 let last = 0
 let acc = 0
 
-const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400, kiss: 1800, tongue: 1100 }
+const moodMs: Record<Mood, number> = { happy: 1500, proud: 1400, kiss: 1800, tongue: 1100, peek: 1500, 'peek-all': 2250 }
 
 function start() {
   if (started) return
@@ -316,6 +323,24 @@ function target(f: Face, now: number): { pose: Pose; doze: boolean; glint: numbe
       if (t > 120 && t < 400) glint = 4 * easeInOut((t - 120) / 280)
       if (t > 330 && t < 400) shine = 1 - (t - 330) / 70
       else if (t >= 400 && t < 550) shine = (t - 400) / 150
+    } else if (mood.name === 'peek' || mood.name === 'peek-all') {
+      // You got some right in the game: it lowers its glasses to look at you over them with smiling
+      // eyes that lift a little, then pushes them back up. All right: then a glint and a hop.
+      if (t < 150) p.gy -= 0.6
+      else if (t < 1050) {
+        p.gy = 5.5
+        p.tilt = 0
+        Object.assign(p, { eyes: 1, mouthW: 12, mouthY: 44.8, smile: 6.2 })
+        if (t > 350) p.brow = -1.5
+      }
+      if (mood.name === 'peek-all') {
+        if (t > 1320 && t < 1600) glint = 4 * easeInOut((t - 1320) / 280)
+        if (t > 1530 && t < 1600) shine = 1 - (t - 1530) / 70
+        else if (t >= 1600 && t < 1750) shine = (t - 1600) / 150
+        if (t > 1370 && t < 1460) p.gy += 0.8
+        else if (t >= 1460 && t < 1700) p.gy -= 3 * Math.sin(((t - 1460) / 240) * (Math.PI / 2))
+        if (t > 1370 && t < 2020) Object.assign(p, { mouthW: 12.2, mouthY: 40.2, smile: 6, open: 3.2 })
+      }
     } else if (mood.name === 'kiss') {
       // A kiss: it leans in, puckers to one side, and lets go of a little heart with a «muac»,
       // back to its smile as the heart floats up.
@@ -451,6 +476,10 @@ function draw(f: Face, glint: number, shine: number, heart: number) {
   // Depth: the mouth goes round with the head (a bit less than the bridge) and narrows as it turns;
   // the light and the rim shadow stay with the room, so against the face they drift the other way.
   f.mouth.setAttribute('transform', `translate(${f2(0.75 * (p.gx + 2.6 * r) + p.mx)} ${f2(0.6 * p.ly)})`)
+  f.eyes.setAttribute('transform', `translate(${f2(0.75 * (p.gx + 2.6 * r))} ${f2(0.6 * p.ly + p.brow)})`)
+  // Shown only as far as the glasses are actually down, so no eye floats outside the lenses while
+  // they go up or come back.
+  f.eyes.setAttribute('opacity', f2(clamp(p.eyes, 0, 1) * clamp((p.gy - 1) / 1.5, 0, 1)))
   f.mouth.setAttribute('d', mouthPath({ ...p, mouthW: p.mouthW * (1 - 0.08 * Math.abs(r)) }))
   f.mouth.setAttribute('fill', p.open < 0.05 ? 'none' : '#352310')
   // The tongue hangs from just inside the lower lip, wherever the mouth is.
