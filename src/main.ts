@@ -29,7 +29,7 @@ import reportEn from './landing/report-en.jpg'
 import reportEs from './landing/report-es.jpg'
 import * as survey from './surveyMessage'
 import { confetti } from './confetti'
-import { face, react } from './face'
+import { face, poke, react } from './face'
 import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
@@ -181,7 +181,10 @@ function themeToggle() {
     btn.title = btn.getAttribute('aria-label')!
   }
   btn.addEventListener('click', () => {
-    setTheme(currentTheme() === 'dark' ? 'light' : 'dark')
+    const next = currentTheme() === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    // The logo pushes its sunglasses up in the dark, and puts them back on in the light.
+    react(next === 'dark' ? 'night' : 'day')
     paint()
   })
   paint()
@@ -195,7 +198,7 @@ const brand = (slot = 'header') =>
     'a',
     api.isDemo
       ? { class: 'brand', href: '/', 'aria-label': t('demo.home') }
-      : { class: 'brand', href: '#/', onclick: () => react('tongue') },
+      : { class: 'brand', href: '#/', onclick: () => poke() },
     face('brand-mark', slot),
     h('span', { class: 'brand-text' }, 'HappyX'),
     // On a phone the demo's notice has no room for «Back to HappyX», so the logo says it.
@@ -242,6 +245,8 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
         : h('button', {
             class: 'btn btn-ghost', type: 'button',
             onclick: async () => {
+              // A wink goodbye; the logo carries on in the header of the page that follows.
+              react('wink')
               await api.logout()
               me = null
               location.hash = ''
@@ -954,8 +959,8 @@ function kudosCard(k: api.KudosSummary) {
       )
       kudo.addEventListener('click', (e) => {
         confetti(e.clientX, e.clientY)
-        // The logo blows a kiss.
-        react('kiss')
+        // The logo looks with star eyes («wow»), which reads as praise, not as a kiss.
+        react('starry')
       })
       return kudo
     }),
