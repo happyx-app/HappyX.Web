@@ -248,20 +248,20 @@ export function winterHat(): SVGGElement[] {
   const line = { stroke: '#352310', 'stroke-width': 1.8, 'stroke-linejoin': 'round' as const }
   const knit = '#14a39a'
   const wool = '#fbf7ee'
-  const ribs = Array.from({ length: 9 }, (_, i) => `M${15 + i * 4.25} 14.2v2.6`).join('')
+  const ribs = Array.from({ length: 10 }, (_, i) => `M${12 + i * 4.5} 14.2v4.2`).join('')
   const crown = s(
     'g',
     {},
-    s('path', { d: 'M12.6 14.6C12.6 6.6 21.2 2.8 32 2.8s19.4 3.8 19.4 11.8z', fill: knit, ...line }),
-    s('rect', { x: 11, y: 12.4, width: 42, height: 6.2, rx: 3.1, fill: wool, ...line }),
+    s('path', { d: 'M9.8 15.8C9.8 6.4 19.6 2.6 32 2.6s22.2 3.8 22.2 13.2z', fill: knit, ...line }),
+    s('rect', { x: 7.4, y: 13, width: 49.2, height: 6.6, rx: 3.3, fill: wool, ...line }),
     s('path', { d: ribs, stroke: '#352310', 'stroke-width': 0.9, 'stroke-linecap': 'round', opacity: 0.35 }),
-    s('circle', { cx: 32, cy: 3.6, r: 3.6, fill: wool, ...line }),
+    s('circle', { cx: 32, cy: 4.4, r: 3.4, fill: wool, ...line }),
   )
   const flaps = s(
     'g',
     {},
-    s('path', { d: 'M12.4 18.2L6.6 29.6q-1 4.6 3.2 4.6 2.6 0 3.8-3l3.4-12.6z', fill: knit, ...line }),
-    s('path', { d: 'M51.6 18.2l5.8 11.4q1 4.6-3.2 4.6-2.6 0-3.8-3L47 18.6z', fill: knit, ...line }),
+    s('path', { d: 'M7.8 19.4 4 31q-1 5.6 3.4 5.6 2.2 0 2.6-3.2L9.6 26 15 19.6z', fill: knit, ...line }),
+    s('path', { d: 'M56.2 19.4 60 31q1 5.6-3.4 5.6-2.2 0-2.6-3.2L54.4 26 49 19.6z', fill: knit, ...line }),
   )
   return [crown, flaps]
 }
