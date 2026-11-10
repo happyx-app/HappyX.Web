@@ -27,9 +27,9 @@ const rest: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 11.2, mouthY: 40.8, smile: 5
 const zero: Pose = { gx: 0, gy: 0, tilt: 0, mouthW: 0, mouthY: 0, smile: 0, open: 0, ly: 0 }
 const mouthKeys = new Set<keyof Pose>(['mouthW', 'mouthY', 'smile', 'open'])
 
-// How far the glasses may travel towards the pointer: about a pixel at 28 px, a glance. Less and
-// nobody sees it; more and the bar's overhang past the face turns lopsided.
-const reach = { x: 2.2, y: 1.5 }
+// How far the glasses may travel towards the pointer: about two pixels at 28 px, enough to read
+// where the face looks. Chosen by eye over a smaller travel that nobody noticed.
+const reach = { x: 4.2, y: 2.6 }
 const sleepAfter = 120_000
 const glanceAfter = 20_000
 
@@ -363,7 +363,7 @@ function draw(f: Face, glint: number, shine: number) {
   f.glasses.setAttribute('transform', `translate(${f2(p.gx)} ${f2(p.gy)}) rotate(${f2(p.tilt)} 32 29) translate(0 29) scale(1 ${f2(sy)}) translate(0 -29)`)
   // The bridge moves towards the look; the lens on that side squeezes as it goes round the face,
   // the other stretches a little, and both ends of the bar keep hugging the head.
-  const bridge = 32 + 2.6 * r
+  const bridge = 32 + 3.4 * r
   for (const [i, half] of f.halves.entries()) {
     const side = i ? 1 : -1 // -1 left half, 1 right half
     const outer = side * r > 0 ? bridge + side * 24.4 * (1 - 0.22 * Math.abs(r)) : 32 + side * 24.4 - 1.6 * r
