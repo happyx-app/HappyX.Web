@@ -224,7 +224,7 @@ const en = (): Policy => ({
       ],
     },
     {
-      title: 'Stopping',
+      title: 'Leaving HappyX',
       body: [
         {
           p: [
