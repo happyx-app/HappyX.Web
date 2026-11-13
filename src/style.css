@@ -215,12 +215,10 @@ a { color: var(--accent); }
 @media (min-width: 720px) { .segmented { width: fit-content; } }
 
 .dashboard { display: grid; gap: 20px; }
-/* Another period on the way: the figures on screen stay, dimmed only if it takes a while. */
-.dashboard[aria-busy='true']:not(:has(> .skeleton)) { opacity: 0.6; }
-@media (prefers-reduced-motion: no-preference) {
-  .dashboard { transition: opacity 150ms ease-out; }
-  .dashboard[aria-busy='true'] { transition-delay: 300ms; }
-}
+/* The next page or period on its way: the page on screen stays, dimmed only if it takes a while
+   (the delay), and stays usable: another click simply asks for something newer. */
+main[aria-busy='true'] { opacity: 0.6; transition: opacity 150ms ease-out 300ms; }
+@media (prefers-reduced-motion: reduce) { main[aria-busy='true'] { transition: none; opacity: 0.8; } }
 .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .stat { gap: 4px; margin: 0; }
 .stat dd { margin-left: 0; }
@@ -908,11 +906,16 @@ h1 { font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem); }
 /* «natural-interactions»: hover, press and focus each look different; focus is an outline with
    an offset (kept by forced colours), never only a shadow. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* A heading takes focus only so that reading starts there after moving to another page; it is
+   not a control, so no ring. */
+:where(h1, main)[tabindex='-1']:focus { outline: none; }
+/* Pressed links and buttons show their own :active state; no grey box from the browser on top. */
+:root { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: no-preference) {
   :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn) { transition: background-color 150ms ease-out, box-shadow 150ms ease-out, scale 150ms ease-out; }
   /* These animate hover and press, not a theme change or a new page: while a view transition
      cross-fades the whole page, they jump, so nothing lags behind the fade. */
-  :active-view-transition :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn, .dashboard) { transition: none; }
+  :active-view-transition :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn) { transition: none; }
   :where(.btn, .account-btn):active { scale: 0.97; }
 }
 .btn:hover { box-shadow: 0 2px 8px rgb(20 20 30 / 0.12); }

@@ -145,8 +145,12 @@ function page(...children: (Node | null)[]): Promise<boolean> {
     mount([...skipLink(nodes), ...nodes], !newPage && !first)
     for (const [bar, section] of marks) markSection(bar, section)
     stickUnderTopbar()
+    // From now on, scrolling belongs to the history entry whose page is drawn (another period of
+    // the same page is an entry of its own too).
+    drawnKey = entryKey()
     if (newPage) {
-      window.scrollTo(0, 0)
+      // Back or forward to a page seen before: where the reader left it. A link: the top.
+      window.scrollTo(0, scrollOf.get(drawnKey) ?? 0)
       // «accessibility»: after moving to another page, focus starts at its heading. A caller that
       // has a better place (a control a link pointed at) moves it there once the promise settles.
       const h1 = app.querySelector<HTMLElement>('main h1')
@@ -157,12 +161,30 @@ function page(...children: (Node | null)[]): Promise<boolean> {
     }
     setTitle(app.querySelector('main h1')?.textContent)
   }
-  // A new page cross-fades in. New data on the same page (another period, a reload after saving)
-  // just appears, where the reader already is.
-  if (newPage) return crossFade(update).then(() => drawn)
-  update()
-  return Promise.resolve(drawn)
+  // The first page just appears. Every later one, a new page or new data on the same page
+  // (another period), cross-fades in as a whole.
+  if (first) {
+    update()
+    return Promise.resolve(drawn)
+  }
+  return crossFade(update).then(() => drawn)
 }
+
+// Each history entry gets a key of its own (two entries can share a URL), and the scroll position
+// is remembered per key, so back and forward return to where the reader was.
+const scrollOf = new Map<string, number>()
+// The entry whose page is on screen: scrolling belongs to it, not to an entry whose page is
+// still loading.
+let drawnKey: string | null = null
+function entryKey(): string {
+  const state = history.state as { key?: string } | null
+  if (state?.key) return state.key
+  const key = crypto.randomUUID()
+  history.replaceState({ ...state, key }, '')
+  return key
+}
+history.scrollRestoration = 'manual'
+addEventListener('scroll', () => drawnKey && scrollOf.set(drawnKey, scrollY), { passive: true })
 
 // Shell parts (the top bar, the footer) that a render hands back unchanged are already on the
 // page: they stay where they are and only the rest is replaced. Nothing in them is rebuilt, so
@@ -371,7 +393,17 @@ function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolea
       // outside close it, and focus moves into it (to the radio with autofocus).
       h(
         'dialog',
-        { id: 'account-menu', class: 'account-menu', popover: 'auto', 'aria-labelledby': 'account-who' },
+        {
+          id: 'account-menu', class: 'account-menu', popover: 'auto', 'aria-labelledby': 'account-who',
+          // Light dismiss covers clicks and Esc, not Tab: leaving it with the keyboard closes it
+          // too, so focus never sits on something the menu covers.
+          onfocusout: (e: Event) => {
+            const menu = e.currentTarget as HTMLElement
+            const to = (e as FocusEvent).relatedTarget as Node | null
+            // The button toggles it by itself; focus going there is not leaving.
+            if (to && !menu.contains(to) && !(to instanceof Element && to.matches(`[popovertarget="${menu.id}"]`))) menu.hidePopover()
+          },
+        },
         h('p', { class: 'account-who' }, h('strong', { id: 'account-who' }, u.username), h('span', { class: 'muted small' }, t('account.via'))),
         themeField(),
         languageField(),
@@ -671,6 +703,9 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
   )
 }
 
+// The period last chosen on each server's dashboard, for links back to it.
+const periodOf = new Map<string, Preset>()
+
 async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = true) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
@@ -679,8 +714,18 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
     return
   }
+  if (chosen) periodOf.set(guildID, preset)
   const range = rangeFor(preset, todayIn(g.timezone))
-  const { body, show: showData } = dataArea(`guild-${guildID}`, 'dashboard')
+  const before = previousRange(range, preset)
+  // The period before only adds comparisons, and older APIs have no health: the dashboard still
+  // shows without them.
+  const loading = Promise.all([
+    api.report(guildID, range.from, range.to),
+    api.report(guildID, before.from, before.to).catch(() => null),
+    api.health(guildID).catch(() => null),
+  ])
+  await whileLoading(loading)
+  const { body, show: showData } = dataArea()
   const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
     // Links, so a <nav> (not tabs: «tabs» says never for page navigation). One row that scrolls
@@ -715,18 +760,11 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   // into view on a phone; older browsers get the same from script.
   if (!CSS.supports('scroll-initial-target', 'nearest')) void shown.then((drawn) => drawn && picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
 
-  const before = previousRange(range, preset)
   let r: api.Report
   let prev: api.Report | null
-  // Older APIs don't have it; the dashboard just leaves that card out.
   let health: api.Health | null
   try {
-    // The period before only adds comparisons, so the dashboard still shows without it.
-    ;[r, prev, health] = await Promise.all([
-      api.report(guildID, range.from, range.to),
-      api.report(guildID, before.from, before.to).catch(() => null),
-      api.health(guildID).catch(() => null),
-    ])
+    ;[r, prev, health] = await loading
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     showData(errorCard(err))
@@ -1174,16 +1212,16 @@ function surveyOffCard(m: api.Me) {
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
-  const { body, show: showData } = dataArea('me', 'me')
-  const myGamesSlot = h('div', { class: 'dashboard' })
+  const moods = api.myMoods(range.from, range.to)
   // Your game score is extra: if it fails to load, the rest of the page still works.
-  api
-    .myGames(range.from, range.to)
-    .then((r) => {
-      const played = r.guilds.filter((g) => g.weeks.some((w) => w.guesses > 0))
-      myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
-    })
-    .catch(() => {})
+  const games = api.myGames(range.from, range.to).catch(() => null)
+  await whileLoading(Promise.all([moods, games]))
+  const { body, show: showData } = dataArea('me')
+  const myGamesSlot = h('div', { class: 'dashboard' })
+  void games.then((r) => {
+    const played = r ? r.guilds.filter((g) => g.weeks.some((w) => w.guesses > 0)) : []
+    myGamesSlot.replaceChildren(...played.map((g) => myGamesCard(g, played.length > 1)))
+  })
   const dates = h('p', { class: 'me-dates' }, nowrap(formatRange(range.from, range.to)))
   const periods = h(
     'div',
@@ -1210,7 +1248,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
 
   let data: api.MyMoods
   try {
-    data = await api.myMoods(range.from, range.to)
+    data = await moods
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     showData(errorCard(err))
@@ -1374,7 +1412,9 @@ async function renderSettings(m: api.Me, guildID: string, focus: string | null =
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
     return
   }
-  const back = h('a', { class: 'back', href: `#/g/${guildID}` }, `← ${t('settings.back')}`)
+  // Back to the charts as they were left: the same period.
+  const period = periodOf.get(guildID)
+  const back = h('a', { class: 'back', href: `#/g/${guildID}${period ? `?p=${period}` : ''}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
     page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
     return
@@ -1626,6 +1666,8 @@ function renderGames(m: api.Me) {
 
 async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
+  const loading = api.game(guildID)
+  await whileLoading(loading)
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('game'))
   const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
   page(
@@ -1640,7 +1682,7 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   )
   let board: api.GameBoard
   try {
-    board = await api.game(guildID)
+    board = await loading
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     if (err instanceof api.NotFound) {
@@ -1757,21 +1799,29 @@ function messagesCard(r: api.Report) {
   return { card, show, showDays, countIn }
 }
 
-// The part of a page that shows loaded data. Opened again for other data (another period), it
-// keeps what is on screen, dimmed only if loading takes a while, until the new content
-// cross-fades in: no skeleton in between. The first time, it starts with a skeleton.
-function dataArea(key: string, shape: 'dashboard' | 'me' | 'game') {
-  const onScreen = [...app.querySelectorAll<HTMLElement>('.dashboard[data-area]')].find((el) => el.dataset.area === key)
-  // What stays on screen is out of date: it can't be used until the new content replaces it.
-  const body = h('div', { class: 'dashboard', 'data-area': key, 'aria-busy': 'true', inert: onScreen ? true : undefined }, ...(onScreen ? [...onScreen.childNodes] : [skeleton(shape)]))
+// Moving on from a page that is on screen: it stays, marked busy (and dimmed if this takes a
+// while), until the next page's data is in, so the next page is drawn once, complete, in one
+// fade, with no skeleton in between. On the first load nothing is on screen: the page draws its
+// skeleton and fills it in.
+let loads = 0
+async function whileLoading(data: Promise<unknown>) {
+  const main = app.querySelector('main')
+  if (!main) return
+  loads++
+  main.setAttribute('aria-busy', 'true')
+  await data.then(() => {}, () => {})
+  if (--loads === 0) main.removeAttribute('aria-busy')
+}
+
+// The part of a page that shows loaded data. Data that is already in (see whileLoading) goes in
+// before the page is drawn; data that comes later replaces the skeleton with a cross-fade.
+function dataArea(shape: 'dashboard' | 'me' = 'dashboard') {
+  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton(shape))
   const show = (...nodes: Node[]) => {
     const swap = () => {
       body.replaceChildren(...nodes)
       body.removeAttribute('aria-busy')
-      body.inert = false
     }
-    // Still on its way in (the page fade hasn't drawn it yet): the page arrives with the data,
-    // no skeleton. Already on screen: cross-fade from what it shows.
     if (body.isConnected) void crossFade(swap)
     else swap()
   }

@@ -584,7 +584,7 @@ function start() {
   document.addEventListener('visibilitychange', () => !document.hidden && wake())
   // While a page is loading (it marks itself aria-busy) the face thinks.
   const watchBusy = () => {
-    const now = !!document.querySelector('main [aria-busy="true"]')
+    const now = !!document.querySelector('main[aria-busy="true"], main [aria-busy="true"]')
     if (now === !!busySince) return
     busySince = now ? performance.now() : 0
     wake()
