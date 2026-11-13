@@ -179,7 +179,7 @@ a { color: var(--accent); }
 .feature-list li { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--border); }
 .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .checks li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; color: var(--ink-2); }
-.checks li::before { content: '✓'; color: var(--accent); font-weight: 800; }
+.checks li::before { content: '✓'; content: '✓' / ''; color: var(--accent); font-weight: 800; }
 .landing .checks li { font-size: 1rem; }
 .checks.privacy { gap: 12px; }
 .cta { display: grid; gap: 8px; justify-items: center; text-align: center; padding: 48px 24px; border-radius: var(--radius); background: var(--insight); border: 1px solid var(--card-border); }
@@ -1099,9 +1099,9 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .health-card[open] > summary::after { rotate: 225deg; translate: 0 -25%; }
 .health-sum-title { font-family: var(--display); font-weight: 800; font-size: 1.1875rem; }
 .health-sum-state { font-size: 0.875rem; font-weight: 700; color: var(--up); }
-.health-sum-state::before { content: '✓ '; }
+.health-sum-state::before { content: '✓ '; content: '✓ ' / ''; }
 .health-sum-state.todo { color: var(--down); }
-.health-sum-state.todo::before { content: '○ '; }
+.health-sum-state.todo::before { content: '○ '; content: '○ ' / ''; }
 .health-sum-next { flex-basis: 100%; }
 
 /* Landing: «card» features, the report as a <figure>. */
