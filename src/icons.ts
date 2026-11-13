@@ -39,3 +39,7 @@ export const inline = (i: Icon) => {
   el.classList.add('icon-inline')
   return el
 }
+
+export const chevron: Icon = () => icon(path('M6 9l6 6 6-6'))
+
+export const logout: Icon = () => icon(path('M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'), path('M16 17l5-5-5-5'), path('M21 12H9'))

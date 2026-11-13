@@ -15,7 +15,8 @@ import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { policyPage } from './policy'
 import { termsPage } from './terms'
-import { applySavedTheme, currentTheme, setTheme } from './theme'
+import { applySavedTheme, currentTheme, savedTheme, setTheme, type ThemeChoice } from './theme'
+import { hideBarOnScroll, loadPolyfills, setTitle, swapPage, toggletip } from './platform'
 import logoURL from './logo.svg'
 import panelEnLight from './landing/panel-en-light.jpg'
 import panelEnDark from './landing/panel-en-dark.jpg'
@@ -48,6 +49,10 @@ import { reloadCanvas, showCanvas } from './canvas'
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
 applySavedTheme()
+void loadPolyfills()
+hideBarOnScroll()
+// Set on in-app navigation, so the new page's heading takes focus (not on the first load).
+let navigated = false
 if (api.isDemo) document.title = `HappyX · ${t('demo.label')}`
 let me: api.Me | null = null
 
@@ -116,8 +121,13 @@ function page(...children: (Node | null)[]) {
   if (api.isDemo && nodes[0] instanceof HTMLElement && nodes[0].classList.contains('topbar')) {
     nodes[0] = h('div', { class: 'demo-head' }, demoBanner(), nodes[0])
   }
-  app.replaceChildren(...skipLink(nodes), ...nodes, ...(me && !api.isDemo ? [footer()] : []))
-  window.scrollTo(0, 0)
+  const focus = navigated
+  navigated = false
+  swapPage(() => {
+    app.replaceChildren(...skipLink(nodes), ...nodes, ...(me && !api.isDemo ? [footer()] : []))
+    window.scrollTo(0, 0)
+    setTitle(app.querySelector('main h1')?.textContent)
+  }, focus)
 }
 
 // The first Tab stop jumps past the top bar to the page's main content. It moves focus by hand:
@@ -159,34 +169,42 @@ const footer = () =>
   )
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
+// The language picker lives here, not in the top bar: «content-first-noise-reduction» keeps the
+// bar to one compact row, and the page already follows the browser's language.
 const landingFooter = () =>
-  h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())))
+  h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())), languageField())
 
-// The top bar shows short codes so it still fits on a phone.
-function languagePicker(short = false) {
+// A labelled language picker (a visible <label>, not just aria-label).
+function languageField() {
+  const id = `lang-${Math.random().toString(36).slice(2, 8)}`
   return h(
-    'select',
-    { class: 'lang-picker', 'aria-label': t('nav.language'), onchange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value) },
-    ...languages.map(([code, name]) => h('option', { value: code, selected: code === lang }, short ? code.toUpperCase() : name)),
+    'span',
+    { class: 'lang-field' },
+    h('label', { for: id }, t('nav.language')),
+    h(
+      'select',
+      { id, class: 'lang-picker', onchange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value) },
+      ...languages.map(([code, name]) => h('option', { value: code, selected: code === lang }, name)),
+    ),
   )
 }
 
-// Shows the mode it switches to, like most theme buttons.
-function themeToggle() {
-  const btn = h('button', { class: 'btn btn-ghost icon-btn theme-toggle', type: 'button' })
-  const paint = () => {
-    const next = currentTheme() === 'dark' ? 'light' : 'dark'
-    btn.replaceChildren(next === 'dark' ? icons.moon() : icons.sun())
-    btn.setAttribute('aria-label', t(next === 'dark' ? 'nav.theme.dark' : 'nav.theme.light'))
-    btn.title = btn.getAttribute('aria-label')!
-  }
-  btn.addEventListener('click', () => {
-    setTheme(currentTheme() === 'dark' ? 'light' : 'dark')
-    paint()
+// «dark-mode-toggle»: no persistent toggle in the bar. In the account menu (a settings surface),
+// three explicit choices; «System» says what the system is using right now.
+function themeField() {
+  const now = savedTheme()
+  const option = (value: ThemeChoice, label: string) =>
+    h('label', { class: 'choice' }, h('input', { type: 'radio', name: 'theme', value, checked: value === now, onchange: () => setTheme(value) }), h('span', {}, label))
+  const systemNow = () => t('theme.system.now', { mode: t(matchMedia('(prefers-color-scheme: dark)').matches ? 'theme.dark' : 'theme.light').toLowerCase() })
+  const sys = option('system', systemNow())
+  addEventListener('storage', (e) => {
+    if (e.key !== 'happyx.theme') return
+    for (const r of document.querySelectorAll<HTMLInputElement>('input[name="theme"]')) r.checked = r.value === savedTheme()
   })
-  paint()
-  return btn
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => (sys.querySelector('span')!.textContent = systemNow()))
+  return h('fieldset', { class: 'theme-field' }, h('legend', {}, t('theme.label')), sys, option('light', t('theme.light')), option('dark', t('theme.dark')))
 }
+void currentTheme
 
 // Clicking the logo makes it stick its tongue out, also while it takes you home (not in the demo,
 // where it leaves for the real site: on a phone «Back to HappyX» doesn't fit).
@@ -220,7 +238,7 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
       brand(),
       h(
         'nav',
-        { class: 'nav' },
+        { class: 'nav', 'aria-label': t('nav.main') },
         h('a', { href: '#/me', class: active === 'me' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'me' ? 'page' : undefined }, t('nav.me')),
         m.guilds.length > 0 || memberGuilds(m).length > 0
           ? h('a', { href: '#/', class: active === 'servers' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'servers' ? 'page' : undefined }, t('nav.servers'))
@@ -230,24 +248,31 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
           : null,
       ),
     ),
+    // «content-first-noise-reduction»: theme, language and log out go in a popover behind the
+    // account button instead of four controls in the bar. popovertarget gives click, Enter, Esc
+    // and light dismiss with no script; the button is the popover's anchor.
     h(
       'div',
       { class: 'user' },
-      themeToggle(),
-      languagePicker(true),
-      avatar,
-      h('span', { class: 'user-name' }, u.username),
-      api.isDemo
-        ? null
-        : h('button', {
-            class: 'btn btn-ghost', type: 'button',
-            onclick: async () => {
-              await api.logout()
-              me = null
-              location.hash = ''
-              route()
-            },
-          }, t('nav.logout')),
+      h('button', { class: 'account-btn', type: 'button', popovertarget: 'account-menu', 'aria-label': t('account.button', { name: u.username }) }, avatar, h('span', { class: 'user-name' }, u.username), icons.chevron()),
+      h(
+        'div',
+        { id: 'account-menu', class: 'account-menu', popover: 'auto', role: 'dialog', 'aria-labelledby': 'account-who' },
+        h('p', { class: 'account-who' }, h('strong', { id: 'account-who' }, u.username), h('span', { class: 'muted small' }, t('account.via'))),
+        themeField(),
+        languageField(),
+        api.isDemo
+          ? null
+          : h('button', {
+              class: 'btn btn-ghost account-out', type: 'button',
+              onclick: async () => {
+                await api.logout()
+                me = null
+                location.hash = ''
+                route()
+              },
+            }, icons.logout(), t('account.logout')),
+      ),
     ),
   )
 }
@@ -270,7 +295,8 @@ function renderLanding(m: api.Me | null) {
       : m.guilds.length
         ? h('a', { class: cls, href: '#/' }, t('landing.dashboard'))
         : h('a', { class: cls, href: '#/me' }, t('nav.me'))
-  const feature = (title: string, body: string) => h('li', {}, h('h3', {}, title), h('p', { class: 'secondary' }, body))
+  // «card»: an <article> with a heading and one paragraph, nothing else.
+  const feature = (title: string, body: string) => h('li', {}, h('article', { class: 'feature' }, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
   // A real capture of the demo dashboard, in the page's language and theme.
   const shotLang = lang === 'es' ? 'es' : 'en'
   const shot = (theme: 'light' | 'dark') =>
@@ -285,7 +311,7 @@ function renderLanding(m: api.Me | null) {
       'header',
       { class: 'topbar' },
       brand(),
-      h('div', { class: 'user' }, themeToggle(), languagePicker(true), enter('btn btn-ghost')),
+      h('div', { class: 'user' }, enter('btn btn-outline btn-compact')),
     ),
     h(
       'main',
@@ -314,7 +340,7 @@ function renderLanding(m: api.Me | null) {
         'section',
         { class: 'landing-section report-shot' },
         h('div', {}, h('h2', {}, t('landing.report.title')), h('p', { class: 'secondary' }, t('landing.report.body'))),
-        h('img', { src: lang === 'es' ? reportEs : reportEn, alt: t('landing.report.alt'), width: 1200, height: 1234, loading: 'lazy', decoding: 'async' }),
+        h('figure', { class: 'report-figure' }, h('img', { src: lang === 'es' ? reportEs : reportEn, alt: t('landing.report.alt'), width: 1200, height: 1234, loading: 'lazy', decoding: 'async' })),
       ),
       h(
         'section',
@@ -344,7 +370,7 @@ function renderLanding(m: api.Me | null) {
         { class: 'cta' },
         h('h2', {}, t('landing.cta.title')),
         h('p', { class: 'secondary' }, t('landing.cta.body')),
-        h('div', { class: 'actions' }, add(), demo(), enter()),
+        h('div', { class: 'actions' }, add(), demo()),
       ),
     ),
     landingFooter(),
@@ -548,8 +574,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
   const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
-    'div',
-    { class: 'segmented', role: 'navigation', 'aria-label': t('period.label') },
+    // Links, so a <nav> (not tabs: «tabs» says never for page navigation). One row that scrolls
+    // and snaps on a phone instead of wrapping; the current one is marked by shape, not colour only.
+    'nav',
+    { class: 'segmented', 'aria-label': t('period.label') },
     ...presets.map((p) =>
       h('a', {
         href: `#/g/${guildID}?p=${p}`, ...(p === preset ? { 'aria-current': 'page' } : {}),
@@ -574,6 +602,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       body,
     ),
   )
+  // «scroll-target-on-load» fallback: the CSS (scroll-initial-target) brings the current period
+  // into view on a phone; older browsers get the same from script.
+  if (!CSS.supports('scroll-initial-target', 'nearest')) picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 
   const before = previousRange(range, preset)
   let r: api.Report
@@ -684,9 +715,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'div',
       { class: 'stats' },
-      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(Math.round(r.average * 10) / 10)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average)),
+      stat(t('stat.average'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, moodEmoji(Math.round(r.average * 10) / 10)), formatNumber(r.average, 1), h('span', { class: 'stat-unit' }, ' / 5')), old ? deltaNote(r.average, old.average, 1) : moodLabel(r.average), t('help.average')),
       rate !== null
-        ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), oldRate !== null ? deltaNote(rate, oldRate, 0, 'delta.points') : t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }))
+        ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), oldRate !== null ? deltaNote(rate, oldRate, 0, 'delta.points') : t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }), t('help.participation'))
         : stat(t('stat.responses'), formatNumber(r.responses), old ? deltaNote(r.responses, old.responses) : undefined),
       stat(
         t('stat.respondents'),
@@ -694,8 +725,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
         // «At least once», so «10 of 10» doesn't read as the opposite of the participation figure.
         // The delta first, level with the others; «at least once» under it.
         old ? h('span', { class: 'stat-notes' }, deltaNote(r.respondents, old.respondents), t('stat.respondents.note')) : t('stat.respondents.note'),
+        t('help.respondents'),
       ),
-      stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined),
+      stat(t('stat.kudos'), h('span', {}, h('span', { class: 'stat-emoji', 'aria-hidden': 'true' }, '💛'), formatNumber(kudos.count)), old?.kudos ? deltaNote(kudos.count, old.kudos.count) : undefined, t('help.kudos')),
     ),
     h(
       'section',
@@ -773,6 +805,7 @@ function firstSteps(g: api.Guild) {
 }
 
 function focusCard(card: HTMLElement) {
+  if (card instanceof HTMLDetailsElement) card.open = true
   // Stop below the sticky top bar, so it doesn't cover the card's title. CSSOM: the CSP forbids style attributes.
   const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
   card.style.scrollMarginTop = `${bar && getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight + 12 : 12}px`
@@ -827,10 +860,20 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
   todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
-  return h(
-    'section',
-    { class: 'card' },
-    h('h2', {}, t('health.title')),
+  // «content-first-noise-reduction»: rarely needed detail goes in <details>, closed. The summary
+  // carries what is worth seeing at a glance: whether something needs doing, and the next survey.
+  const pending = todo.filter((li) => li.querySelector('.todo-open')).length
+  const nextLabel = next ? (next === todayIn(g.timezone) ? t('health.sum.today') : formatDay(next, long)) : ''
+  const card = h(
+    'details',
+    { class: 'card health-card', open: pending > 0 },
+    h(
+      'summary',
+      {},
+      h('span', { class: 'health-sum-title' }, t('health.title')),
+      h('span', { class: pending ? 'health-sum-state todo' : 'health-sum-state' }, pending === 1 ? t('health.sum.todo.one') : pending ? t('health.sum.todo', { n: formatNumber(pending) }) : t('health.sum.ok')),
+      h('span', { class: 'muted small health-sum-next' }, surveyOn && next ? `${t('health.nextSurvey')}: ${nextLabel}, ${hour}` : ''),
+    ),
     h(
       'div',
       { class: 'health' },
@@ -847,6 +890,7 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
     ),
     h('ul', { class: 'todo' }, ...todo),
   )
+  return card
 }
 
 // Below this many days with answers, the dashboard gives no tone or trend.
@@ -906,7 +950,8 @@ function weekdayCard(stats: WeekdayStat[]) {
             h(
               'div',
               { class: 'bar-row', role: 'listitem', title: `${formatDay(w.day, { weekday: 'long' })}: ${formatNumber(w.average, 1)} · ${answers(w.responses)}` },
-              h('span', { class: 'bar-label' }, capitalize(formatDay(w.day, { weekday: 'long' }))),
+              // «color»: the lowest day isn't told by the yellow bar alone; it also says so.
+              h('span', { class: 'bar-label' }, h('span', {}, capitalize(formatDay(w.day, { weekday: 'long' })), w === low ? h('span', { class: 'tag-low' }, t('weekday.lowest')) : null)),
               h('span', { class: 'bar-track' }, fill(((w.average - 1) / 4) * 100, w === low)),
               h('span', { class: 'bar-value' }, `${moodEmoji(w.average)} ${formatNumber(w.average, 1)}`),
             ),
@@ -1400,7 +1445,7 @@ function signInReason(path: string) {
 function renderSignIn(path: string, reason: string) {
   me = null
   page(
-    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true))),
+    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, languageField())),
     h(
       'main',
       { class: 'container narrow' },
@@ -1423,7 +1468,7 @@ function renderLegal(m: api.Me | null, content: HTMLElement[]) {
     ? h('a', { class: 'btn btn-ghost', href: '#/' }, t('landing.dashboard'))
     : h('a', { class: 'btn btn-ghost', href: api.loginURL }, t('landing.login'))
   page(
-    m ? header(m, 'none') : h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true), enter)),
+    m ? header(m, 'none') : h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, enter)),
     h('main', { class: 'container narrow policy' }, ...content),
     m ? null : landingFooter(),
   )
@@ -1503,9 +1548,15 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   if (toHistory) document.getElementById('history')?.scrollIntoView()
 }
 
-function stat(label: string, value: Node | string, note?: Node | string) {
-  // A description list, so screen readers pair each figure with its name.
-  return h('dl', { class: 'card stat' }, h('dt', { class: 'stat-label' }, label), h('dd', { class: 'stat-value' }, value), note ? h('dd', { class: 'muted small' }, note) : null)
+function stat(label: string, value: Node | string, note?: Node | string, help?: string) {
+  // «card»: an <article>; inside, a description list pairs the figure with its name. «How is
+  // this counted?» is a toggletip («interest-triggered-tooltips»): wanted now and then, not always.
+  const tip = help ? toggletip(t('help.what', { name: label }), help) : null
+  return h(
+    'article',
+    { class: 'card stat' },
+    h('dl', {}, h('dt', { class: 'stat-label' }, h('span', {}, label), ...(tip ?? [])), h('dd', { class: 'stat-value' }, value), note ? h('dd', { class: 'muted small' }, note) : null),
+  )
 }
 
 function messagesCard(r: api.Report) {
@@ -1516,7 +1567,12 @@ function messagesCard(r: api.Report) {
   const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
-  const chips = h('div', { class: 'chips', role: 'group', 'aria-label': t('messages.filter') })
+  // «browser-ui-theming»: one choice among a few, laid out inline = native radios inside labels,
+  // styled with label:has(:checked). A check mark shows the chosen one besides the colour.
+  const chips = h('fieldset', { class: 'chips' })
+  const legend = () => h('legend', { class: 'sr-only' }, t('messages.filter'))
+  const radio = (label: string, on: boolean, pick: () => void) =>
+    h('label', { class: 'chip' }, h('input', { type: 'radio', name: 'mood-filter', checked: on, onchange: pick }), h('span', { class: 'chip-mark', 'aria-hidden': 'true' }), h('span', {}, label))
   const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' })
   more.addEventListener('click', () => {
     all = true
@@ -1545,18 +1601,17 @@ function messagesCard(r: api.Report) {
         : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
     )
     chips.replaceChildren(
-      ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) => {
-        const on = !days && f === current
-        const b = h('button', { type: 'button', 'aria-pressed': String(on), class: on ? 'chip chip-on' : 'chip' }, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`)
-        b.addEventListener('click', () => {
+      legend(),
+      ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) =>
+        radio(`${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`, !days && f === current, () => {
           current = f
           days = null
           all = false
           draw()
-        })
-        return b
-      }),
-      ...(days ? [h('button', { type: 'button', 'aria-pressed': 'true', class: 'chip chip-on' }, `${days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) })} · ${formatNumber(matching.length)}`)] : []),
+        }),
+      ),
+      // A day picked on the chart isn't one of the choices: a button that removes it.
+      ...(days ? [h('button', { type: 'button', class: 'chip chip-clear', onclick: () => show(current) }, `${t('messages.filter.clear', { day: days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) }) })} ×`)] : []),
     )
   }
   draw()
@@ -1610,7 +1665,7 @@ function errorCard(err: unknown) {
 function renderError(err: unknown) {
   me = null
   page(
-    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, themeToggle(), languagePicker(true))),
+    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, languageField())),
     h('main', { class: 'container narrow' }, errorCard(err)),
     landingFooter(),
   )
@@ -1643,6 +1698,7 @@ window.addEventListener('hashchange', () => {
     return
   }
   shownURL = location.href
+  navigated = true
   route()
 })
 window.addEventListener('beforeunload', (e) => {
