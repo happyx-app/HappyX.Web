@@ -4,38 +4,9 @@
 
 import { h } from './dom'
 
-// «declarative-dialog-popover-control» / «interest-triggered-tooltips»: feature-detect, then load.
-export async function loadPolyfills() {
-  if (!Object.hasOwn(HTMLElement.prototype, 'popover')) await import('@oddbird/popover-polyfill')
-  if (!('interestForElement' in HTMLButtonElement.prototype)) await import('interestfor')
-  // popover="hint" falls back to "manual"; a toggletip opened by a click would never close, so it
-  // becomes "auto" as it opens (must happen in beforetoggle, which doesn't bubble: capture).
-  const probe = document.createElement('div')
-  probe.setAttribute('popover', 'hint')
-  if ((probe as HTMLElement & { popover: string | null }).popover !== 'hint') {
-    document.addEventListener('beforetoggle', (e) => {
-      const target = e.target as HTMLElement
-      const ev = e as ToggleEvent
-      if (ev.newState === 'open' && target.getAttribute('popover') === 'hint' && document.querySelector(`[popovertarget="${CSS.escape(target.id)}"]`)) {
-        target.setAttribute('popover', 'auto')
-      }
-    }, true)
-  }
-  // «viewport-aware-dropdowns» fallback: without anchor positioning a popover would sit in the
-  // top-left corner; place it under its button from getBoundingClientRect (CSSOM, CSP-safe).
-  if (!CSS.supports('position-area: block-end')) {
-    document.addEventListener('beforetoggle', (e) => {
-      const target = e.target as HTMLElement
-      if ((e as ToggleEvent).newState !== 'open' || !target.id) return
-      const trigger = document.querySelector<HTMLElement>(`[popovertarget="${CSS.escape(target.id)}"]`)
-      if (!trigger) return
-      const r = trigger.getBoundingClientRect()
-      target.style.position = 'fixed'
-      target.style.top = `${r.bottom + 8}px`
-      if (target.classList.contains('account-menu')) target.style.right = `${Math.max(16, innerWidth - r.right)}px`
-      else target.style.left = `${Math.min(r.left, innerWidth - 16 - 280)}px`
-    }, true)
-  }
+// «declarative-dialog-popover-control» / «interest-triggered-tooltips»: feature-detect, then load
+// only what is missing. Listeners that must see every toggle are in place before any import.
+export function loadPolyfills() {
   // Toggletip buttons own aria-expanded: keep it in sync from the popover (toggle doesn't bubble).
   document.addEventListener('toggle', (e) => {
     const target = e.target as HTMLElement
@@ -44,6 +15,23 @@ export async function loadPolyfills() {
       b.setAttribute('aria-expanded', String((e as ToggleEvent).newState === 'open'))
     }
   }, true)
+  // popover="hint" falls back to "manual" where it isn't supported: a toggletip opened by a click
+  // would never close, so it becomes "auto" as it opens (in beforetoggle, which doesn't bubble).
+  const probe = document.createElement('div')
+  probe.setAttribute('popover', 'hint')
+  if ((probe as HTMLElement & { popover: string | null }).popover !== 'hint') {
+    document.addEventListener('beforetoggle', (e) => {
+      const target = e.target as HTMLElement
+      if ((e as ToggleEvent).newState === 'open' && target.getAttribute('popover') === 'hint' && document.querySelector(`[popovertarget="${CSS.escape(target.id)}"]`)) {
+        target.setAttribute('popover', 'auto')
+      }
+    }, true)
+  }
+  const missing: Promise<unknown>[] = []
+  if (!Object.hasOwn(HTMLElement.prototype, 'popover')) missing.push(import('@oddbird/popover-polyfill'))
+  if (!('interestForElement' in HTMLButtonElement.prototype)) missing.push(import('interestfor'))
+  // Without them the page still works: the «?» and the account menu just don't open.
+  Promise.all(missing).catch((err: unknown) => console.error('HappyX: a polyfill failed to load', err))
 }
 
 let tipCount = 0
@@ -77,26 +65,25 @@ export function hideBarOnScroll() {
   }, { passive: true })
 }
 
-// «same-document-transitions»: a soft cross-fade between pages (the CSS keeps it to a fade and
-// turns it off with reduced motion), then focus goes to the new page's heading.
-export function swapPage(update: () => void, focusHeading = false) {
-  const done = () => {
-    if (!focusHeading) return
-    const h1 = document.querySelector<HTMLElement>('main h1')
-    if (h1) {
-      h1.tabIndex = -1
-      h1.focus({ preventScroll: true })
-    }
-  }
+// «same-document-transitions»: a soft cross-fade from what is on screen to what update() draws
+// (a new page, new figures on the same page, another theme). The CSS keeps it to a short fade,
+// and it is off with reduced motion. Settles once the new content is in the document.
+//
+// One fade at a time: one asked for while another runs starts when that one ends, so none is cut
+// short and updates land in the order they were asked for.
+let fading: Promise<unknown> = Promise.resolve()
+export function crossFade(update: () => void): Promise<void> {
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     update()
-    done()
-    return
+    return Promise.resolve()
   }
-  const vt = document.startViewTransition(update)
-  // A newer page skips this one's animation: not an error.
-  vt.ready.catch(() => {})
-  vt.finished.then(done, done)
+  const drawn = fading.then(() => {
+    const vt = document.startViewTransition(update)
+    fading = vt.finished.catch(() => {})
+    return vt.updateCallbackDone
+  })
+  fading = drawn.catch(() => {})
+  return drawn
 }
 
 // «accessibility»: every page its own title, front-loaded.

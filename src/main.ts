@@ -15,8 +15,8 @@ import { gamePage } from './game'
 import { guildExport, privacyPage } from './privacy'
 import { policyPage } from './policy'
 import { termsPage } from './terms'
-import { applySavedTheme, currentTheme, savedTheme, setTheme, type ThemeChoice } from './theme'
-import { hideBarOnScroll, loadPolyfills, setTitle, swapPage, toggletip } from './platform'
+import { onThemeChange, savedTheme, setTheme, type ThemeChoice } from './theme'
+import { crossFade, hideBarOnScroll, loadPolyfills, setTitle, toggletip } from './platform'
 import logoURL from './logo.svg'
 import panelEnLight from './landing/panel-en-light.jpg'
 import panelEnDark from './landing/panel-en-dark.jpg'
@@ -48,11 +48,11 @@ import { reloadCanvas, showCanvas } from './canvas'
 
 const app = document.getElementById('app')!
 document.documentElement.lang = lang
-applySavedTheme()
-void loadPolyfills()
+loadPolyfills()
 hideBarOnScroll()
-// Set on in-app navigation, so the new page's heading takes focus (not on the first load).
-let navigated = false
+// The route path last drawn («/g/123»), without the query. A new path is a new page; the same
+// path with another query («?p=last-week») is the same page showing other data.
+let shownPath: string | null = null
 if (api.isDemo) document.title = `HappyX · ${t('demo.label')}`
 let me: api.Me | null = null
 
@@ -115,19 +115,67 @@ async function route() {
   renderGuilds(me)
 }
 
-function page(...children: (Node | null)[]) {
+// Draws a page. The promise settles once the new content is in the document: with a view
+// transition that is a moment later, so work on the new page's elements waits for it.
+function page(...children: (Node | null)[]): Promise<void> {
   const nodes = children.filter((c): c is Node => c !== null)
   // In the demo the notice stays on top, together with the top bar.
   if (api.isDemo && nodes[0] instanceof HTMLElement && nodes[0].classList.contains('topbar')) {
-    nodes[0] = h('div', { class: 'demo-head' }, demoBanner(), nodes[0])
+    const top = nodes[0]
+    nodes[0] = top.parentElement?.classList.contains('demo-head') ? top.parentElement : h('div', { class: 'demo-head' }, demoBanner(), top)
   }
-  const focus = navigated
-  navigated = false
-  swapPage(() => {
-    app.replaceChildren(...skipLink(nodes), ...nodes, ...(me && !api.isDemo ? [footer()] : []))
-    window.scrollTo(0, 0)
+  if (me && !api.isDemo) nodes.push(footer())
+  const path = location.hash.replace(/^#/, '').split('?')[0]
+  const first = shownPath === null
+  const newPage = !first && path !== shownPath
+  shownPath = path
+  const update = () => {
+    mount([...skipLink(nodes), ...nodes], !newPage && !first)
+    stickUnderTopbar()
+    if (newPage) {
+      window.scrollTo(0, 0)
+      // «accessibility»: after moving to another page, focus starts at its heading. A caller that
+      // has a better place (a control a link pointed at) moves it there once the promise settles.
+      const h1 = app.querySelector<HTMLElement>('main h1')
+      if (h1) {
+        h1.tabIndex = -1
+        h1.focus({ preventScroll: true })
+      }
+    }
     setTitle(app.querySelector('main h1')?.textContent)
-  }, focus)
+  }
+  // A new page cross-fades in. New data on the same page (another period, a reload after saving)
+  // just appears, where the reader already is.
+  if (newPage) return crossFade(update)
+  update()
+  return Promise.resolve()
+}
+
+// Shell parts (the top bar, the footer) that a render hands back unchanged are already on the
+// page: they stay where they are and only the rest is replaced. Nothing in them is rebuilt, so
+// they don't flash, and the logo, an open menu and focus inside them are left alone.
+function mount(nodes: Node[], keepFocus: boolean) {
+  // On the same page, focus on a link that the new content draws again (a period, a filter)
+  // moves to the new copy of that link instead of falling back to the start of the page.
+  const was = keepFocus && document.activeElement instanceof HTMLAnchorElement && app.contains(document.activeElement) ? document.activeElement.getAttribute('href') : null
+  for (const child of [...app.childNodes]) if (!nodes.includes(child)) child.remove()
+  let at: ChildNode | null = app.firstChild
+  for (const n of nodes) {
+    if (n === at) at = at.nextSibling
+    else app.insertBefore(n, at)
+  }
+  if (was !== null && !app.contains(document.activeElement)) {
+    app.querySelector<HTMLElement>(`a[href="${CSS.escape(was)}"]`)?.focus({ preventScroll: true })
+  }
+}
+
+// A shell part already on the page with the same key is handed back as it is; otherwise it is
+// built. The key holds everything the part shows, so an equal key means an identical part.
+function shell<T extends HTMLElement>(key: string, build: () => T): T {
+  for (const el of app.querySelectorAll<T>('[data-shell]')) if (el.dataset.shell === key) return el
+  const el = build()
+  el.dataset.shell = key
+  return el
 }
 
 // The first Tab stop jumps past the top bar to the page's main content. It moves focus by hand:
@@ -162,28 +210,43 @@ function demoBanner() {
 }
 
 const footer = () =>
-  h(
-    'footer',
-    { class: 'footer' },
-    h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('a', { href: '#/privacy' }, t('privacy.title'))),
+  shell('footer', () =>
+    h(
+      'footer',
+      { class: 'footer' },
+      h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('a', { href: '#/privacy' }, t('privacy.title'))),
+    ),
   )
 
 // The landing page's footer, also under the privacy policy when nobody is logged in.
 // The language picker lives here, not in the top bar: «content-first-noise-reduction» keeps the
 // bar to one compact row, and the page already follows the browser's language.
 const landingFooter = () =>
-  h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())), languageField())
+  shell('landing-footer', () =>
+    h('footer', { class: 'landing-footer muted small' }, brand('footer'), h('span', { class: 'footer-links' }, h('a', { href: '#/privacy-policy' }, t('nav.privacy')), h('a', { href: '#/terms' }, t('nav.terms')), h('span', {}, '© ', new Date().getFullYear())), languageField()),
+  )
+
+// The top bar of the public pages when nobody is signed in: the logo, and the language or a
+// sign-in button.
+const publicHeader = (kind: 'language' | 'login') =>
+  shell(`public-${kind}`, () =>
+    h(
+      'header',
+      { class: 'topbar' },
+      brand(),
+      h('div', { class: 'user' }, kind === 'language' ? languageField() : h('a', { class: 'btn btn-outline btn-compact', href: api.loginURL }, t('landing.login'))),
+    ),
+  )
 
 // A labelled language picker (a visible <label>, not just aria-label).
 function languageField() {
-  const id = `lang-${Math.random().toString(36).slice(2, 8)}`
   return h(
-    'span',
+    'label',
     { class: 'lang-field' },
-    h('label', { for: id }, t('nav.language')),
+    h('span', { class: 'lang-field-name' }, t('nav.language')),
     h(
       'select',
-      { id, class: 'lang-picker', onchange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value) },
+      { class: 'lang-picker', onchange: (e: Event) => setLanguage((e.target as HTMLSelectElement).value) },
       ...languages.map(([code, name]) => h('option', { value: code, selected: code === lang }, name)),
     ),
   )
@@ -191,20 +254,24 @@ function languageField() {
 
 // «dark-mode-toggle»: no persistent toggle in the bar. In the account menu (a settings surface),
 // three explicit choices; «System» says what the system is using right now.
+const systemDark = matchMedia('(prefers-color-scheme: dark)')
+const systemNow = () => t('theme.system.now', { mode: t(systemDark.matches ? 'theme.dark' : 'theme.light').toLocaleLowerCase(lang) })
+
 function themeField() {
   const now = savedTheme()
   const option = (value: ThemeChoice, label: string) =>
-    h('label', { class: 'choice' }, h('input', { type: 'radio', name: 'theme', value, checked: value === now, onchange: () => setTheme(value) }), h('span', {}, label))
-  const systemNow = () => t('theme.system.now', { mode: t(matchMedia('(prefers-color-scheme: dark)').matches ? 'theme.dark' : 'theme.light').toLowerCase() })
-  const sys = option('system', systemNow())
-  addEventListener('storage', (e) => {
-    if (e.key !== 'happyx.theme') return
-    for (const r of document.querySelectorAll<HTMLInputElement>('input[name="theme"]')) r.checked = r.value === savedTheme()
-  })
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => (sys.querySelector('span')!.textContent = systemNow()))
-  return h('fieldset', { class: 'theme-field' }, h('legend', {}, t('theme.label')), sys, option('light', t('theme.light')), option('dark', t('theme.dark')))
+    h('label', { class: 'choice' }, h('input', { type: 'radio', name: 'theme', value, checked: value === now, onchange: () => void crossFade(() => setTheme(value)) }), h('span', { class: value === 'system' ? 'theme-system-now' : undefined }, label))
+  return h('fieldset', { class: 'theme-field' }, h('legend', {}, t('theme.label')), option('system', systemNow()), option('light', t('theme.light')), option('dark', t('theme.dark')))
 }
-void currentTheme
+
+// Once for the whole app, not per menu: the radios follow a choice made in another tab, and
+// «System» says what the system uses right now.
+onThemeChange((choice) => {
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name="theme"]')) r.checked = r.value === choice
+})
+systemDark.addEventListener('change', () => {
+  for (const el of document.querySelectorAll('.theme-system-now')) el.textContent = systemNow()
+})
 
 // Clicking the logo makes it stick its tongue out, also while it takes you home (not in the demo,
 // where it leaves for the real site: on a phone «Back to HappyX» doesn't fit).
@@ -220,7 +287,24 @@ const brand = (slot = 'header') =>
     api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
   )
 
-function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'none' = 'servers') {
+type Section = 'me' | 'servers' | 'games' | 'privacy' | 'none'
+
+// The signed-in top bar. It is the same bar on every page, so it is built once and kept (see
+// shell); a page only moves the «you are here» mark between its links.
+function header(m: api.Me, active: Section = 'servers') {
+  const links = { me: true, servers: m.guilds.length > 0 || memberGuilds(m).length > 0, games: m.games.length > 0 }
+  const key = JSON.stringify(['header', m.user.discord_user_id, m.user.username, m.user.avatar, links])
+  const bar = shell(key, () => buildHeader(m, links))
+  for (const a of bar.querySelectorAll<HTMLAnchorElement>('a[data-section]')) {
+    const on = a.dataset.section === active
+    a.classList.toggle('nav-on', on)
+    if (on) a.setAttribute('aria-current', 'page')
+    else a.removeAttribute('aria-current')
+  }
+  return bar
+}
+
+function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolean>) {
   const u = m.user
   // Some networks block Discord's image server: show the name's initial instead of a broken image.
   const avatar: HTMLElement = h('img', {
@@ -239,13 +323,9 @@ function header(m: api.Me, active: 'me' | 'servers' | 'games' | 'privacy' | 'non
       h(
         'nav',
         { class: 'nav', 'aria-label': t('nav.main') },
-        h('a', { href: '#/me', class: active === 'me' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'me' ? 'page' : undefined }, t('nav.me')),
-        m.guilds.length > 0 || memberGuilds(m).length > 0
-          ? h('a', { href: '#/', class: active === 'servers' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'servers' ? 'page' : undefined }, t('nav.servers'))
-          : null,
-        m.games.length > 0
-          ? h('a', { href: '#/games', class: active === 'games' ? 'nav-link nav-on' : 'nav-link', 'aria-current': active === 'games' ? 'page' : undefined }, t('nav.games'))
-          : null,
+        h('a', { href: '#/me', class: 'nav-link', 'data-section': 'me' }, t('nav.me')),
+        links.servers ? h('a', { href: '#/', class: 'nav-link', 'data-section': 'servers' }, t('nav.servers')) : null,
+        links.games ? h('a', { href: '#/games', class: 'nav-link', 'data-section': 'games' }, t('nav.games')) : null,
       ),
     ),
     // «content-first-noise-reduction»: theme, language and log out go in a popover behind the
@@ -307,12 +387,7 @@ function renderLanding(m: api.Me | null) {
       h('img', { src: shots[`${shotLang}-${theme}`], alt: theme === 'light' ? t('landing.shot.alt') : '', width: 2400, height: 1500, loading: 'lazy', decoding: 'async' }),
     )
   page(
-    h(
-      'header',
-      { class: 'topbar' },
-      brand(),
-      h('div', { class: 'user' }, enter('btn btn-outline btn-compact')),
-    ),
+    m ? shell(`landing-${m.guilds.length ? 'dashboard' : 'me'}`, () => h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, enter('btn btn-outline btn-compact')))) : publicHeader('login'),
     h(
       'main',
       { class: 'landing' },
@@ -571,7 +646,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     return
   }
   const range = rangeFor(preset, todayIn(g.timezone))
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton())
+  const { body, show: showData } = dataArea(`guild-${guildID}`, 'dashboard')
   const dates = h('p', { class: 'muted' }, nowrap(formatRange(range.from, range.to)))
   const picker = h(
     // Links, so a <nav> (not tabs: «tabs» says never for page navigation). One row that scrolls
@@ -585,7 +660,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       }, t(`period.${p}`)),
     ),
   )
-  page(
+  const shown = page(
     header(m),
     h(
       'main',
@@ -604,7 +679,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   )
   // «scroll-target-on-load» fallback: the CSS (scroll-initial-target) brings the current period
   // into view on a phone; older browsers get the same from script.
-  if (!CSS.supports('scroll-initial-target', 'nearest')) picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  if (!CSS.supports('scroll-initial-target', 'nearest')) void shown.then(() => picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
 
   const before = previousRange(range, preset)
   let r: api.Report
@@ -620,8 +695,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     ])
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
-    body.replaceChildren(errorCard(err))
-    body.removeAttribute('aria-busy')
+    showData(errorCard(err))
     return
   }
   // A default period without answers, when this week has some (a new server, early in the
@@ -634,19 +708,18 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       return renderGuild(m, guildID, 'this-week')
     }
   }
-  body.removeAttribute('aria-busy')
   const healthSection = health ? healthCard(g, health) : null
   const extra = healthSection ? [healthSection] : []
   if (r.responses === 0 && isNewGuild(g.created_at)) {
     // «First steps» starts with starting the survey, so «Server status» doesn't repeat it.
     const status = health ? healthCard(g, health, false) : null
-    body.replaceChildren(firstSteps(g), ...(status ? [status] : []))
+    showData(firstSteps(g), ...(status ? [status] : []))
     return
   }
   if (r.responses === 0) {
     const next = nextSurveyDay(g.timezone, g.survey_hour, g.working_days ?? [1, 2, 3, 4, 5])
     const longer = preset !== 'last-30' && preset !== 'last-90'
-    body.replaceChildren(
+    showData(
       h(
         'div',
         { class: 'card empty' },
@@ -703,7 +776,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
 
-  body.replaceChildren(
+  showData(
     summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
       ...(health && healthSection ? [healthAlert(health, healthSection, ask)] : []),
@@ -849,9 +922,12 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
     h('div', { class: 'health-tile' }, h('span', { class: 'muted small' }, label), h('strong', {}, value), h('span', { class: 'muted small' }, note))
   const last = x.last_survey
   const todo: HTMLElement[] = []
+  let pending = 0
   // done: ✓, false: ○ (something to do), null: · (just a fact, nothing to do).
-  const item = (done: boolean | null, text: string, link?: [string, string]) =>
-    h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
+  const item = (done: boolean | null, text: string, link?: [string, string]) => {
+    if (done === false) pending++
+    return h('li', {}, h('span', { class: done === null ? 'todo-info' : done ? 'todo-done' : 'todo-open', 'aria-hidden': 'true' }, done === null ? icons.info() : done ? '✓' : '○'), h('span', {}, text), link && api.canManage(g) ? h('a', { href: link[0] }, `${link[1]} →`) : null)
+  }
   const settings = `#/g/${g.discord_guild_id}/settings`
   const surveyOn = g.survey_enabled !== false
   if (!surveyOn && surveyOffItem) todo.push(item(false, t('health.survey.off'), [`${settings}?f=survey-on`, t('health.start')]))
@@ -862,7 +938,6 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   // «content-first-noise-reduction»: rarely needed detail goes in <details>, closed. The summary
   // carries what is worth seeing at a glance: whether something needs doing, and the next survey.
-  const pending = todo.filter((li) => li.querySelector('.todo-open')).length
   const nextLabel = next ? (next === todayIn(g.timezone) ? t('health.sum.today') : formatDay(next, long)) : ''
   const card = h(
     'details',
@@ -870,7 +945,7 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
     h(
       'summary',
       {},
-      h('span', { class: 'health-sum-title' }, t('health.title')),
+      h('h2', { class: 'health-sum-title' }, t('health.title')),
       h('span', { class: pending ? 'health-sum-state todo' : 'health-sum-state' }, pending === 1 ? t('health.sum.todo.one') : pending ? t('health.sum.todo', { n: formatNumber(pending) }) : t('health.sum.ok')),
       h('span', { class: 'muted small health-sum-next' }, surveyOn && next ? `${t('health.nextSurvey')}: ${nextLabel}, ${hour}` : ''),
     ),
@@ -1065,7 +1140,7 @@ function surveyOffCard(m: api.Me) {
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
-  const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('me'))
+  const { body, show: showData } = dataArea('me', 'me')
   const myGamesSlot = h('div', { class: 'dashboard' })
   // Your game score is extra: if it fails to load, the rest of the page still works.
   api
@@ -1104,11 +1179,9 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     data = await api.myMoods(range.from, range.to)
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
-    body.replaceChildren(errorCard(err))
-    body.removeAttribute('aria-busy')
+    showData(errorCard(err))
     return
   }
-  body.removeAttribute('aria-busy')
   if (data.guilds.every((g) => g.responses === 0)) {
     // Someone with no server to manage or play in, and no answer in the last year, most likely
     // has no server with HappyX: say how to add it instead.
@@ -1119,7 +1192,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       dates.remove()
       periods.remove()
     }
-    body.replaceChildren(noServer ? noServerCard() : off ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
+    showData(noServer ? noServerCard() : off ?? h('div', { class: 'card empty' }, h('h2', {}, t('me.empty.title')), h('p', { class: 'secondary' }, t('me.empty.body'))))
     return
   }
 
@@ -1197,7 +1270,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
         )
       : null
 
-  body.replaceChildren(
+  showData(
     h(
       'section',
       { class: 'card' },
@@ -1261,7 +1334,7 @@ function swatch(color: string) {
   return el
 }
 
-function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
+async function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
     page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
@@ -1309,7 +1382,7 @@ function renderSettings(m: api.Me, guildID: string, focus: string | null = null)
     c.card.tabIndex = -1
   })
   unsavedCards = () => cards.filter((c) => c.card.isConnected && c.card.querySelector('[data-dirty="true"]')).map((c) => c.label)
-  page(
+  const shown = page(
     header(m),
     h(
       'main',
@@ -1323,7 +1396,7 @@ function renderSettings(m: api.Me, guildID: string, focus: string | null = null)
       ),
     ),
   )
-  stickUnderTopbar()
+  await shown
   // «Start →», «Change →» and the like open the page on the control they are about.
   const target = focus ? document.getElementById(focus) : null
   if (target) {
@@ -1379,12 +1452,17 @@ function sectionNav(cards: { label: string; card: HTMLElement }[]): HTMLElement 
 
 // The settings list sticks under the top bar, whose height depends on the width (on a phone the
 // links wrap to a second row). The demo's head stops sticking on a phone, and then counts as 0.
+// One observer for the whole app, following whichever top bar is on the page now.
+let watchedBar: HTMLElement | null = null
+const barSize = new ResizeObserver(() => {
+  if (watchedBar) document.documentElement.style.setProperty('--topbar-h', getComputedStyle(watchedBar).position === 'sticky' ? `${watchedBar.offsetHeight}px` : '0px')
+})
 function stickUnderTopbar() {
   const bar = document.querySelector<HTMLElement>('.demo-head, .topbar')
-  if (!bar) return
-  const set = () => document.documentElement.style.setProperty('--topbar-h', getComputedStyle(bar).position === 'sticky' ? `${bar.offsetHeight}px` : '0px')
-  new ResizeObserver(set).observe(bar)
-  set()
+  if (bar === watchedBar) return
+  if (watchedBar) barSize.unobserve(watchedBar)
+  watchedBar = bar
+  if (bar) barSize.observe(bar)
 }
 
 // refreshAfterHandover reloads what the user can do once they gave the main admin to someone
@@ -1445,7 +1523,7 @@ function signInReason(path: string) {
 function renderSignIn(path: string, reason: string) {
   me = null
   page(
-    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, languageField())),
+    publicHeader('language'),
     h(
       'main',
       { class: 'container narrow' },
@@ -1464,11 +1542,9 @@ function renderSignIn(path: string, reason: string) {
 
 function renderLegal(m: api.Me | null, content: HTMLElement[]) {
   if (!m) me = null
-  const enter = m
-    ? h('a', { class: 'btn btn-ghost', href: '#/' }, t('landing.dashboard'))
-    : h('a', { class: 'btn btn-ghost', href: api.loginURL }, t('landing.login'))
+  // The same bar as the landing page, so going from one to the other keeps it in place.
   page(
-    m ? header(m, 'none') : h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, enter)),
+    m ? header(m, 'none') : publicHeader('login'),
     h('main', { class: 'container narrow policy' }, ...content),
     m ? null : landingFooter(),
   )
@@ -1545,7 +1621,7 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
-  if (toHistory) document.getElementById('history')?.scrollIntoView()
+  if (toHistory) body.querySelector('#history')?.scrollIntoView()
 }
 
 function stat(label: string, value: Node | string, note?: Node | string, help?: string) {
@@ -1569,10 +1645,24 @@ function messagesCard(r: api.Report) {
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   // «browser-ui-theming»: one choice among a few, laid out inline = native radios inside labels,
   // styled with label:has(:checked). A check mark shows the chosen one besides the colour.
-  const chips = h('fieldset', { class: 'chips' })
-  const legend = () => h('legend', { class: 'sr-only' }, t('messages.filter'))
-  const radio = (label: string, on: boolean, pick: () => void) =>
-    h('label', { class: 'chip' }, h('input', { type: 'radio', name: 'mood-filter', checked: on, onchange: pick }), h('span', { class: 'chip-mark', 'aria-hidden': 'true' }), h('span', {}, label))
+  // Built once: draw() only changes which one is checked, so focus stays on the radio that the
+  // arrow keys moved to.
+  const radios = new Map<MoodFilter, HTMLInputElement>()
+  const radio = (f: MoodFilter) => {
+    const input = h('input', { type: 'radio', name: 'mood-filter', onchange: () => show(f) }) as HTMLInputElement
+    radios.set(f, input)
+    return h('label', { class: 'chip' }, input, h('span', { class: 'chip-mark', 'aria-hidden': 'true' }), h('span', {}, `${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`))
+  }
+  // A day picked on the chart isn't one of the choices: a button that removes it.
+  const clearText = h('span', {})
+  const clear = h('button', { type: 'button', class: 'chip chip-clear', onclick: () => { show(current); radios.get(current)?.focus() } }, clearText, h('span', { 'aria-hidden': 'true' }, ' ×'))
+  const chips = h(
+    'fieldset',
+    { class: 'chips' },
+    h('legend', { class: 'sr-only' }, t('messages.filter')),
+    ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map(radio),
+    clear,
+  )
   const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' })
   more.addEventListener('click', () => {
     all = true
@@ -1600,27 +1690,17 @@ function messagesCard(r: api.Report) {
           )
         : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
     )
-    chips.replaceChildren(
-      legend(),
-      ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map((f) =>
-        radio(`${t(`messages.filter.${f}`)} · ${formatNumber(counts[f])}`, !days && f === current, () => {
-          current = f
-          days = null
-          all = false
-          draw()
-        }),
-      ),
-      // A day picked on the chart isn't one of the choices: a button that removes it.
-      ...(days ? [h('button', { type: 'button', class: 'chip chip-clear', onclick: () => show(current) }, `${t('messages.filter.clear', { day: days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) }) })} ×`)] : []),
-    )
+    for (const [f, input] of radios) input.checked = !days && f === current
+    clear.hidden = !days
+    if (days) clearText.textContent = t('messages.filter.clear', { day: days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) }) })
   }
-  draw()
-  const show = (f: MoodFilter) => {
+  function show(f: MoodFilter) {
     current = f
     days = null
     all = false
     draw()
   }
+  draw()
   const showDays = (from: string, to: string) => {
     days = { from, to }
     all = true
@@ -1644,6 +1724,25 @@ function messagesCard(r: api.Report) {
 }
 
 // A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
+// The part of a page that shows loaded data. Opened again for other data (another period), it
+// keeps what is on screen, dimmed only if loading takes a while, until the new content
+// cross-fades in: no skeleton in between. The first time, it starts with a skeleton.
+function dataArea(key: string, shape: 'dashboard' | 'me' | 'game') {
+  const onScreen = [...app.querySelectorAll<HTMLElement>('.dashboard[data-area]')].find((el) => el.dataset.area === key)
+  const body = h('div', { class: 'dashboard', 'data-area': key, 'aria-busy': 'true' }, ...(onScreen ? [...onScreen.childNodes] : [skeleton(shape)]))
+  const show = (...nodes: Node[]) => {
+    const swap = () => {
+      body.replaceChildren(...nodes)
+      body.removeAttribute('aria-busy')
+    }
+    // Still on its way in (the page fade hasn't drawn it yet): the page arrives with the data,
+    // no skeleton. Already on screen: cross-fade from what it shows.
+    if (body.isConnected) void crossFade(swap)
+    else swap()
+  }
+  return { body, show }
+}
+
 function skeleton(shape: 'dashboard' | 'me' | 'game' = 'dashboard') {
   if (shape === 'me') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-chart' }), h('div', { class: 'grid-2' }, h('div', { class: 'sk sk-card' })))
   if (shape === 'game') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-steps' }), h('div', { class: 'sk sk-card' }))
@@ -1665,7 +1764,7 @@ function errorCard(err: unknown) {
 function renderError(err: unknown) {
   me = null
   page(
-    h('header', { class: 'topbar' }, brand(), h('div', { class: 'user' }, languageField())),
+    publicHeader('language'),
     h('main', { class: 'container narrow' }, errorCard(err)),
     landingFooter(),
   )
@@ -1698,7 +1797,6 @@ window.addEventListener('hashchange', () => {
     return
   }
   shownURL = location.href
-  navigated = true
   route()
 })
 window.addEventListener('beforeunload', (e) => {

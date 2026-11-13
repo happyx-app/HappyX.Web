@@ -113,6 +113,10 @@ const lensPath =
 // face as last time, so an animation that started on a click (the tongue on the way to the home
 // page) carries on in the new header instead of restarting from the icon.
 const kept = new Map<string, Face>()
+// Stand-ins for a kept face that is still on the page: the face itself moves in only once the
+// new header is in the page (see join), so the page it leaves keeps its logo until then; a view
+// transition takes its picture of that page first.
+const standIns = new WeakMap<SVGSVGElement, Face>()
 
 export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   const old = slot ? kept.get(slot) : undefined
@@ -120,7 +124,11 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     old.center = null
     old.hover = false
     // Out of its square: the new header gets the empty square, and the face stays where it is.
-    return old.free ? old.hole : old.svg
+    const shown = old.free ? old.hole : old.svg
+    if (!shown.isConnected) return shown
+    const stand = s('svg', { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false', 'data-face-stand': '' })
+    standIns.set(stand, old)
+    return stand
   }
   const id = `face-${++uid}`
   const shineOf = (d: string) => s('path', { d, stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
@@ -592,6 +600,10 @@ function start() {
 // Faces start moving once they are in the page, not when they are built: a page swapped in
 // through a view transition is put in the document a frame or more after it was built.
 function join() {
+  for (const stand of document.querySelectorAll<SVGSVGElement>('svg[data-face-stand]')) {
+    const f = standIns.get(stand)
+    if (f) stand.replaceWith(f.free ? f.hole : f.svg)
+  }
   let joined = false
   for (const svg of document.querySelectorAll<SVGSVGElement>('svg[data-face]')) {
     const f = made.get(svg)
