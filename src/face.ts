@@ -74,6 +74,7 @@ type Face = {
   hover: boolean
   lens: SVGPathElement // the right half's lens, hidden while facing front
   still?: boolean // drawn at rest for reduced motion
+  added: number // when the page last asked for this face; it may join the page a moment later
   bg: SVGRectElement // the violet square, left behind when the face is taken out
   spirals: SVGGElement[] // the dizzy eyes, one per side, so each can spin
   stars: SVGPathElement[] // the stars that circle a dizzy head
@@ -114,6 +115,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   if (old) {
     old.center = null
     old.hover = false
+    old.added = performance.now()
     faces.add(old)
     wake()
     // Out of its square: the new header gets the empty square, and the face stays where it is.
@@ -189,7 +191,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: '#4c1d95' }),
     s('circle', { cx: 32, cy: 35.4, r: 21.6, fill: '#6d3fd6' }),
   )
-  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null, dizzyAt: -1e9 }
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null, dizzyAt: -1e9, added: performance.now() }
   faces.add(f)
   if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
@@ -750,6 +752,7 @@ function still() {
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const step = 1000 / 60
+const joinWithin = 2000
 
 function frame(ts: number) {
   raf = 0
@@ -767,7 +770,10 @@ function frame(ts: number) {
   let dozing = false
   for (const f of faces) {
     if (!f.svg.isConnected) {
-      faces.delete(f)
+      // A page drawn through a view transition puts its header in a frame or two later: wait for
+      // it. A face still missing after that belongs to a page that is gone.
+      if (now - f.added < joinWithin) moving = true
+      else faces.delete(f)
       continue
     }
     f.still = false
