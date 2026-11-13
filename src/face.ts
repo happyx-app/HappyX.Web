@@ -98,7 +98,12 @@ type Free = {
   bounced: number // when it last hit an edge hard
 }
 
+// The faces in the page right now, which the frame loop moves. A face joins this set when it
+// enters the page (see join) and leaves it when it leaves the page.
 const faces = new Set<Face>()
+// Every face drawn, found again from its element when that element enters the page. Weak, so a
+// face built for a page that was never shown is simply collected.
+const made = new WeakMap<SVGSVGElement, Face>()
 let uid = 0
 
 const lensPath =
@@ -108,16 +113,22 @@ const lensPath =
 // face as last time, so an animation that started on a click (the tongue on the way to the home
 // page) carries on in the new header instead of restarting from the icon.
 const kept = new Map<string, Face>()
+// Stand-ins for a kept face that is still on the page: the face itself moves in only once the
+// new header is in the page (see join), so the page it leaves keeps its logo until then; a view
+// transition takes its picture of that page first.
+const standIns = new WeakMap<SVGSVGElement, Face>()
 
 export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   const old = slot ? kept.get(slot) : undefined
   if (old) {
     old.center = null
     old.hover = false
-    faces.add(old)
-    wake()
     // Out of its square: the new header gets the empty square, and the face stays where it is.
-    return old.free ? old.hole : old.svg
+    const shown = old.free ? old.hole : old.svg
+    if (!shown.isConnected) return shown
+    const stand = s('svg', { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false', 'data-face-stand': '' })
+    standIns.set(stand, old)
+    return stand
   }
   const id = `face-${++uid}`
   const shineOf = (d: string) => s('path', { d, stroke: '#8a6131', 'stroke-width': 2.4, 'stroke-linecap': 'round', fill: 'none' })
@@ -160,7 +171,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   const bg = s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' })
   const svg = s(
     'svg',
-    { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
+    { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false', 'data-face': '' },
     s(
       'defs',
       {},
@@ -190,7 +201,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     s('circle', { cx: 32, cy: 35.4, r: 21.6, fill: '#6d3fd6' }),
   )
   const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null, dizzyAt: -1e9 }
-  faces.add(f)
+  made.set(svg, f)
   if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
   svg.addEventListener('pointerleave', () => setHover(f, false))
@@ -573,14 +584,44 @@ function start() {
   document.addEventListener('visibilitychange', () => !document.hidden && wake())
   // While a page is loading (it marks itself aria-busy) the face thinks.
   const watchBusy = () => {
-    const now = !!document.querySelector('main [aria-busy="true"]')
+    const now = !!document.querySelector('main[aria-busy="true"], main [aria-busy="true"]')
     if (now === !!busySince) return
     busySince = now ? performance.now() : 0
     wake()
   }
-  new MutationObserver(watchBusy).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
+  new MutationObserver((records) => {
+    join(records.flatMap((r) => [...r.addedNodes]))
+    watchBusy()
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
   reducedMotion?.addEventListener('change', wake)
   wake()
+}
+
+// Faces start moving once they are in the page, not when they are built: a page swapped in
+// through a view transition is put in the document a frame or more after it was built.
+function join(added: Iterable<Node>) {
+  const svgs: SVGSVGElement[] = []
+  for (const n of added) {
+    if (!(n instanceof Element)) continue
+    if (n.matches('svg[data-face], svg[data-face-stand]')) svgs.push(n as SVGSVGElement)
+    svgs.push(...n.querySelectorAll<SVGSVGElement>('svg[data-face], svg[data-face-stand]'))
+  }
+  let joined = false
+  for (const svg of svgs) {
+    if (!svg.isConnected) continue
+    const stand = standIns.get(svg)
+    if (stand) {
+      // The kept face takes its stand-in's place; its own insertion joins it on the next round.
+      svg.replaceWith(stand.free ? stand.hole : stand.svg)
+      continue
+    }
+    const f = made.get(svg)
+    if (f && !faces.has(f)) {
+      faces.add(f)
+      joined = true
+    }
+  }
+  if (joined) wake()
 }
 
 // (Re)starts the frame loop; it stops by itself once every face has settled.
@@ -766,6 +807,7 @@ function frame(ts: number) {
   let moving = false
   let dozing = false
   for (const f of faces) {
+    // It left the page. If the page puts it back (a kept header face), it joins again.
     if (!f.svg.isConnected) {
       faces.delete(f)
       continue

@@ -6,8 +6,12 @@
   /* modern-web-guidance «dark-mode»: one token set; light-dark() picks the value from the used
      color-scheme, which follows the system unless the <meta name=color-scheme> pins one. */
   color-scheme: light dark;
-  &:has(> head > meta[name='color-scheme'][content='dark']) { color-scheme: dark; }
-  &:has(> head > meta[name='color-scheme'][content='light']) { color-scheme: light; }
+  /* The scheme in use, as a value that style queries can test, for the few rules that change
+     something other than a colour (modern-web-guidance «selector-atrule-combinations»). */
+  --color-scheme: light;
+  @media (prefers-color-scheme: dark) { --color-scheme: dark; }
+  &:has(> head > meta[name='color-scheme'][content='dark']) { color-scheme: dark; --color-scheme: dark; }
+  &:has(> head > meta[name='color-scheme'][content='light']) { color-scheme: light; --color-scheme: light; }
   --page: light-dark(#f4f4f5, #131316);
   --surface: light-dark(#ffffff, #1c1c20);
   --surface-2: light-dark(#efeff1, #27272c);
@@ -27,19 +31,23 @@
   --danger: light-dark(#d03b3b, #f87171);
   --up: light-dark(#15803d, #4ade80);
   --down: light-dark(#c2410c, #fb923c);
-  --shadow: 0 1px 2px rgba(20, 20, 30, 0.05);
+  --shadow: 0 1px 2px light-dark(rgba(20, 20, 30, 0.05), transparent);
   --radius: 12px;
   --display: 'Nunito Variable', system-ui, sans-serif;
   --warm-soft: light-dark(#fdf4d8, #3a2f1a);
-  --kudo-bg: #fff8e1;
+  --kudo-bg: light-dark(#fff8e1, var(--surface-2));
   --prev: light-dark(#9181e0, #7d6bc0);
   --control-border: light-dark(#8e8d98, #6e6d78);
   --card-border: light-dark(rgba(20, 20, 30, 0.08), rgba(255, 255, 255, 0.08));
   --insight: var(--surface);
-  --seg-on: var(--surface);
-  --seg-on-ink: var(--accent);
-  --seg-shadow: 0 1px 2px rgba(20, 20, 30, 0.12);
-  --dc-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 8px 24px rgba(20, 20, 30, 0.08);
+  --seg-on: light-dark(var(--surface), #3a2c6b);
+  --seg-on-ink: light-dark(var(--accent), #ffffff);
+  --seg-shadow: 0 1px 2px light-dark(rgba(20, 20, 30, 0.12), transparent);
+  --dc-shadow: 0 1px 2px light-dark(rgba(20, 20, 30, 0.06), transparent), 0 8px 24px light-dark(rgba(20, 20, 30, 0.08), transparent), 0 20px 60px light-dark(transparent, rgba(0, 0, 0, 0.5));
+  --track: light-dark(#e2e2e7, #34343b);
+  /* Popovers (the account menu, the «?» help) sit a step above the card they open over. */
+  --pop-bg: light-dark(var(--surface), #2a2a30);
+  --pop-border: light-dark(rgb(20 20 30 / 0.12), rgb(255 255 255 / 0.18));
   --dc-mention: light-dark(rgba(88, 101, 242, 0.15), rgba(88, 101, 242, 0.3));
   --dc-mention-ink: light-dark(#505cdc, #c9cdfb);
   --dc-bg: light-dark(#ffffff, #313338);
@@ -51,26 +59,6 @@
   --dc-button-ink: light-dark(#060607, #ffffff);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
-/* Values light-dark() can't hold (shadows, references): the system preference unless pinned. */
-@media (prefers-color-scheme: dark) {
-  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) {
-    --shadow: none;
-    --kudo-bg: var(--surface-2);
-    --seg-on: #3a2c6b;
-    --seg-on-ink: #ffffff;
-    --seg-shadow: none;
-    --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  }
-}
-:root:has(> head > meta[name='color-scheme'][content='dark']) {
-  --shadow: none;
-  --kudo-bg: var(--surface-2);
-  --seg-on: #3a2c6b;
-  --seg-on-ink: #ffffff;
-  --seg-shadow: none;
-  --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
 * { box-sizing: border-box; }
 /* `hidden` always wins over a component's display (e.g. .btn's inline-flex). */
 [hidden] { display: none !important; }
@@ -101,9 +89,8 @@ a { color: var(--accent); }
 .user { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .user-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; flex: none; }
-.avatar-initial { display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 0.875rem; }
+.avatar-initial { display: inline-grid; place-items: center; background: var(--primary); color: #fff; font-weight: 700; font-size: 0.875rem; }
 @media (max-width: 480px) {
-  .user-name, .user .avatar { display: none; }
   .user { gap: 4px; }
   .user .btn { white-space: nowrap; padding: 6px 8px; }
   .lang-picker { padding: 5px 4px; }
@@ -152,7 +139,7 @@ a { color: var(--accent); }
 .hero h1 { font-size: clamp(2.5rem, 5vw, 3.25rem); letter-spacing: -0.02em; text-wrap: balance; }
 /* The highlighted words of the title, as if marked with a yellow pen. */
 .hero h1 mark { background: none; color: inherit; position: relative; white-space: nowrap; z-index: 0; }
-.hero h1 mark::after { content: ''; position: absolute; inset: auto -4px 0.1em; height: 0.32em; background: var(--sun); opacity: 0.5; border-radius: 2px; z-index: -1; }
+.hero h1 mark::after { content: ''; position: absolute; inset: auto -4px 0.1em; height: 0.32em; background: light-dark(color-mix(in srgb, var(--sun) 50%, transparent), color-mix(in srgb, var(--sun) 35%, transparent)); border-radius: 2px; z-index: -1; }
 .lead { font-size: 1.1875rem; max-width: 52ch; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 .hero-art { display: grid; place-items: center; min-height: 380px; }
@@ -168,12 +155,12 @@ a { color: var(--accent); }
 .shot-dark { display: none; }
 .report-shot { display: grid; gap: 24px; align-items: center; }
 .report-shot img { display: block; width: 100%; max-width: 420px; height: auto; border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--dc-shadow); }
+@container style(--color-scheme: dark) { .report-shot img { filter: brightness(0.88); } }
+@media (max-width: 600px) { .shot-frame { mask-image: linear-gradient(#000 85%, transparent); } }
 @media (min-width: 760px) { .report-shot { grid-template-columns: 1fr 420px; } }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .shot-frame .shot-light { display: none; }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .shot-frame .shot-dark { display: block; }
-@media (prefers-color-scheme: dark) {
-  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .shot-frame .shot-light { display: none; }
-  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .shot-frame .shot-dark { display: block; }
+@container style(--color-scheme: dark) {
+  .shot-frame .shot-light { display: none; }
+  .shot-frame .shot-dark { display: block; }
 }
 .feature-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px 48px; }
 .feature-list li { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -221,13 +208,17 @@ a { color: var(--accent); }
 .title-row { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .title-row > .icon-btn { flex: none; margin-top: 4px; }
 
-.segmented { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 10px; overflow-x: auto; scrollbar-width: none; }
+.segmented { display: flex; flex-wrap: nowrap; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 10px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
 .seg { flex: none; padding: 7px 14px; border-radius: 7px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; font-weight: 600; white-space: nowrap; }
 .seg:hover { color: var(--ink); }
 .seg-on { background: var(--seg-on); color: var(--seg-on-ink); box-shadow: var(--seg-shadow); }
 @media (min-width: 720px) { .segmented { width: fit-content; } }
 
 .dashboard { display: grid; gap: 20px; }
+/* The next page or period on its way: the page on screen stays, dimmed only if it takes a while
+   (the delay), and stays usable: another click simply asks for something newer. */
+main[aria-busy='true'] { opacity: 0.6; transition: opacity 150ms ease-out 300ms; }
+@media (prefers-reduced-motion: reduce) { main[aria-busy='true'] { transition: none; opacity: 0.8; } }
 .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .stat { gap: 4px; margin: 0; }
 .stat dd { margin-left: 0; }
@@ -293,18 +284,10 @@ svg.pickable { cursor: pointer; }
 
 /* Categorical colours for one line per server (validated order; dark steps for the dark surface). */
 :root {
-  --cat-1: #7c3aed; --cat-2: #eb6834; --cat-3: #1baf7a; --cat-4: #eda100;
-  --cat-5: #e87ba4; --cat-6: #008300; --cat-7: #2a78d6; --cat-8: #e34948;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) {
-    --cat-1: #9b72f8; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
-    --cat-5: #d55181; --cat-6: #008300; --cat-7: #3987e5; --cat-8: #e66767;
-  }
-}
-:root:has(> head > meta[name='color-scheme'][content='dark']) {
-  --cat-1: #9b72f8; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
-  --cat-5: #d55181; --cat-6: #008300; --cat-7: #3987e5; --cat-8: #e66767;
+  --cat-1: light-dark(#7c3aed, #9b72f8); --cat-2: light-dark(#eb6834, #d95926);
+  --cat-3: light-dark(#1baf7a, #199e70); --cat-4: light-dark(#eda100, #c98500);
+  --cat-5: light-dark(#e87ba4, #d55181); --cat-6: #008300;
+  --cat-7: light-dark(#2a78d6, #3987e5); --cat-8: light-dark(#e34948, #e66767);
 }
 
 .topbar-left { display: flex; align-items: center; gap: 20px; min-width: 0; }
@@ -460,7 +443,7 @@ svg.pickable { cursor: pointer; }
 .dc-button.dc-emoji { font-size: 1.25rem; padding: 2px 14px; }
 .btn-primary { background: var(--primary); color: #fff; border-color: transparent; }
 .btn-primary:disabled { opacity: 0.45; cursor: default; filter: none; }
-.success { color: #006300; }
+.success { color: light-dark(#006300, #0ca30c); }
 .error { color: var(--danger); }
 .danger { margin-top: 24px; border-color: color-mix(in srgb, var(--danger) 45%, transparent); gap: 12px; }
 .danger h2 { color: var(--danger); }
@@ -476,8 +459,6 @@ svg.pickable { cursor: pointer; }
 .btn-danger:disabled { opacity: 0.45; cursor: default; filter: none; }
 .btn-danger-outline { color: var(--danger); border-color: var(--danger); background: transparent; }
 .btn-danger-outline:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); filter: none; }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .success { color: #0ca30c; } }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .success { color: #0ca30c; }
 
 /* «Who's who?» game */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -521,10 +502,8 @@ svg.pickable { cursor: pointer; }
 .reveal li:last-child { border-bottom: 0; }
 .reveal-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 0.875rem; }
 .pill { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
-.pill-right { background: #d6f2e0; color: #0b5a2a; }
+.pill-right { background: light-dark(#d6f2e0, #12391f); color: light-dark(#0b5a2a, #8fe0aa); }
 .pill-wrong { background: var(--surface-2); color: var(--ink-2); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .pill-right { background: #12391f; color: #8fe0aa; } }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .pill-right { background: #12391f; color: #8fe0aa; }
 /* The nav scrolls rather than overflow the page if a translation runs long. */
 .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 
@@ -608,21 +587,19 @@ main:focus { outline: none; }
 .swatch-line { display: inline-block; width: 16px; height: 0; border-top: 2.5px solid var(--series); }
 .swatch-dashed { border-top: 2px dashed var(--prev); }
 .chart .line-dashed { stroke-dasharray: 5 4; stroke-width: 2; }
-.bar-warm { background: var(--sun); }
+.bar-warm { background: var(--sun); outline: 1px solid light-dark(#b45309, transparent); outline-offset: -1px; } /* the yellow alone is 1.7:1 on white */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font: inherit; font-size: 0.8125rem; padding: 4px 10px; border-radius: 999px; border: 0; background: var(--surface-2); color: var(--ink-2); cursor: pointer; }
 .chip:hover { color: var(--ink); }
-.chip-on, .chip-on:hover { background: var(--series); color: #fff; }
-.kudo { margin: 0; padding: 13px 16px; border-radius: 18px; background: var(--kudo-bg); display: grid; gap: 2px; cursor: pointer; }
+.chip-on, .chip-on:hover { background: light-dark(var(--series), var(--seg-on)); color: #fff; }
+.kudo { margin: 0; padding: 12px 15px; border: 1px solid light-dark(transparent, color-mix(in srgb, var(--sun) 35%, transparent)); border-radius: 18px; background: var(--kudo-bg); display: grid; gap: 2px; cursor: pointer; }
 .confetti { position: fixed; z-index: 50; width: 10px; height: 14px; border-radius: 2px; pointer-events: none; }
 /* What flies out of the live logo (effects.ts), and the logo itself while it is out of its square. */
 .fx { position: fixed; z-index: 60; pointer-events: none; overflow: visible; }
 .brand-mark { touch-action: manipulation; cursor: grab; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* Out of its square: only the face flies, with a soft shadow under it. */
 /* Above the page and its sticky bars, below dialogs (.canvas-modal-back is 30). */
-.brand-mark.face-free { position: fixed; z-index: 25; width: 44px; height: 44px; border-radius: 0; touch-action: none; filter: drop-shadow(0 6px 8px rgba(20, 20, 30, 0.28)); }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); } }
+.brand-mark.face-free { position: fixed; z-index: 25; width: 44px; height: 44px; border-radius: 0; touch-action: none; filter: drop-shadow(0 5px 9px light-dark(rgba(20, 20, 30, 0.28), rgba(0, 0, 0, 0.6))) drop-shadow(0 0 1px light-dark(transparent, rgba(255, 255, 255, 0.35))); }
 .brand-mark.face-held { cursor: grabbing; }
 /* The square the face left (drawn in face.ts): a click puts the face back. */
 .brand-mark.brand-hole { cursor: pointer; }
@@ -670,14 +647,10 @@ main:focus { outline: none; }
 .unsaved { color: var(--muted); font-size: 0.875rem; }
 .unsaved.on { color: var(--accent); font-weight: 600; }
 @media (max-width: 560px) {
-  .segmented { display: grid; grid-template-columns: repeat(3, 1fr); border-radius: 18px; overflow: visible; }
-  .seg { text-align: center; padding: 8px 6px; }
   .card-head { flex-wrap: wrap; }
 }
 .stat-emoji { font-size: 0.7em; vertical-align: 0.12em; }
 .bar-kudo { background: var(--series); }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); } }
 .todo li { display: grid; grid-template-columns: 1.25em 1fr auto; gap: 10px; align-items: baseline; }
 .todo li > :nth-child(2) { min-width: 0; }
 .todo-info svg { width: 1em; height: 1em; vertical-align: -0.15em; }
@@ -702,11 +675,7 @@ main:focus { outline: none; }
 @media (max-width: 640px) { .demo-head { position: static; } }
 .demo-back { display: none; }
 @media (max-width: 640px) { .topbar .demo-back { display: inline; font-size: 0.875rem; font-weight: 600; color: var(--accent); } }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .hero h1 mark::after { opacity: 0.35; } }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .hero h1 mark::after { opacity: 0.35; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .chip-on, :root:has(> head > meta[name='color-scheme'][content='dark']) .chip-on:hover { background: var(--seg-on); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .chip-on, :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .chip-on:hover { background: var(--seg-on); } }
 .sk-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 @media (max-width: 720px) { .sk-row { grid-template-columns: repeat(2, 1fr); } }
 .chart.hovering .note { visibility: hidden; }
@@ -890,9 +859,6 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .mygames-bars li { display: grid; justify-items: center; gap: 2px; white-space: nowrap; }
 .mygames-col { display: flex; align-items: flex-end; width: 100%; max-width: 36px; height: 72px; background: var(--track, var(--surface-2)); border-radius: 6px; overflow: hidden; }
 .mygames-fill { display: block; width: 100%; background: var(--series); border-radius: 6px 6px 0 0; }
-:root { --track: #e2e2e7; }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) { --track: #34343b; } }
-:root:has(> head > meta[name='color-scheme'][content='dark']) { --track: #34343b; }
 @media (max-width: 760px) {
   .history-row summary, .history-off { grid-template-columns: minmax(0, 1fr) 5.5rem; }
   .history-when { grid-column: 1 / -1; grid-row: 1; }
@@ -925,7 +891,7 @@ h1 { font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem); }
 /* «dark-mode», «browser-ui-theming»: tint the browser's own UI instead of rebuilding it. */
 :root {
   accent-color: var(--series);
-  scrollbar-color: light-dark(#8e8d98, #6e6d78) var(--page);
+  scrollbar-color: var(--control-border) var(--page);
 }
 ::selection { background: color-mix(in oklab, var(--series) 28%, transparent); }
 
@@ -940,8 +906,16 @@ h1 { font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem); }
 /* «natural-interactions»: hover, press and focus each look different; focus is an outline with
    an offset (kept by forced colours), never only a shadow. */
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* A heading takes focus only so that reading starts there after moving to another page; it is
+   not a control, so no ring. */
+:where(h1, main)[tabindex='-1']:focus { outline: none; }
+/* Pressed links and buttons show their own :active state; no grey box from the browser on top. */
+:root { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: no-preference) {
   :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn) { transition: background-color 150ms ease-out, box-shadow 150ms ease-out, scale 150ms ease-out; }
+  /* These animate hover and press, not a theme change or a new page: while a view transition
+     cross-fades the whole page, they jump, so nothing lags behind the fade. */
+  :active-view-transition :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn) { transition: none; }
   :where(.btn, .account-btn):active { scale: 0.97; }
 }
 .btn:hover { box-shadow: 0 2px 8px rgb(20 20 30 / 0.12); }
@@ -963,13 +937,12 @@ html { container-type: scroll-state; }
   .topbar:not(:focus-within, :has(:popover-open)) { translate: 0 -100%; }
 }
 .topbar.is-hidden:not(:focus-within, :has(:is(:popover-open, .\:popover-open))) { translate: 0 -100%; }
-:target { scroll-margin-top: 4.5rem; }
+:target { scroll-margin-top: calc(var(--topbar-h, 0px) + 16px); }
 /* Phones: still one row (logo, links, account), no second row for the links. */
 @media (max-width: 480px) {
   .topbar { flex-wrap: nowrap; padding-bottom: 12px; }
   .topbar .topbar-left { display: flex; min-width: 0; }
   .topbar .nav { order: 0; flex: 0 1 auto; margin: 0; overflow-x: auto; }
-  .user .avatar { display: block; }
 }
 
 /* The account button and its popover (theme, language, log out). */
@@ -981,16 +954,14 @@ html { container-type: scroll-state; }
 .account-btn .icon { width: 16px; height: 16px; color: var(--muted); }
 .account-btn:has(+ :popover-open) .icon { rotate: 180deg; }
 @media (max-width: 480px) {
-  /* The name stays in the button's accessible name, only hidden from sight. */
+  /* The name stays in the button's accessible name, only hidden from sight (as .sr-only). */
   .user-name { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .account-btn { padding-right: 6px; gap: 4px; }
 }
 .account-menu {
-  /* popovertarget makes the button the anchor: open below it, from its corner. */
-  inset: auto; margin: 8px 0 0; position-area: block-end span-inline-start; position-try-fallbacks: flip-block;
   transform-origin: top right;
-  inline-size: min(320px, calc(100dvw - 32px)); padding: 16px; border-radius: 14px;
-  border: 1px solid var(--card-border); background: var(--surface); color: var(--ink);
+  inline-size: min(320px, calc(100dvw - 32px)); block-size: max-content; max-block-size: calc(100dvh - 80px); overflow: auto;
+  padding: 16px; border-radius: 14px; border: 1px solid var(--pop-border); background: var(--pop-bg); color: var(--ink);
   box-shadow: 0 12px 32px rgb(20 20 30 / 0.16);
 }
 .account-menu:is(:popover-open, .\:popover-open) { display: grid; gap: 16px; animation: mwg-fade 150ms ease-out both; }
@@ -1001,14 +972,14 @@ html { container-type: scroll-state; }
 @keyframes mwg-fade { from { opacity: 0; } }
 .account-who { display: grid; gap: 0; }
 .theme-field { border: 0; padding: 0; margin: 0; display: grid; gap: 2px; min-inline-size: 0; }
-.theme-field legend, .lang-field label { font-weight: 700; font-size: 0.8125rem; color: var(--ink-2); padding: 0 0 6px; }
+.theme-field legend, .lang-field-name { font-weight: 700; font-size: 0.8125rem; color: var(--ink-2); padding: 0 0 6px; }
 .choice { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .choice:hover { background: var(--surface-2); }
 .choice:has(:checked) { background: var(--surface-2); font-weight: 600; }
 .choice input { margin: 0; }
 .lang-field { display: grid; }
 .account-menu .lang-picker { inline-size: 100%; border-radius: 8px; padding: 8px 10px; font-size: 0.9375rem; color: var(--ink); }
-.account-out { justify-content: flex-start; gap: 10px; border-top: 1px solid var(--border); border-radius: 0; padding: 14px 8px 2px; }
+.account-out { justify-content: flex-start; gap: 10px; border-width: 1px 0 0; border-color: var(--border); border-radius: 0; padding: 14px 8px 2px; min-block-size: var(--target); }
 .account-out:hover { background: none; color: var(--accent); }
 /* «branded-select-styling»: the native <select>, customisable where supported. */
 @supports (appearance: base-select) {
@@ -1019,7 +990,7 @@ html { container-type: scroll-state; }
 }
 /* The landing's language picker, in its footer. */
 .landing-footer .lang-field { display: inline-flex; align-items: center; gap: 8px; }
-.landing-footer .lang-field label { padding: 0; font-weight: 500; color: var(--muted); }
+.landing-footer .lang-field-name { padding: 0; font-weight: 500; color: var(--muted); }
 .landing-footer .lang-picker { border-radius: 8px; }
 .btn-compact { padding: 8px 14px; font-size: 0.9375rem; }
 
@@ -1028,19 +999,17 @@ html { container-type: scroll-state; }
    underline (a shape), not only a colour; it scrolls into view on load. */
 @property --fade-start { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --fade-end { syntax: '<length>'; inherits: false; initial-value: 0px; }
-.segmented {
-  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
-  mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
-  animation: mwg-edges linear both; animation-timeline: scroll(self inline);
+@supports (animation-timeline: scroll()) {
+  .segmented {
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+    animation: mwg-edges linear both; animation-timeline: scroll(self inline);
+  }
 }
 @keyframes mwg-edges { 0% { --fade-start: 0px; --fade-end: 28px; } 8%, 92% { --fade-start: 28px; --fade-end: 28px; } 100% { --fade-start: 28px; --fade-end: 0px; } }
 .seg { scroll-snap-align: start; position: relative; white-space: nowrap; }
 .seg[aria-current] { scroll-initial-target: nearest; scroll-snap-align: center; }
 .seg[aria-current]::before { content: ''; position: absolute; inset-inline: 12px; inset-block-end: 3px; border-block-end: 2px solid currentColor; border-radius: 2px; }
-@media (max-width: 560px) {
-  .segmented { display: flex; border-radius: 10px; overflow-x: auto; }
-  .seg { padding: 8px 12px; }
-}
+@media (max-width: 560px) { .seg { padding: 8px 12px; } }
 
 /* «card», «fluid-scaling», «form-factor-adaptation»: each figure is an <article> and its own
    size container; the number scales with the card, not the window. */
@@ -1061,10 +1030,19 @@ html { container-type: scroll-state; }
 .tip-btn:hover, .tip-btn[aria-expanded='true'] { color: var(--ink); border-color: var(--ink-2); background: var(--surface-2); }
 [interestfor] { --interest-delay-start: 0.3s; interest-delay-start: var(--interest-delay-start); }
 .tip {
-  inset: auto; margin: 6px 0; position-area: block-end center; position-try-fallbacks: block-end span-inline-end, block-end span-inline-start, flip-block;
   max-inline-size: min(34ch, calc(100dvw - 32px)); padding: 10px 12px; border-radius: 10px;
-  border: 1px solid var(--card-border); background: var(--surface); color: var(--ink);
+  border: 1px solid var(--pop-border); background: var(--pop-bg); color: var(--ink);
   box-shadow: 0 10px 28px rgb(20 20 30 / 0.18); font-size: 0.875rem; line-height: 1.45; font-weight: 400;
+}
+/* «viewport-aware-dropdowns» option 2: popovertarget makes the button the anchor, so with anchor
+   positioning both open next to their button. Without it, the account menu sits under the bar on
+   the right, and a «?» opens where the browser centres popovers. */
+@supports (position-area: block-end) {
+  .account-menu { inset: auto; margin: 8px 0 0; position-area: block-end span-inline-start; position-try-fallbacks: flip-block; }
+  .tip { inset: auto; margin: 6px 0; position-area: block-end center; position-try-fallbacks: block-end span-inline-end, block-end span-inline-start, flip-block; }
+}
+@supports not (position-area: block-end) {
+  .account-menu { position: fixed; inset: calc(var(--topbar-h, 0px) + 8px) 16px auto auto; margin: 0; }
 }
 
 /* «color»: the lowest weekday says so in words, not only in yellow. */
@@ -1075,21 +1053,22 @@ html { container-type: scroll-state; }
    The radio is hidden from sight but stays focusable; a check mark (not only colour) shows the
    choice, in space reserved so nothing moves when it changes («card»). */
 fieldset.chips { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
-label.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding-inline: 10px 12px; }
+label.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding-inline: 10px 12px; border: 1px solid transparent; }
 label.chip input { position: absolute; opacity: 0; inline-size: 1px; block-size: 1px; margin: 0; }
 /* A radio mark of the same size in both states: an empty ring, or a ring with a dot. */
 .chip-mark { inline-size: 12px; block-size: 12px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; margin-inline-end: 2px; }
-label.chip:has(:checked) { background: var(--series); color: #fff; }
+label.chip:has(:checked) { background: light-dark(var(--series), var(--seg-on)); border-color: var(--accent); color: #fff; }
 label.chip:has(:checked) .chip-mark { background: radial-gradient(currentColor 0 3px, transparent 3.5px); }
 @media (forced-colors: active) { label.chip:has(:checked) .chip-mark { border-width: 4px; } }
 label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-:root:has(> head > meta[name='color-scheme'][content='dark']) label.chip:has(:checked) { background: var(--seg-on); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) label.chip:has(:checked) { background: var(--seg-on); } }
+.chip-clear { border: 1px dashed var(--control-border); background: transparent; }
 
 /* «content-first-noise-reduction»: «Server status» is a <details>, closed unless something is
    pending; its summary says whether all is well and when the next survey goes out. */
 .health-card { gap: 0; }
 .health-card[open] { gap: 16px; }
+.health-card[open] .health-sum-next { display: none; }
+.health-card .todo { margin-block-start: 8px; }
 .health-card > summary { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-inline-end: 32px; cursor: pointer; list-style: none; border-radius: 8px; }
 .health-card > summary::-webkit-details-marker { display: none; }
 .health-card > summary::after {
@@ -1097,7 +1076,7 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
   border-inline-end: 2px solid var(--ink-2); border-block-end: 2px solid var(--ink-2); rotate: 45deg; translate: 0 -75%;
 }
 .health-card[open] > summary::after { rotate: 225deg; translate: 0 -25%; }
-.health-sum-title { font-family: var(--display); font-weight: 800; font-size: 1.1875rem; }
+.health-sum-title { margin: 0; font-family: var(--display); font-weight: 800; font-size: 1.1875rem; }
 .health-sum-state { font-size: 0.875rem; font-weight: 700; color: var(--up); }
 .health-sum-state::before { content: '✓ '; content: '✓ ' / ''; }
 .health-sum-state.todo { color: var(--down); }
@@ -1108,21 +1087,6 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .feature { display: grid; gap: 6px; }
 .report-figure { margin: 0; }
 
-/* «same-document-transitions»: a short cross-fade between pages; the bar stays put. */
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
-.account-menu { block-size: max-content; max-block-size: calc(100dvh - 80px); overflow: auto; }
-.account-out { border-width: 1px 0 0; border-color: var(--border); min-block-size: var(--target); }
-.health-card[open] .health-sum-next { display: none; }
-
-/* After the reviews (UI): */
-.user .avatar-initial { display: grid; place-items: center; }
-:root { --pop-bg: light-dark(var(--surface), #2a2a30); --pop-border: light-dark(rgb(20 20 30 / 0.12), rgb(255 255 255 / 0.18)); }
-.tip, .account-menu { background: var(--pop-bg); border-color: var(--pop-border); }
-.bar-warm { outline: 1px solid light-dark(#b45309, transparent); outline-offset: -1px; }
-label.chip { border: 1px solid transparent; }
-label.chip:has(:checked) { border-color: var(--accent); }
-.health-card .todo { margin-block-start: 8px; }
-:root:has(> head > meta[name='color-scheme'][content='dark']) .report-shot img { filter: brightness(0.88); }
-@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .report-shot img { filter: brightness(0.88); } }
-@media (max-width: 600px) { .shot-frame { mask-image: linear-gradient(#000 85%, transparent); } }
-.chip-clear { border: 1px dashed var(--control-border); background: transparent; }
+/* «same-document-transitions»: a short cross-fade, the same length for every part (the page,
+   and the top bar, which is its own part so that it stays put between pages). */
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 160ms; }

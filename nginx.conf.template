@@ -65,6 +65,12 @@ server {
     location = /demo/ {
         return 301 /demo$is_args$args;
     }
+    # Applies the saved light/dark choice before the first paint (index.html loads it by this
+    # fixed name, so it can't be hashed into /assets/). Revalidated like the page that loads it.
+    location = /theme-boot.js {
+        try_files $uri =404;
+        expires -1;
+    }
     # The link preview image (og:image) needs a fixed URL, so it isn't under /assets/.
     location = /og.png {
         try_files $uri =404;
