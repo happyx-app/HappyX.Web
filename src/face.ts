@@ -74,7 +74,6 @@ type Face = {
   hover: boolean
   lens: SVGPathElement // the right half's lens, hidden while facing front
   still?: boolean // drawn at rest for reduced motion
-  added: number // when the page last asked for this face; it may join the page a moment later
   bg: SVGRectElement // the violet square, left behind when the face is taken out
   spirals: SVGGElement[] // the dizzy eyes, one per side, so each can spin
   stars: SVGPathElement[] // the stars that circle a dizzy head
@@ -99,7 +98,12 @@ type Free = {
   bounced: number // when it last hit an edge hard
 }
 
+// The faces in the page right now, which the frame loop moves. A face joins this set when it
+// enters the page (see join) and leaves it when it leaves the page.
 const faces = new Set<Face>()
+// Every face drawn, found again from its element when that element enters the page. Weak, so a
+// face built for a page that was never shown is simply collected.
+const made = new WeakMap<SVGSVGElement, Face>()
 let uid = 0
 
 const lensPath =
@@ -115,9 +119,6 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   if (old) {
     old.center = null
     old.hover = false
-    old.added = performance.now()
-    faces.add(old)
-    wake()
     // Out of its square: the new header gets the empty square, and the face stays where it is.
     return old.free ? old.hole : old.svg
   }
@@ -162,7 +163,7 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
   const bg = s('rect', { width: 64, height: 64, rx: 14, fill: '#8b5cf6' })
   const svg = s(
     'svg',
-    { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false' },
+    { class: cls, viewBox: '0 0 64 64', 'aria-hidden': 'true', focusable: 'false', 'data-face': '' },
     s(
       'defs',
       {},
@@ -191,8 +192,8 @@ export function face(cls = 'brand-mark', slot?: string): SVGSVGElement {
     s('circle', { cx: 32, cy: 32.8, r: 23.4, fill: '#4c1d95' }),
     s('circle', { cx: 32, cy: 35.4, r: 21.6, fill: '#6d3fd6' }),
   )
-  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null, dizzyAt: -1e9, added: performance.now() }
-  faces.add(f)
+  const f: Face = { svg, glasses, shine, halves, cut: halves[0].firstElementChild as SVGGElement, cutClip: `url(#${id}-l)`, shade, light, mouth, tongue, eyes, heart, pose: { ...rest }, speed: { ...zero }, shineAt: { x: 0, y: 0, vx: 0, vy: 0 }, center: null, hover: false, lens: halves[1].querySelector('path')!, bg, spirals, stars, hole, free: null, dizzyAt: -1e9 }
+  made.set(svg, f)
   if (slot) kept.set(slot, f)
   svg.addEventListener('pointerenter', () => setHover(f, true))
   svg.addEventListener('pointerleave', () => setHover(f, false))
@@ -580,9 +581,26 @@ function start() {
     busySince = now ? performance.now() : 0
     wake()
   }
-  new MutationObserver(watchBusy).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
+  new MutationObserver((records) => {
+    if (records.some((r) => r.addedNodes.length)) join()
+    watchBusy()
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
   reducedMotion?.addEventListener('change', wake)
   wake()
+}
+
+// Faces start moving once they are in the page, not when they are built: a page swapped in
+// through a view transition is put in the document a frame or more after it was built.
+function join() {
+  let joined = false
+  for (const svg of document.querySelectorAll<SVGSVGElement>('svg[data-face]')) {
+    const f = made.get(svg)
+    if (f && !faces.has(f)) {
+      faces.add(f)
+      joined = true
+    }
+  }
+  if (joined) wake()
 }
 
 // (Re)starts the frame loop; it stops by itself once every face has settled.
@@ -752,7 +770,6 @@ function still() {
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const step = 1000 / 60
-const joinWithin = 2000
 
 function frame(ts: number) {
   raf = 0
@@ -769,11 +786,9 @@ function frame(ts: number) {
   let moving = false
   let dozing = false
   for (const f of faces) {
+    // It left the page. If the page puts it back (a kept header face), it joins again.
     if (!f.svg.isConnected) {
-      // A page drawn through a view transition puts its header in a frame or two later: wait for
-      // it. A face still missing after that belongs to a page that is gone.
-      if (now - f.added < joinWithin) moving = true
-      else faces.delete(f)
+      faces.delete(f)
       continue
     }
     f.still = false
