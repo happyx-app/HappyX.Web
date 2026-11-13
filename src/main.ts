@@ -115,10 +115,17 @@ async function route() {
   renderGuilds(me)
 }
 
-// Draws a page. The promise settles once the new content is in the document: with a view
-// transition that is a moment later, so work on the new page's elements waits for it.
-function page(...children: (Node | null)[]): Promise<void> {
+// Draws a page. The promise settles once the new content is in the document (with a view
+// transition that is a moment later, so work on the new page's elements waits for it), with
+// false if a newer page was asked for in the meantime and this one was never drawn.
+let pages = 0
+function page(...children: (Node | null)[]): Promise<boolean> {
+  const mine = ++pages
   const nodes = children.filter((c): c is Node => c !== null)
+  // The section each top bar marks, as this page wants it: applied when the page is drawn, so a
+  // kept bar doesn't change ahead of the page it belongs to.
+  const marks = nodes.flatMap((n) => (n instanceof HTMLElement ? (n.matches('.topbar') ? [n] : [...n.querySelectorAll<HTMLElement>('.topbar')]) : []))
+    .map((bar) => [bar, sectionOf.get(bar) ?? 'none'] as const)
   // In the demo the notice stays on top, together with the top bar.
   if (api.isDemo && nodes[0] instanceof HTMLElement && nodes[0].classList.contains('topbar')) {
     const top = nodes[0]
@@ -129,8 +136,14 @@ function page(...children: (Node | null)[]): Promise<void> {
   const first = shownPath === null
   const newPage = !first && path !== shownPath
   shownPath = path
+  let drawn = false
   const update = () => {
+    // Pages are drawn in the order they were asked for, and only the latest one at all: a page
+    // still waiting for its fade when a newer one comes is dropped, never drawn over it.
+    if (mine !== pages) return
+    drawn = true
     mount([...skipLink(nodes), ...nodes], !newPage && !first)
+    for (const [bar, section] of marks) markSection(bar, section)
     stickUnderTopbar()
     if (newPage) {
       window.scrollTo(0, 0)
@@ -146,9 +159,9 @@ function page(...children: (Node | null)[]): Promise<void> {
   }
   // A new page cross-fades in. New data on the same page (another period, a reload after saving)
   // just appears, where the reader already is.
-  if (newPage) return crossFade(update)
+  if (newPage) return crossFade(update).then(() => drawn)
   update()
-  return Promise.resolve()
+  return Promise.resolve(drawn)
 }
 
 // Shell parts (the top bar, the footer) that a render hands back unchanged are already on the
@@ -257,18 +270,31 @@ function languageField() {
 const systemDark = matchMedia('(prefers-color-scheme: dark)')
 const systemNow = () => t('theme.system.now', { mode: t(systemDark.matches ? 'theme.dark' : 'theme.light').toLocaleLowerCase(lang) })
 
+// The chosen radio is checked and carries autofocus: opening the account menu puts focus on it,
+// the first thing to act on in the menu.
+function markTheme(choice: ThemeChoice) {
+  for (const r of document.querySelectorAll<HTMLInputElement>('input[name="theme"]')) {
+    r.checked = r.value === choice
+    r.autofocus = r.checked
+  }
+}
+
 function themeField() {
   const now = savedTheme()
   const option = (value: ThemeChoice, label: string) =>
-    h('label', { class: 'choice' }, h('input', { type: 'radio', name: 'theme', value, checked: value === now, onchange: () => void crossFade(() => setTheme(value)) }), h('span', { class: value === 'system' ? 'theme-system-now' : undefined }, label))
+    h('label', { class: 'choice' }, h('input', {
+      type: 'radio', name: 'theme', value, checked: value === now, autofocus: value === now,
+      onchange: () => {
+        markTheme(value)
+        void crossFade(() => setTheme(value))
+      },
+    }), h('span', { class: value === 'system' ? 'theme-system-now' : undefined }, label))
   return h('fieldset', { class: 'theme-field' }, h('legend', {}, t('theme.label')), option('system', systemNow()), option('light', t('theme.light')), option('dark', t('theme.dark')))
 }
 
 // Once for the whole app, not per menu: the radios follow a choice made in another tab, and
 // «System» says what the system uses right now.
-onThemeChange((choice) => {
-  for (const r of document.querySelectorAll<HTMLInputElement>('input[name="theme"]')) r.checked = r.value === choice
-})
+onThemeChange(markTheme)
 systemDark.addEventListener('change', () => {
   for (const el of document.querySelectorAll('.theme-system-now')) el.textContent = systemNow()
 })
@@ -295,13 +321,19 @@ function header(m: api.Me, active: Section = 'servers') {
   const links = { me: true, servers: m.guilds.length > 0 || memberGuilds(m).length > 0, games: m.games.length > 0 }
   const key = JSON.stringify(['header', m.user.discord_user_id, m.user.username, m.user.avatar, links])
   const bar = shell(key, () => buildHeader(m, links))
+  sectionOf.set(bar, active)
+  return bar
+}
+
+// The «you are here» mark of a signed-in top bar; page() moves it when it draws the page.
+const sectionOf = new WeakMap<HTMLElement, Section>()
+function markSection(bar: HTMLElement, active: Section) {
   for (const a of bar.querySelectorAll<HTMLAnchorElement>('a[data-section]')) {
     const on = a.dataset.section === active
     a.classList.toggle('nav-on', on)
     if (on) a.setAttribute('aria-current', 'page')
     else a.removeAttribute('aria-current')
   }
-  return bar
 }
 
 function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolean>) {
@@ -335,9 +367,11 @@ function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolea
       'div',
       { class: 'user' },
       h('button', { class: 'account-btn', type: 'button', popovertarget: 'account-menu', 'aria-label': t('account.button', { name: u.username }) }, avatar, h('span', { class: 'user-name' }, u.username), icons.chevron()),
+      // A non-modal dialog shown as a popover: the button opens and closes it, Esc and a click
+      // outside close it, and focus moves into it (to the radio with autofocus).
       h(
-        'div',
-        { id: 'account-menu', class: 'account-menu', popover: 'auto', role: 'dialog', 'aria-labelledby': 'account-who' },
+        'dialog',
+        { id: 'account-menu', class: 'account-menu', popover: 'auto', 'aria-labelledby': 'account-who' },
         h('p', { class: 'account-who' }, h('strong', { id: 'account-who' }, u.username), h('span', { class: 'muted small' }, t('account.via'))),
         themeField(),
         languageField(),
@@ -679,7 +713,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   )
   // «scroll-target-on-load» fallback: the CSS (scroll-initial-target) brings the current period
   // into view on a phone; older browsers get the same from script.
-  if (!CSS.supports('scroll-initial-target', 'nearest')) void shown.then(() => picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+  if (!CSS.supports('scroll-initial-target', 'nearest')) void shown.then((drawn) => drawn && picker.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
 
   const before = previousRange(range, preset)
   let r: api.Report
@@ -1396,7 +1430,7 @@ async function renderSettings(m: api.Me, guildID: string, focus: string | null =
       ),
     ),
   )
-  await shown
+  if (!(await shown)) return
   // «Start →», «Change →» and the like open the page on the control they are about.
   const target = focus ? document.getElementById(focus) : null
   if (target) {
@@ -1723,17 +1757,18 @@ function messagesCard(r: api.Report) {
   return { card, show, showDays, countIn }
 }
 
-// A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
 // The part of a page that shows loaded data. Opened again for other data (another period), it
 // keeps what is on screen, dimmed only if loading takes a while, until the new content
 // cross-fades in: no skeleton in between. The first time, it starts with a skeleton.
 function dataArea(key: string, shape: 'dashboard' | 'me' | 'game') {
   const onScreen = [...app.querySelectorAll<HTMLElement>('.dashboard[data-area]')].find((el) => el.dataset.area === key)
-  const body = h('div', { class: 'dashboard', 'data-area': key, 'aria-busy': 'true' }, ...(onScreen ? [...onScreen.childNodes] : [skeleton(shape)]))
+  // What stays on screen is out of date: it can't be used until the new content replaces it.
+  const body = h('div', { class: 'dashboard', 'data-area': key, 'aria-busy': 'true', inert: onScreen ? true : undefined }, ...(onScreen ? [...onScreen.childNodes] : [skeleton(shape)]))
   const show = (...nodes: Node[]) => {
     const swap = () => {
       body.replaceChildren(...nodes)
       body.removeAttribute('aria-busy')
+      body.inert = false
     }
     // Still on its way in (the page fade hasn't drawn it yet): the page arrives with the data,
     // no skeleton. Already on screen: cross-fade from what it shows.
@@ -1743,6 +1778,7 @@ function dataArea(key: string, shape: 'dashboard' | 'me' | 'game') {
   return { body, show }
 }
 
+// A grey outline of what is loading, in the page's own shape so nothing jumps when it arrives.
 function skeleton(shape: 'dashboard' | 'me' | 'game' = 'dashboard') {
   if (shape === 'me') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-chart' }), h('div', { class: 'grid-2' }, h('div', { class: 'sk sk-card' })))
   if (shape === 'game') return h('div', { class: 'skeleton' }, h('div', { class: 'sk sk-steps' }), h('div', { class: 'sk sk-card' }))

@@ -77,13 +77,14 @@ export function crossFade(update: () => void): Promise<void> {
     update()
     return Promise.resolve()
   }
-  const drawn = fading.then(() => {
+  const started = fading.then(() => {
     const vt = document.startViewTransition(update)
-    fading = vt.finished.catch(() => {})
-    return vt.updateCallbackDone
+    vt.ready.catch(() => {}) // skipped (the page was hidden, say): the update still runs
+    return vt
   })
-  fading = drawn.catch(() => {})
-  return drawn
+  // The next fade starts only once this one has finished, whatever happened to it.
+  fading = started.then((vt) => vt.finished).catch(() => {})
+  return started.then((vt) => vt.updateCallbackDone)
 }
 
 // «accessibility»: every page its own title, front-loaded.

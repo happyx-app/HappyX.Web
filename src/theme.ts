@@ -27,8 +27,15 @@ export function savedTheme(): ThemeChoice {
   }
 }
 
+// theme-boot.js is loaded by index.html before this module; without it nothing can change the
+// theme, and that has to show up as an error, not as radios that silently do nothing.
+function apply(choice: ThemeChoice) {
+  if (!window.happyxTheme) throw new Error('HappyX: theme-boot.js did not load, so the theme cannot change')
+  window.happyxTheme(choice)
+}
+
 export function setTheme(choice: ThemeChoice) {
-  window.happyxTheme?.(choice)
+  apply(choice)
   try {
     if (choice === 'system') localStorage.removeItem(storageKey)
     else localStorage.setItem(storageKey, choice)
@@ -42,7 +49,7 @@ export function onThemeChange(changed: (choice: ThemeChoice) => void) {
   addEventListener('storage', (e) => {
     if (e.key !== storageKey && e.key !== null) return
     const choice = savedTheme()
-    window.happyxTheme?.(choice)
+    apply(choice)
     changed(choice)
   })
 }

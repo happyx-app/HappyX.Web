@@ -590,7 +590,7 @@ function start() {
     wake()
   }
   new MutationObserver((records) => {
-    if (records.some((r) => r.addedNodes.length)) join()
+    join(records.flatMap((r) => [...r.addedNodes]))
     watchBusy()
   }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] })
   reducedMotion?.addEventListener('change', wake)
@@ -599,13 +599,22 @@ function start() {
 
 // Faces start moving once they are in the page, not when they are built: a page swapped in
 // through a view transition is put in the document a frame or more after it was built.
-function join() {
-  for (const stand of document.querySelectorAll<SVGSVGElement>('svg[data-face-stand]')) {
-    const f = standIns.get(stand)
-    if (f) stand.replaceWith(f.free ? f.hole : f.svg)
+function join(added: Iterable<Node>) {
+  const svgs: SVGSVGElement[] = []
+  for (const n of added) {
+    if (!(n instanceof Element)) continue
+    if (n.matches('svg[data-face], svg[data-face-stand]')) svgs.push(n as SVGSVGElement)
+    svgs.push(...n.querySelectorAll<SVGSVGElement>('svg[data-face], svg[data-face-stand]'))
   }
   let joined = false
-  for (const svg of document.querySelectorAll<SVGSVGElement>('svg[data-face]')) {
+  for (const svg of svgs) {
+    if (!svg.isConnected) continue
+    const stand = standIns.get(svg)
+    if (stand) {
+      // The kept face takes its stand-in's place; its own insertion joins it on the next round.
+      svg.replaceWith(stand.free ? stand.hole : stand.svg)
+      continue
+    }
     const f = made.get(svg)
     if (f && !faces.has(f)) {
       faces.add(f)
