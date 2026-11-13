@@ -1079,8 +1079,8 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .health-sum-title { margin: 0; font-family: var(--display); font-weight: 800; font-size: 1.1875rem; }
 .health-sum-state { font-size: 0.875rem; font-weight: 700; color: var(--up); }
 .health-sum-state::before { content: '✓ '; content: '✓ ' / ''; }
-.health-sum-state.todo { color: var(--down); }
-.health-sum-state.todo::before { content: '○ '; content: '○ ' / ''; }
+.health-sum-state.pending { color: var(--down); }
+.health-sum-state.pending::before { content: '○ '; content: '○ ' / ''; }
 .health-sum-next { flex-basis: 100%; }
 
 /* Landing: «card» features, the report as a <figure>. */
