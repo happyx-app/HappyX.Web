@@ -1018,7 +1018,7 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
       'summary',
       {},
       h('h2', { class: 'health-sum-title' }, t('health.title')),
-      h('span', { class: pending ? 'health-sum-state todo' : 'health-sum-state' }, pending === 1 ? t('health.sum.todo.one') : pending ? t('health.sum.todo', { n: formatNumber(pending) }) : t('health.sum.ok')),
+      h('span', { class: pending ? 'health-sum-state pending' : 'health-sum-state' }, pending === 1 ? t('health.sum.todo.one') : pending ? t('health.sum.todo', { n: formatNumber(pending) }) : t('health.sum.ok')),
       h('span', { class: 'muted small health-sum-next' }, surveyOn && next ? `${t('health.nextSurvey')}: ${nextLabel}, ${hour}` : ''),
     ),
     h(
