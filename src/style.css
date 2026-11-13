@@ -3,105 +3,72 @@
 /* Suave: a neutral grey page, white cards, medium corners, and Nunito (rounded) for titles and
    numbers. Violet only for buttons, links and the chart; yellow stays the small warm accent. */
 :root {
-  color-scheme: light;
-  --page: #f4f4f5;
-  --surface: #ffffff;
-  --surface-2: #efeff1;
-  --ink: #1c1b22;
-  --ink-2: #46454f;
-  --muted: #6b6a75;
-  --grid: #ececee;
-  --axis: #d0d0d6;
-  --border: rgba(20, 20, 30, 0.1);
-  /* The bot's icon: a yellow face on violet. Violet leads, yellow is the small warm accent. */
-  --series: #7c3aed;
-  --series-soft: #ede9fe;
-  --accent: #6d28d9;
+  /* modern-web-guidance «dark-mode»: one token set; light-dark() picks the value from the used
+     color-scheme, which follows the system unless the <meta name=color-scheme> pins one. */
+  color-scheme: light dark;
+  &:has(> head > meta[name='color-scheme'][content='dark']) { color-scheme: dark; }
+  &:has(> head > meta[name='color-scheme'][content='light']) { color-scheme: light; }
+  --page: light-dark(#f4f4f5, #131316);
+  --surface: light-dark(#ffffff, #1c1c20);
+  --surface-2: light-dark(#efeff1, #27272c);
+  --ink: light-dark(#1c1b22, #f2f2f4);
+  --ink-2: light-dark(#46454f, #c6c6cd);
+  --muted: light-dark(#6b6a75, #9a99a5);
+  --grid: light-dark(#ececee, #2a2a30);
+  --axis: light-dark(#d0d0d6, #3c3c44);
+  --border: light-dark(rgba(20, 20, 30, 0.1), rgba(255, 255, 255, 0.1));
+  --series: light-dark(#7c3aed, #9b72f8);
+  --series-soft: light-dark(#ede9fe, #2e2257);
+  --accent: light-dark(#6d28d9, #b49afb);
   --primary: #7c3aed;
-  --sun: #fbbf24;
+  --sun: light-dark(#fbbf24, #fcd34d);
   --sun-ink: #352310;
   --discord: #5865f2;
-  --danger: #d03b3b;
-  --up: #15803d;
-  --down: #c2410c;
+  --danger: light-dark(#d03b3b, #f87171);
+  --up: light-dark(#15803d, #4ade80);
+  --down: light-dark(#c2410c, #fb923c);
   --shadow: 0 1px 2px rgba(20, 20, 30, 0.05);
   --radius: 12px;
   --display: 'Nunito Variable', system-ui, sans-serif;
-  --warm-soft: #fdf4d8;
+  --warm-soft: light-dark(#fdf4d8, #3a2f1a);
   --kudo-bg: #fff8e1;
-  --prev: #9181e0;
-  --control-border: #8e8d98;
-  --card-border: rgba(20, 20, 30, 0.08);
+  --prev: light-dark(#9181e0, #7d6bc0);
+  --control-border: light-dark(#8e8d98, #6e6d78);
+  --card-border: light-dark(rgba(20, 20, 30, 0.08), rgba(255, 255, 255, 0.08));
   --insight: var(--surface);
-  --seg-on: var(--surface); --seg-on-ink: var(--accent); --seg-shadow: 0 1px 2px rgba(20, 20, 30, 0.12);
-  --dc-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 8px 24px rgba(20, 20, 30, 0.08); --dc-mention: rgba(88, 101, 242, 0.15); --dc-mention-ink: #505cdc;
-  /* Discord's own light colours, for the survey previews. */
-  --dc-bg: #ffffff; --dc-ink: #313338; --dc-strong: #060607; --dc-muted: #5c5e66; --dc-embed: #f2f3f5; --dc-button: #e3e5e8; --dc-button-ink: #060607;
+  --seg-on: var(--surface);
+  --seg-on-ink: var(--accent);
+  --seg-shadow: 0 1px 2px rgba(20, 20, 30, 0.12);
+  --dc-shadow: 0 1px 2px rgba(20, 20, 30, 0.06), 0 8px 24px rgba(20, 20, 30, 0.08);
+  --dc-mention: light-dark(rgba(88, 101, 242, 0.15), rgba(88, 101, 242, 0.3));
+  --dc-mention-ink: light-dark(#505cdc, #c9cdfb);
+  --dc-bg: light-dark(#ffffff, #313338);
+  --dc-ink: light-dark(#313338, #dbdee1);
+  --dc-strong: light-dark(#060607, #f2f3f5);
+  --dc-muted: light-dark(#5c5e66, #949ba4);
+  --dc-embed: light-dark(#f2f3f5, #2b2d31);
+  --dc-button: light-dark(#e3e5e8, #4e5058);
+  --dc-button-ink: light-dark(#060607, #ffffff);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+/* Values light-dark() can't hold (shadows, references): the system preference unless pinned. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --page: #131316;
-    --surface: #1c1c20;
-    --surface-2: #27272c;
-    --ink: #f2f2f4;
-    --ink-2: #c6c6cd;
-    --muted: #9a99a5;
-    --grid: #2a2a30;
-    --axis: #3c3c44;
-    --border: rgba(255, 255, 255, 0.1);
-    --series: #9b72f8;
-    --series-soft: #2e2257;
-    --accent: #b49afb;
-    --primary: #7c3aed;
-    --sun: #fcd34d;
-    --up: #4ade80;
-    --down: #fb923c;
+  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) {
     --shadow: none;
-    --warm-soft: #3a2f1a;
-    --kudo-bg: #2f2716;
-    --prev: #7d6bc0;
-    --control-border: #6e6d78;
-    --danger: #f87171;
     --kudo-bg: var(--surface-2);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --insight: var(--surface);
-    --seg-on: #3a2c6b; --seg-on-ink: #ffffff; --seg-shadow: none;
-    --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --dc-mention: rgba(88, 101, 242, 0.3); --dc-mention-ink: #c9cdfb;
-    --dc-bg: #313338; --dc-ink: #dbdee1; --dc-strong: #f2f3f5; --dc-muted: #949ba4; --dc-embed: #2b2d31; --dc-button: #4e5058; --dc-button-ink: #ffffff;
+    --seg-on: #3a2c6b;
+    --seg-on-ink: #ffffff;
+    --seg-shadow: none;
+    --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   }
 }
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --page: #131316;
-  --surface: #1c1c20;
-  --surface-2: #27272c;
-  --ink: #f2f2f4;
-  --ink-2: #c6c6cd;
-  --muted: #9a99a5;
-  --grid: #2a2a30;
-  --axis: #3c3c44;
-  --border: rgba(255, 255, 255, 0.1);
-  --series: #9b72f8;
-  --series-soft: #2e2257;
-  --accent: #b49afb;
-  --primary: #7c3aed;
-  --sun: #fcd34d;
-  --up: #4ade80;
-  --down: #fb923c;
+:root:has(> head > meta[name='color-scheme'][content='dark']) {
   --shadow: none;
-  --warm-soft: #3a2f1a;
-  --kudo-bg: #2f2716;
-  --prev: #7d6bc0;
-  --control-border: #6e6d78;
-  --danger: #f87171;
   --kudo-bg: var(--surface-2);
-  --card-border: rgba(255, 255, 255, 0.08);
-  --insight: var(--surface);
-  --seg-on: #3a2c6b; --seg-on-ink: #ffffff; --seg-shadow: none;
-  --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); --dc-mention: rgba(88, 101, 242, 0.3); --dc-mention-ink: #c9cdfb;
-  --dc-bg: #313338; --dc-ink: #dbdee1; --dc-strong: #f2f3f5; --dc-muted: #949ba4; --dc-embed: #2b2d31; --dc-button: #4e5058; --dc-button-ink: #ffffff;
+  --seg-on: #3a2c6b;
+  --seg-on-ink: #ffffff;
+  --seg-shadow: none;
+  --dc-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -202,11 +169,11 @@ a { color: var(--accent); }
 .report-shot { display: grid; gap: 24px; align-items: center; }
 .report-shot img { display: block; width: 100%; max-width: 420px; height: auto; border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--dc-shadow); }
 @media (min-width: 760px) { .report-shot { grid-template-columns: 1fr 420px; } }
-:root[data-theme='dark'] .shot-frame .shot-light { display: none; }
-:root[data-theme='dark'] .shot-frame .shot-dark { display: block; }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .shot-frame .shot-light { display: none; }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .shot-frame .shot-dark { display: block; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .shot-frame .shot-light { display: none; }
-  :root:not([data-theme='light']) .shot-frame .shot-dark { display: block; }
+  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .shot-frame .shot-light { display: none; }
+  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .shot-frame .shot-dark { display: block; }
 }
 .feature-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px 48px; }
 .feature-list li { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -330,12 +297,12 @@ svg.pickable { cursor: pointer; }
   --cat-5: #e87ba4; --cat-6: #008300; --cat-7: #2a78d6; --cat-8: #e34948;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not(:has(> head > meta[name='color-scheme'][content='light'])) {
     --cat-1: #9b72f8; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
     --cat-5: #d55181; --cat-6: #008300; --cat-7: #3987e5; --cat-8: #e66767;
   }
 }
-:root[data-theme='dark'] {
+:root:has(> head > meta[name='color-scheme'][content='dark']) {
   --cat-1: #9b72f8; --cat-2: #d95926; --cat-3: #199e70; --cat-4: #c98500;
   --cat-5: #d55181; --cat-6: #008300; --cat-7: #3987e5; --cat-8: #e66767;
 }
@@ -509,8 +476,8 @@ svg.pickable { cursor: pointer; }
 .btn-danger:disabled { opacity: 0.45; cursor: default; filter: none; }
 .btn-danger-outline { color: var(--danger); border-color: var(--danger); background: transparent; }
 .btn-danger-outline:hover { background: color-mix(in srgb, var(--danger) 8%, transparent); filter: none; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .success { color: #0ca30c; } }
-:root[data-theme='dark'] .success { color: #0ca30c; }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .success { color: #0ca30c; } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .success { color: #0ca30c; }
 
 /* «Who's who?» game */
 .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -556,8 +523,8 @@ svg.pickable { cursor: pointer; }
 .pill { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
 .pill-right { background: #d6f2e0; color: #0b5a2a; }
 .pill-wrong { background: var(--surface-2); color: var(--ink-2); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .pill-right { background: #12391f; color: #8fe0aa; } }
-:root[data-theme='dark'] .pill-right { background: #12391f; color: #8fe0aa; }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .pill-right { background: #12391f; color: #8fe0aa; } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .pill-right { background: #12391f; color: #8fe0aa; }
 /* The nav scrolls rather than overflow the page if a translation runs long. */
 .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 
@@ -654,8 +621,8 @@ main:focus { outline: none; }
 /* Out of its square: only the face flies, with a soft shadow under it. */
 /* Above the page and its sticky bars, below dialogs (.canvas-modal-back is 30). */
 .brand-mark.face-free { position: fixed; z-index: 25; width: 44px; height: 44px; border-radius: 0; touch-action: none; filter: drop-shadow(0 6px 8px rgba(20, 20, 30, 0.28)); }
-:root[data-theme='dark'] .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .brand-mark.face-free { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.35)); } }
 .brand-mark.face-held { cursor: grabbing; }
 /* The square the face left (drawn in face.ts): a click puts the face back. */
 .brand-mark.brand-hole { cursor: pointer; }
@@ -709,8 +676,8 @@ main:focus { outline: none; }
 }
 .stat-emoji { font-size: 0.7em; vertical-align: 0.12em; }
 .bar-kudo { background: var(--series); }
-:root[data-theme='dark'] .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .kudo { border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent); } }
 .todo li { display: grid; grid-template-columns: 1.25em 1fr auto; gap: 10px; align-items: baseline; }
 .todo li > :nth-child(2) { min-width: 0; }
 .todo-info svg { width: 1em; height: 1em; vertical-align: -0.15em; }
@@ -735,11 +702,11 @@ main:focus { outline: none; }
 @media (max-width: 640px) { .demo-head { position: static; } }
 .demo-back { display: none; }
 @media (max-width: 640px) { .topbar .demo-back { display: inline; font-size: 0.875rem; font-weight: 600; color: var(--accent); } }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .hero h1 mark::after { opacity: 0.35; } }
-:root[data-theme='dark'] .hero h1 mark::after { opacity: 0.35; }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .hero h1 mark::after { opacity: 0.35; } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .hero h1 mark::after { opacity: 0.35; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
-:root[data-theme='dark'] .chip-on, :root[data-theme='dark'] .chip-on:hover { background: var(--seg-on); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .chip-on, :root:not([data-theme='light']) .chip-on:hover { background: var(--seg-on); } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .chip-on, :root:has(> head > meta[name='color-scheme'][content='dark']) .chip-on:hover { background: var(--seg-on); }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .chip-on, :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .chip-on:hover { background: var(--seg-on); } }
 .sk-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 @media (max-width: 720px) { .sk-row { grid-template-columns: repeat(2, 1fr); } }
 .chart.hovering .note { visibility: hidden; }
@@ -924,8 +891,8 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
 .mygames-col { display: flex; align-items: flex-end; width: 100%; max-width: 36px; height: 72px; background: var(--track, var(--surface-2)); border-radius: 6px; overflow: hidden; }
 .mygames-fill { display: block; width: 100%; background: var(--series); border-radius: 6px 6px 0 0; }
 :root { --track: #e2e2e7; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --track: #34343b; } }
-:root[data-theme='dark'] { --track: #34343b; }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) { --track: #34343b; } }
+:root:has(> head > meta[name='color-scheme'][content='dark']) { --track: #34343b; }
 @media (max-width: 760px) {
   .history-row summary, .history-off { grid-template-columns: minmax(0, 1fr) 5.5rem; }
   .history-when { grid-column: 1 / -1; grid-row: 1; }
@@ -938,3 +905,224 @@ body.has-canvas:has(.settings-page) #app { padding-bottom: 72px; }
   .mygames-bars li { font-size: 0.75rem; }
   .mygames-body { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================================
+   modern-web-guidance (GoogleChrome/modern-web-guidance), applied as a whole.
+   Each block names the guide it comes from.
+   ===================================================================================== */
+
+/* «typography», «improve-text-layout-and-legibility», «responsive-design»: rem + vw in clamp()
+   (max ≤ 2.5× min so zoom still reaches 200 %), balanced headings, pretty paragraphs, ≤ 80 ch. */
+h1, h2, h3, h4, th { text-wrap: balance; }
+p, li, blockquote, figcaption, dd { text-wrap: pretty; }
+body { overflow-wrap: break-word; }
+h1 { font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem); }
+.hero h1 { font-size: clamp(2.25rem, 1.5rem + 3vw, 3.5rem); }
+.landing h2 { font-size: clamp(1.625rem, 1.25rem + 1.5vw, 2.25rem); }
+.landing .cta h2 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); }
+.lead, .landing-section > p, .checks.privacy, .cta p { max-inline-size: 62ch; }
+
+/* «dark-mode», «browser-ui-theming»: tint the browser's own UI instead of rebuilding it. */
+:root {
+  accent-color: var(--series);
+  scrollbar-color: light-dark(#8e8d98, #6e6d78) var(--page);
+}
+::selection { background: color-mix(in oklab, var(--series) 28%, transparent); }
+
+/* «form-factor-adaptation», «accessibility»: 24 px targets, 44 px on touch screens. */
+:root { --target: 24px; }
+@media (pointer: coarse) { :root { --target: 44px; } }
+:where(button, select, .btn, .seg, .nav-link, .chip, .choice, summary, .account-btn) {
+  min-block-size: var(--target); min-inline-size: var(--target);
+}
+:where(.seg, .nav-link) { display: inline-flex; align-items: center; }
+
+/* «natural-interactions»: hover, press and focus each look different; focus is an outline with
+   an offset (kept by forced colours), never only a shadow. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  :where(.btn, .account-btn, .chip, .seg, .nav-link, .tip-btn) { transition: background-color 150ms ease-out, box-shadow 150ms ease-out, scale 150ms ease-out; }
+  :where(.btn, .account-btn):active { scale: 0.97; }
+}
+.btn:hover { box-shadow: 0 2px 8px rgb(20 20 30 / 0.12); }
+
+/* «color» (forced colours): bars are data drawn with a background, which forced colours would
+   wipe out; they keep a system colour pair instead. */
+@media (forced-colors: active) {
+  .bar, .bar-warm { forced-color-adjust: none; background: CanvasText; }
+  .seg[aria-current]::before { border-color: Highlight; }
+  .chip:has(:checked) { outline: 2px solid Highlight; }
+}
+
+/* «content-first-noise-reduction»: one compact row, out of the way while reading. The root
+   scroller remembers the direction; the script in platform.ts covers browsers without it. */
+html { container-type: scroll-state; }
+.topbar { view-transition-name: topbar; }
+@media (prefers-reduced-motion: no-preference) { .topbar { transition: translate 200ms ease-out; } }
+@container scroll-state((scrolled: bottom) and (scrollable: top)) {
+  .topbar:not(:focus-within, :has(:popover-open)) { translate: 0 -100%; }
+}
+.topbar.is-hidden:not(:focus-within, :has(:is(:popover-open, .\:popover-open))) { translate: 0 -100%; }
+:target { scroll-margin-top: 4.5rem; }
+/* Phones: still one row (logo, links, account), no second row for the links. */
+@media (max-width: 480px) {
+  .topbar { flex-wrap: nowrap; padding-bottom: 12px; }
+  .topbar .topbar-left { display: flex; min-width: 0; }
+  .topbar .nav { order: 0; flex: 0 1 auto; margin: 0; overflow-x: auto; }
+  .user .avatar { display: block; }
+}
+
+/* The account button and its popover (theme, language, log out). */
+.account-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 3px 10px 3px 3px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer;
+}
+.account-btn:hover { background: var(--surface-2); }
+.account-btn .icon { width: 16px; height: 16px; color: var(--muted); }
+.account-btn:has(+ :popover-open) .icon { rotate: 180deg; }
+@media (max-width: 480px) {
+  /* The name stays in the button's accessible name, only hidden from sight. */
+  .user-name { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .account-btn { padding-right: 6px; gap: 4px; }
+}
+.account-menu {
+  /* popovertarget makes the button the anchor: open below it, from its corner. */
+  inset: auto; margin: 8px 0 0; position-area: block-end span-inline-start; position-try-fallbacks: flip-block;
+  transform-origin: top right;
+  inline-size: min(320px, calc(100dvw - 32px)); padding: 16px; border-radius: 14px;
+  border: 1px solid var(--card-border); background: var(--surface); color: var(--ink);
+  box-shadow: 0 12px 32px rgb(20 20 30 / 0.16);
+}
+.account-menu:is(:popover-open, .\:popover-open) { display: grid; gap: 16px; animation: mwg-fade 150ms ease-out both; }
+@media (prefers-reduced-motion: no-preference) {
+  .account-menu:is(:popover-open, .\:popover-open) { animation: mwg-grow 300ms linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1) both, mwg-fade 150ms ease-out both; }
+}
+@keyframes mwg-grow { from { scale: 0.92; } }
+@keyframes mwg-fade { from { opacity: 0; } }
+.account-who { display: grid; gap: 0; }
+.theme-field { border: 0; padding: 0; margin: 0; display: grid; gap: 2px; min-inline-size: 0; }
+.theme-field legend, .lang-field label { font-weight: 700; font-size: 0.8125rem; color: var(--ink-2); padding: 0 0 6px; }
+.choice { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.choice:hover { background: var(--surface-2); }
+.choice:has(:checked) { background: var(--surface-2); font-weight: 600; }
+.choice input { margin: 0; }
+.lang-field { display: grid; }
+.account-menu .lang-picker { inline-size: 100%; border-radius: 8px; padding: 8px 10px; font-size: 0.9375rem; color: var(--ink); }
+.account-out { justify-content: flex-start; gap: 10px; border-top: 1px solid var(--border); border-radius: 0; padding: 14px 8px 2px; }
+.account-out:hover { background: none; color: var(--accent); }
+/* «branded-select-styling»: the native <select>, customisable where supported. */
+@supports (appearance: base-select) {
+  .lang-picker, .lang-picker::picker(select) { appearance: base-select; }
+  .lang-picker::picker(select) { border: 1px solid var(--card-border); border-radius: 10px; background: var(--surface); padding: 4px; }
+  .lang-picker option { padding: 8px 10px; border-radius: 6px; }
+  .lang-picker option:checked { font-weight: 600; }
+}
+/* The landing's language picker, in its footer. */
+.landing-footer .lang-field { display: inline-flex; align-items: center; gap: 8px; }
+.landing-footer .lang-field label { padding: 0; font-weight: 500; color: var(--muted); }
+.landing-footer .lang-picker { border-radius: 8px; }
+.btn-compact { padding: 8px 14px; font-size: 0.9375rem; }
+
+/* «tabs» (strategy 1) + «natural-interactions»: the period links stay on one row; on a phone it
+   scrolls and snaps, with edges that fade only where there is more. The current one carries an
+   underline (a shape), not only a colour; it scrolls into view on load. */
+@property --fade-start { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --fade-end { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.segmented {
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+  animation: mwg-edges linear both; animation-timeline: scroll(self inline);
+}
+@keyframes mwg-edges { 0% { --fade-start: 0px; --fade-end: 28px; } 8%, 92% { --fade-start: 28px; --fade-end: 28px; } 100% { --fade-start: 28px; --fade-end: 0px; } }
+.seg { scroll-snap-align: start; position: relative; white-space: nowrap; }
+.seg[aria-current] { scroll-initial-target: nearest; scroll-snap-align: center; }
+.seg[aria-current]::before { content: ''; position: absolute; inset-inline: 12px; inset-block-end: 3px; border-block-end: 2px solid currentColor; border-radius: 2px; }
+@media (max-width: 560px) {
+  .segmented { display: flex; border-radius: 10px; overflow-x: auto; }
+  .seg { padding: 8px 12px; }
+}
+
+/* «card», «fluid-scaling», «form-factor-adaptation»: each figure is an <article> and its own
+   size container; the number scales with the card, not the window. */
+.stat { container-type: inline-size; }
+.stat dl { margin: 0; display: grid; gap: 4px; }
+.stat .stat-value { font-size: clamp(2rem, 1.4rem + 9cqi, 2.75rem); }
+.stat-label { display: flex; align-items: center; gap: 6px; }
+
+/* «interest-triggered-tooltips»: a "?" toggletip; hover/focus or click. Its hit area grows past
+   the drawn circle. */
+.tip-btn {
+  position: relative; display: inline-grid; place-items: center; inline-size: 20px; block-size: 20px; min-inline-size: 20px; min-block-size: 20px;
+  padding: 0; border-radius: 50%; border: 1px solid var(--control-border); background: transparent; color: var(--ink-2);
+  font: 800 0.75rem/1 var(--display); cursor: help;
+}
+.tip-btn::after { content: ''; position: absolute; inset: -4px; }
+@media (pointer: coarse) { .tip-btn::after { inset: -12px; } }
+.tip-btn:hover, .tip-btn[aria-expanded='true'] { color: var(--ink); border-color: var(--ink-2); background: var(--surface-2); }
+[interestfor] { --interest-delay-start: 0.3s; interest-delay-start: var(--interest-delay-start); }
+.tip {
+  inset: auto; margin: 6px 0; position-area: block-end center; position-try-fallbacks: block-end span-inline-end, block-end span-inline-start, flip-block;
+  max-inline-size: min(34ch, calc(100dvw - 32px)); padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--card-border); background: var(--surface); color: var(--ink);
+  box-shadow: 0 10px 28px rgb(20 20 30 / 0.18); font-size: 0.875rem; line-height: 1.45; font-weight: 400;
+}
+
+/* «color»: the lowest weekday says so in words, not only in yellow. */
+.bar-label > span { display: grid; justify-items: start; }
+.tag-low { margin-block-start: 2px; padding: 1px 7px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--ink); background: var(--warm-soft); white-space: nowrap; }
+
+/* «browser-ui-theming»: comment filters are native radios inside labels (styled by :has()).
+   The radio is hidden from sight but stays focusable; a check mark (not only colour) shows the
+   choice, in space reserved so nothing moves when it changes («card»). */
+fieldset.chips { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+label.chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding-inline: 10px 12px; }
+label.chip input { position: absolute; opacity: 0; inline-size: 1px; block-size: 1px; margin: 0; }
+/* A radio mark of the same size in both states: an empty ring, or a ring with a dot. */
+.chip-mark { inline-size: 12px; block-size: 12px; border-radius: 50%; border: 1.5px solid currentColor; flex: none; margin-inline-end: 2px; }
+label.chip:has(:checked) { background: var(--series); color: #fff; }
+label.chip:has(:checked) .chip-mark { background: radial-gradient(currentColor 0 3px, transparent 3.5px); }
+@media (forced-colors: active) { label.chip:has(:checked) .chip-mark { border-width: 4px; } }
+label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+:root:has(> head > meta[name='color-scheme'][content='dark']) label.chip:has(:checked) { background: var(--seg-on); }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) label.chip:has(:checked) { background: var(--seg-on); } }
+
+/* «content-first-noise-reduction»: «Server status» is a <details>, closed unless something is
+   pending; its summary says whether all is well and when the next survey goes out. */
+.health-card { gap: 0; }
+.health-card[open] { gap: 16px; }
+.health-card > summary { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-inline-end: 32px; cursor: pointer; list-style: none; border-radius: 8px; }
+.health-card > summary::-webkit-details-marker { display: none; }
+.health-card > summary::after {
+  content: ''; position: absolute; inset-inline-end: 6px; inset-block-start: 50%; inline-size: 9px; block-size: 9px;
+  border-inline-end: 2px solid var(--ink-2); border-block-end: 2px solid var(--ink-2); rotate: 45deg; translate: 0 -75%;
+}
+.health-card[open] > summary::after { rotate: 225deg; translate: 0 -25%; }
+.health-sum-title { font-family: var(--display); font-weight: 800; font-size: 1.1875rem; }
+.health-sum-state { font-size: 0.875rem; font-weight: 700; color: var(--up); }
+.health-sum-state::before { content: '✓ '; }
+.health-sum-state.todo { color: var(--down); }
+.health-sum-state.todo::before { content: '○ '; }
+.health-sum-next { flex-basis: 100%; }
+
+/* Landing: «card» features, the report as a <figure>. */
+.feature { display: grid; gap: 6px; }
+.report-figure { margin: 0; }
+
+/* «same-document-transitions»: a short cross-fade between pages; the bar stays put. */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
+.account-menu { block-size: max-content; max-block-size: calc(100dvh - 80px); overflow: auto; }
+.account-out { border-width: 1px 0 0; border-color: var(--border); min-block-size: var(--target); }
+.health-card[open] .health-sum-next { display: none; }
+
+/* After the reviews (UI): */
+.user .avatar-initial { display: grid; place-items: center; }
+:root { --pop-bg: light-dark(var(--surface), #2a2a30); --pop-border: light-dark(rgb(20 20 30 / 0.12), rgb(255 255 255 / 0.18)); }
+.tip, .account-menu { background: var(--pop-bg); border-color: var(--pop-border); }
+.bar-warm { outline: 1px solid light-dark(#b45309, transparent); outline-offset: -1px; }
+label.chip { border: 1px solid transparent; }
+label.chip:has(:checked) { border-color: var(--accent); }
+.health-card .todo { margin-block-start: 8px; }
+:root:has(> head > meta[name='color-scheme'][content='dark']) .report-shot img { filter: brightness(0.88); }
+@media (prefers-color-scheme: dark) { :root:not(:has(> head > meta[name='color-scheme'][content='light'])) .report-shot img { filter: brightness(0.88); } }
+@media (max-width: 600px) { .shot-frame { mask-image: linear-gradient(#000 85%, transparent); } }
+.chip-clear { border: 1px dashed var(--control-border); background: transparent; }
