@@ -927,8 +927,9 @@ function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null, re
   return h(
     'section',
     { class: 'card withheld' },
-    h('h2', {}, icons.inline(icons.lock), t('withheld.title', { k })),
-    h('p', { class: 'secondary' }, t('withheld.body', { k: now })),
+    h('h2', {}, icons.inline(icons.lock), t(reachesToday ? 'withheld.title' : 'withheld.title.past', { k })),
+    // A period already over gets no more days, so only one that reaches today says what is to come.
+    h('p', { class: 'secondary' }, reachesToday ? `${t('withheld.body')} ${t('withheld.next', { k: now })}` : t('withheld.body')),
     h(
       'div',
       { class: 'stats' },
