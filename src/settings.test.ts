@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { channelGroups, teamChannelFallback, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
+import { channelGroups, summaryMinPeople, teamChannelFallback, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
 
 const base: Settings = { anonymous: true, anonymity_threshold: 3, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', team_channel_id: '', team_summary: true, working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
 
@@ -71,4 +71,6 @@ it('team channel: its own, else the kudos channel, else none', () => {
   expect(teamChannelFallback('', new Map())).toBeNull()
   expect(teamChannelFallback('5', new Map([['5', 'kudos']]))).toBe('#kudos')
   expect(teamChannelFallback('9', new Map())).toBe('#?')
+  expect(summaryMinPeople(3)).toBe(5)
+  expect(summaryMinPeople(8)).toBe(8)
 })

@@ -54,6 +54,10 @@ export function teamChannelFallback(kudosChannelID: string, names: Map<string, s
   return '#' + (names.get(kudosChannelID) ?? '?')
 }
 
+// summaryMinPeople is the fewest people who must answer before the Monday summary says how many
+// did: 5, or the server's minimum when higher (HappyX.Bot internal/bot/team.go).
+export const summaryMinPeople = (threshold: number) => Math.max(5, validThreshold(threshold) ? threshold : minAnonymityThreshold)
+
 export const mondayToFriday = [1, 2, 3, 4, 5]
 
 // Anonymous results show only when at least this many people answered: 3 by default, which suits
@@ -236,9 +240,10 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     },
   )
   const teamSummary = h('input', { id: 'team-summary', type: 'checkbox', role: 'switch', checked: saved.team_summary })
+  const summaryHelp = h('p', { class: 'muted small' })
   const teamSummaryBox = h('div', { class: 'field' },
     h('label', { class: 'switch', for: 'team-summary' }, teamSummary, h('span', {}, t('settings.team.summary'))),
-    h('p', { class: 'muted small' }, t('settings.team.summary.help')),
+    summaryHelp,
   )
 
   const canvasOn = h('input', { id: 'canvas', type: 'checkbox', role: 'switch', checked: saved.canvas_enabled })
@@ -287,6 +292,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     const fallback = teamChannelFallback(now.kudos_channel_id, channelNames)
     teamChannel.options[0].textContent = fallback === null ? t('settings.team.none') : t('settings.team.kudos', { channel: fallback })
     teamSummaryBox.hidden = now.team_channel_id === '' && fallback === null
+    summaryHelp.textContent = t('settings.team.summary.help', { k: summaryMinPeople(now.anonymity_threshold) })
     if (dirty) status.textContent = ''
     unsaved.textContent = t(dirty ? 'settings.unsaved' : 'settings.saved.none')
     unsaved.className = dirty ? 'unsaved on' : 'unsaved'
