@@ -114,6 +114,9 @@ export interface DayStat {
   // That day's anonymous answers came from fewer people than the threshold, so its average is
   // not given (0).
   withheld?: boolean
+  // The minimum of people that applied to that day: the highest among its answers and the
+  // server's current one.
+  anonymity_threshold?: number
   // How many people got that day's survey; missing when the bot didn't report it.
   recipients?: number
 }

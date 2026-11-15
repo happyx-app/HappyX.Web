@@ -806,7 +806,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     return
   }
   if (r.withheld) {
-    showData(withheldCard(g, r, health), kudosCard(r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }), ...extra)
+    showData(withheldCard(g, r, health, range.to >= todayIn(g.timezone)), kudosCard(r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }), ...extra)
     return
   }
   // With answers on fewer than 3 days there is no tone or trend yet. If they all fall in this week,
@@ -886,7 +886,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       // Without hover nothing says the points open their comments; the CSS shows this only on touch screens.
       points.some((_, i) => comments(i) > 0) ? h('p', { class: 'muted small tap-hint' }, t('chart.tapHint')) : null,
-      r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.ring), t('chart.withheld.note', { k: threshold(r) })) : null,
+      r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.ring), t('chart.withheld.note')) : null,
       tableWrap,
     ),
     week
@@ -916,16 +916,19 @@ const threshold = (r: api.Report) => Math.max(r.anonymity_threshold ?? minAnonym
 
 // A period where no day reached the anonymity threshold: how many answered, and why nothing
 // else shows. Kudos are public, so they still show below.
-function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null) {
+function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null, reachesToday: boolean) {
+  // k is the minimum the hidden days had; now is the server's minimum, which applies to new days.
   const k = threshold(r)
+  const now = Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold)
   const rate = participationRate(r.participation)
-  // Who can change the minimum is pointed to it, only when it is above the lowest allowed.
-  const lower = k > minAnonymityThreshold && api.canManage(g)
+  // Lowering the minimum only changes days still to come, so the link shows only when the period
+  // reaches today, to whoever can change it, when it is above the lowest allowed.
+  const lower = reachesToday && now > minAnonymityThreshold && api.canManage(g)
   return h(
     'section',
     { class: 'card withheld' },
     h('h2', {}, icons.inline(icons.lock), t('withheld.title', { k })),
-    h('p', { class: 'secondary' }, t('withheld.body', { k })),
+    h('p', { class: 'secondary' }, t('withheld.body', { k: now })),
     h(
       'div',
       { class: 'stats' },
@@ -934,7 +937,7 @@ function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null) {
         ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }))
         : stat(t('stat.responses'), formatNumber(r.responses)),
     ),
-    lower ? h('a', { href: `#/g/${g.discord_guild_id}/settings?f=anonymity-threshold` }, `${t('withheld.lower', { k })} →`) : null,
+    lower ? h('a', { href: `#/g/${g.discord_guild_id}/settings?f=anonymity-threshold` }, `${t('withheld.lower', { k: now })} →`) : null,
   )
 }
 
@@ -1834,7 +1837,7 @@ function messagesCard(r: api.Report) {
     draw()
   }
   // One line on what the comments leave out: their authors, and the withheld days' comments.
-  const withheld = r.days.some((d) => d.withheld) ? ` ${t('messages.withheld', { k: threshold(r) })}` : ''
+  const withheld = r.days.some((d) => d.withheld) ? ` ${t('messages.withheld')}` : ''
   const privacy = r.anonymous ? t('messages.anonymous') + withheld : r.messages.some((m) => !m.username) ? t('messages.earlier_anonymous') + withheld : withheld.trim()
   const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
