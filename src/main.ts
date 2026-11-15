@@ -886,7 +886,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       // Without hover nothing says the points open their comments; the CSS shows this only on touch screens.
       points.some((_, i) => comments(i) > 0) ? h('p', { class: 'muted small tap-hint' }, t('chart.tapHint')) : null,
-      r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.lock), t('chart.withheld.note', { k: threshold(r) })) : null,
+      r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.ring), t('chart.withheld.note', { k: threshold(r) })) : null,
       tableWrap,
     ),
     week
