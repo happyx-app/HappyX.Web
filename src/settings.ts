@@ -40,10 +40,19 @@ export const settingsOf = (g: api.Guild): Settings => ({
   report_dm: g.report_dm ?? true,
   games_enabled: g.games_enabled,
   kudos_channel_id: g.kudos_channel_id ?? '',
+  team_channel_id: g.team_channel_id ?? '',
+  team_summary: g.team_summary ?? true,
   working_days: g.working_days ?? mondayToFriday,
   game_roles: toSave(filterOf(g.game_roles)),
   canvas_enabled: g.canvas_enabled ?? false,
 })
+
+// teamChannelFallback is the kudos channel's name, where HappyX tells the team when no team channel
+// is set; null when kudos have no channel of their own. An unknown channel reads as «?».
+export function teamChannelFallback(kudosChannelID: string, names: Map<string, string>): string | null {
+  if (kudosChannelID === '') return null
+  return '#' + (names.get(kudosChannelID) ?? '?')
+}
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
 
@@ -181,31 +190,42 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     },
   )
 
-  // The kudos channel is picked from the server's channels, which the bot keeps in sync. Until
-  // they load, only the saved choice is offered.
+  // The kudos and team channels are picked from the server's channels, which the bot keeps in
+  // sync. Until they load, only the saved choice is offered.
   const kudosChannel = h('select', { id: 'kudos-channel', disabled: true },
     h('option', { value: '' }, t('settings.kudos.here')),
     ...(saved.kudos_channel_id ? [h('option', { value: saved.kudos_channel_id, selected: true }, t('access.loading'))] : []),
   )
+  const teamChannel = h('select', { id: 'team-channel', disabled: true, 'aria-describedby': 'team-channel-help' },
+    h('option', { value: '' }, t('settings.team.none')),
+    ...(saved.team_channel_id ? [h('option', { value: saved.team_channel_id, selected: true }, t('access.loading'))] : []),
+  )
   const kudosWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.kudos.noPermission.help'))
+  const teamWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.team.noPermission.help'))
   const kudosNote = h('p', { class: 'muted small', hidden: true }, t('settings.kudos.empty'))
   let postable = new Set<string>()
+  let channelNames = new Map<string, string>()
+  const fillChannels = (select: HTMLSelectElement, empty: string, channels: api.Channel[]) => {
+    const current = select.value
+    const option = (c: api.Channel) =>
+      h('option', { value: c.id, selected: c.id === current, disabled: !c.can_post && c.id !== current },
+        `#${c.name}${c.can_post ? '' : ` (${t('settings.kudos.noPermission')})`}`)
+    select.replaceChildren(
+      h('option', { value: '', selected: current === '' }, empty),
+      ...(current && !channels.some((c) => c.id === current) ? [h('option', { value: current, selected: true }, t('settings.kudos.unknown'))] : []),
+      ...channelGroups(channels).flatMap((grp) => (grp.category ? [h('optgroup', { label: grp.category }, ...grp.channels.map(option))] : grp.channels.map(option))),
+    )
+    select.disabled = false
+  }
   api.channels(g.discord_guild_id).then(
     (channels) => {
       postable = new Set(channels.filter((c) => c.can_post).map((c) => c.id))
-      const current = kudosChannel.value
-      const option = (c: api.Channel) =>
-        h('option', { value: c.id, selected: c.id === current, disabled: !c.can_post && c.id !== current },
-          `#${c.name}${c.can_post ? '' : ` (${t('settings.kudos.noPermission')})`}`)
-      kudosChannel.replaceChildren(
-        h('option', { value: '', selected: current === '' }, t('settings.kudos.here')),
-        ...(current && !channels.some((c) => c.id === current) ? [h('option', { value: current, selected: true }, t('settings.kudos.unknown'))] : []),
-        ...channelGroups(channels).flatMap((grp) => (grp.category ? [h('optgroup', { label: grp.category }, ...grp.channels.map(option))] : grp.channels.map(option))),
-      )
-      kudosChannel.disabled = false
+      channelNames = new Map(channels.map((c) => [c.id, c.name]))
+      fillChannels(kudosChannel, t('settings.kudos.here'), channels)
+      fillChannels(teamChannel, t('settings.team.none'), channels)
       kudosNote.hidden = channels.length > 0
       // The bot never sent the channels (an older bot): any choice it hasn't vetted gets no warning.
-      if (channels.length === 0) postable = new Set([current])
+      if (channels.length === 0) postable = new Set([kudosChannel.value, teamChannel.value])
       refresh()
     },
     (err) => {
@@ -214,6 +234,11 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       kudosNote.className = 'error small'
       kudosNote.textContent = t('error.generic')
     },
+  )
+  const teamSummary = h('input', { id: 'team-summary', type: 'checkbox', role: 'switch', checked: saved.team_summary })
+  const teamSummaryBox = h('div', { class: 'field' },
+    h('label', { class: 'switch', for: 'team-summary' }, teamSummary, h('span', {}, t('settings.team.summary'))),
+    h('p', { class: 'muted small' }, t('settings.team.summary.help')),
   )
 
   const canvasOn = h('input', { id: 'canvas', type: 'checkbox', role: 'switch', checked: saved.canvas_enabled })
@@ -234,6 +259,8 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     anonymity_threshold: threshold.valueAsNumber,
     games_enabled: games.checked,
     kudos_channel_id: kudosChannel.value,
+    team_channel_id: teamChannel.value,
+    team_summary: teamSummary.checked,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
     game_roles: gameRoles ? toSave(gameRoles.value()) : saved.game_roles,
     canvas_enabled: canvasOn.checked,
@@ -255,6 +282,11 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     thresholdOff.hidden = now.anonymous
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
+    teamWarning.hidden = teamChannel.disabled || now.team_channel_id === '' || postable.has(now.team_channel_id)
+    // With no team channel of its own, HappyX tells the team in the kudos channel, if there is one.
+    const fallback = teamChannelFallback(now.kudos_channel_id, channelNames)
+    teamChannel.options[0].textContent = fallback === null ? t('settings.team.none') : t('settings.team.kudos', { channel: fallback })
+    teamSummaryBox.hidden = now.team_channel_id === '' && fallback === null
     if (dirty) status.textContent = ''
     unsaved.textContent = t(dirty ? 'settings.unsaved' : 'settings.saved.none')
     unsaved.className = dirty ? 'unsaved on' : 'unsaved'
@@ -347,6 +379,15 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         kudosNote,
         h('p', { class: 'muted small' }, t('settings.kudos.help')),
       ),
+    ),
+    sub('settings.sub.team',
+      h('div', { class: 'field' },
+        h('label', { for: 'team-channel' }, t('settings.team')),
+        teamChannel,
+        teamWarning,
+        h('p', { class: 'muted small', id: 'team-channel-help' }, t('settings.team.help')),
+      ),
+      teamSummaryBox,
     ),
     api.isOwner(g) ? null : h('p', { class: 'muted small' }, icons.inline(icons.info), t('settings.admin.help.manage')),
     h('div', { class: 'form-actions' }, save, unsaved, status),
@@ -592,7 +633,7 @@ export function dangerZone(g: api.Guild, onDeleted: () => void, onLoggedOut: () 
   )
 }
 
-const sub = (title: 'settings.sub.survey' | 'settings.sub.reports' | 'settings.sub.anonymity' | 'settings.sub.game' | 'settings.sub.canvas' | 'settings.sub.kudos', ...children: Node[]) =>
+const sub = (title: 'settings.sub.survey' | 'settings.sub.reports' | 'settings.sub.anonymity' | 'settings.sub.game' | 'settings.sub.canvas' | 'settings.sub.kudos' | 'settings.sub.team', ...children: Node[]) =>
   h('section', { class: 'subsection' }, h('h3', {}, t(title)), ...children)
 
 // canvasCountRow says how many drawings the team canvas holds, with the button to erase them

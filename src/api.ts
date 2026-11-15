@@ -31,6 +31,11 @@ export interface Guild {
   games_enabled: boolean
   // Where kudos cards are posted; empty or missing means the channel where /happyx kudos is used.
   kudos_channel_id?: string
+  // Where HappyX tells the team things: the notes admins write after a report and the Monday
+  // summary. Empty or missing means the kudos channel. Older APIs leave both out.
+  team_channel_id?: string
+  // Whether the past week's summary goes to the team channel on Mondays. Missing means yes.
+  team_summary?: boolean
   // ISO days the survey goes out, 1 is Monday and 7 Sunday. Monday to Friday when missing.
   working_days?: number[]
   // The admin's own survey text with {{variables}}; empty or missing means the default text.
@@ -377,6 +382,8 @@ export interface SettingsPatch {
   report_dm?: boolean
   working_days?: number[]
   kudos_channel_id?: string // "" posts where the command is used
+  team_channel_id?: string // "" uses the kudos channel
+  team_summary?: boolean
   survey_message?: string // "" goes back to the default text
   survey_roles?: RoleFilter
   game_roles?: RoleFilter
