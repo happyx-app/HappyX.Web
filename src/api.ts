@@ -13,6 +13,12 @@ export interface Guild {
   discord_guild_id: string
   name: string
   anonymous: boolean
+  // Once anonymity was turned off, the first day answers carry names (the day after). Left out
+  // while the server is anonymous.
+  named_since?: string
+  // Anonymous results are shown only when at least this many people answered. Older APIs leave
+  // it out, which means 3.
+  anonymity_threshold?: number
   // Whether members get the survey and the game. A server the bot just joined has it off until an
   // admin starts it. Older APIs leave it out, which means on.
   survey_enabled?: boolean
@@ -105,13 +111,26 @@ export interface DayStat {
   day: string
   responses: number
   average: number
+  // That day's anonymous answers came from fewer people than the threshold, so its average is
+  // not given (0).
+  withheld?: boolean
   // How many people got that day's survey; missing when the bot didn't report it.
   recipients?: number
 }
 
+// counted is how many of a day's (or week's) answers its average covers: none on a withheld day,
+// whose answers count only in the totals. hasAverage tells whether it has an average to show.
+export const counted = (d: DayStat & { counted?: number }) => (d.withheld ? 0 : (d.counted ?? d.responses))
+export const hasAverage = (d: DayStat & { counted?: number }) => counted(d) > 0
+
+// countedAnswers is how many answers the report's average and distribution cover: all of them
+// but those of withheld days.
+export const countedAnswers = (r: Report) => Object.values(r.distribution).reduce((n, c) => n + c, 0)
+
+// An anonymous comment comes with its text only: day and mood are left out so it can't be traced.
 export interface ReportMessage {
-  day: string
-  mood: number
+  day?: string
+  mood?: number
   message: string
   username?: string
 }
@@ -120,6 +139,10 @@ export interface Report {
   from: string
   to: string
   anonymous: boolean
+  // The anonymous answers came from fewer people than anonymity_threshold: only the counts are
+  // given, with no average, distribution or comments.
+  withheld?: boolean
+  anonymity_threshold?: number
   responses: number
   respondents: number
   average: number
@@ -165,8 +188,12 @@ export interface MyGuildMoods {
   discord_guild_id: string
   name: string
   timezone: string
-  // Whether the admin sees who answers; older APIs leave it out.
+  // Whether today's answer is anonymous; older APIs leave it out.
   anonymous?: boolean
+  // Once anonymity was turned off, the first day answers carry names.
+  named_since?: string
+  // The fewest people whose anonymous answers a day needs before admins see more than counts.
+  anonymity_threshold?: number
   responses: number
   average: number
   streak: number
@@ -339,6 +366,7 @@ export const game = (guildID: string) => getJSON<GameBoard>(`/guilds/${encodeURI
 export interface SettingsPatch {
   games_enabled?: boolean
   anonymous?: boolean
+  anonymity_threshold?: number
   timezone?: string
   language?: string
   survey_hour?: number

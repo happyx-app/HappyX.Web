@@ -10,27 +10,36 @@ export const maxSurveyMessage = 500
 export const surveyVars: { name: string; help: Key }[] = [
   { name: 'user.name', help: 'survey.var.user.name' },
   { name: 'user.mention', help: 'survey.var.user.mention' },
-  { name: 'user.streak', help: 'survey.var.user.streak' },
   { name: 'guild.name', help: 'survey.var.guild.name' },
   { name: 'date', help: 'survey.var.date' },
   { name: 'weekday', help: 'survey.var.weekday' },
 ]
+
+// Variables a new or changed message can no longer use. A message saved with them keeps working,
+// and the preview still fills them in. Same list as the API's RetiredSurveyMessageVars.
+export const retiredVars = ['user.streak']
 
 const placeholder = /\{\{\s*([^{}]*?)\s*\}\}/g
 
 export interface Problems {
   tooLong: boolean
   unknown: string[] // variables that don't exist, as written
+  retired: string[] // variables that no longer can be used (retiredVars)
   unclosed: boolean // a {{ or }} without its pair
 }
 
 export function check(text: string): Problems {
-  const unknown = [...text.matchAll(placeholder)].map((m) => m[1]).filter((v) => !surveyVars.some((s) => s.name === v))
+  const used = [...new Set([...text.matchAll(placeholder)].map((m) => m[1]))]
   const rest = text.replace(placeholder, '')
-  return { tooLong: [...text].length > maxSurveyMessage, unknown: [...new Set(unknown)], unclosed: rest.includes('{{') || rest.includes('}}') }
+  return {
+    tooLong: [...text].length > maxSurveyMessage,
+    unknown: used.filter((v) => !surveyVars.some((s) => s.name === v) && !retiredVars.includes(v)),
+    retired: used.filter((v) => retiredVars.includes(v)),
+    unclosed: rest.includes('{{') || rest.includes('}}'),
+  }
 }
 
-export const isValid = (p: Problems) => !p.tooLong && !p.unknown.length && !p.unclosed
+export const isValid = (p: Problems) => !p.tooLong && !p.unknown.length && !p.retired.length && !p.unclosed
 
 // What the bot says around the admin's text, in each language it speaks (its locales/*.json).
 interface BotStrings {

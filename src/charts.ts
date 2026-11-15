@@ -1,7 +1,7 @@
 // Hand-drawn SVG/HTML charts: thin 2px lines, 8px markers, recessive grid, a crosshair
 // tooltip and a table view. Mood is always on a 1-5 axis labelled with the survey's emojis.
 
-import type { DayStat, Report } from './api'
+import { counted, countedAnswers, hasAverage, type DayStat, type Report } from './api'
 import { h, s } from './dom'
 import { monday } from './evolution'
 import { addDays } from './periods'
@@ -56,12 +56,12 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 // tooltip says point i has comments and a click shows them (pick).
 export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void): HTMLElement {
   const title = (d: DayStat) => weekOrDay(d, byWeek)
-  const prevOf = (i: number) => (previous[i]?.responses ? previous[i] : undefined)
+  const prevOf = (i: number) => (previous[i] && hasAverage(previous[i]) ? previous[i] : undefined)
   const series: Series[] = []
   if (days.some((_, i) => prevOf(i))) {
     series.push({ name: t('chart.previous'), color: 'var(--prev)', dashed: true, values: days.map((_, i) => prevOf(i)?.average ?? null) })
   }
-  series.push({ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (d.responses > 0 ? d.average : null)) })
+  series.push({ name: t('stat.average'), color: 'var(--series)', values: days.map((d) => (hasAverage(d) ? d.average : null)) })
   return lineChart(
     days.map((d) => d.day),
     series,
@@ -78,9 +78,11 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
         const p = prevOf(i)
         return [
           h('div', { class: 'tooltip-title' }, title(d)),
-          d.responses > 0
+          hasAverage(d)
             ? h('div', {}, h('strong', {}, `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}`), d.recipients ? null : ` · ${answers(d.responses)}`)
-            : h('div', { class: 'muted' }, t('chart.noAnswers')),
+            : d.responses > 0
+              ? h('div', { class: 'muted' }, t('chart.withheld'), d.recipients ? null : ` · ${answers(d.responses)}`)
+              : h('div', { class: 'muted' }, t('chart.noAnswers')),
           d.recipients ? h('div', { class: 'muted' }, t(byWeek ? 'chart.participation.week' : 'chart.participation', { n: formatNumber(Math.min(d.responses, d.recipients)), of: formatNumber(d.recipients) })) : null,
           p ? h('div', { class: 'muted' }, t('chart.previous.value', { day: title(p), value: formatNumber(p.average, 1) })) : null,
           comments && comments(i) > 0 ? h('div', { class: 'tooltip-action' }, comments(i) === 1 ? t('chart.comments.one') : t('chart.comments', { n: formatNumber(comments(i)) })) : null,
@@ -93,11 +95,11 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
 // What a screen reader hears for the trend chart: the range of days, the lowest and highest daily
 // average, and the average over the period.
 export function trendSummary(days: DayStat[], byWeek = false): string {
-  const answered = days.filter((d) => d.responses > 0)
+  const answered = days.filter(hasAverage)
   if (answered.length === 0 || days.length === 0) return t(byWeek ? 'chart.trend.week' : 'chart.trend')
   const avgs = answered.map((d) => d.average)
-  const total = answered.reduce((n, d) => n + d.responses, 0)
-  const avg = answered.reduce((sum, d) => sum + d.average * d.responses, 0) / total
+  const total = answered.reduce((n, d) => n + counted(d), 0)
+  const avg = answered.reduce((sum, d) => sum + d.average * counted(d), 0) / total
   const long: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long' }
   return t(byWeek ? 'chart.trend.week.summary' : 'chart.trend.summary', {
     from: formatDay(days[0].day, long),
@@ -322,27 +324,32 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
 }
 
 // A point's name: its day, or «Week of 2 Nov», with «(in progress)» while that week isn't over.
-function weekOrDay(d: WeekStat, byWeek: boolean): string {
+function weekOrDay(d: DayStat & { partial?: boolean }, byWeek: boolean): string {
   if (!byWeek) return formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short' })
   const week = t('me.weekOf', { day: formatDay(d.day, { day: 'numeric', month: 'short' }) })
   return d.partial ? t('chart.week.partial', { week }) : week
 }
 
-export type WeekStat = DayStat & { partial?: boolean }
+// counted: the week's answers its average covers, those of withheld days left out.
+export type WeekStat = DayStat & { partial?: boolean; counted: number }
 
 // Each day's answers added up by week (Monday to Sunday), with the week's Monday as the day. With
-// until (the period's last day), a week that ends after it is marked partial.
+// until (the period's last day), a week that ends after it is marked partial. Withheld days only
+// add to the week's answers; a week with only withheld days is withheld too.
 export function weeklyStats(days: DayStat[], until?: string): WeekStat[] {
   const out: WeekStat[] = []
   for (const d of days) {
     const day = monday(d.day)
     let w = out[out.length - 1]
     if (!w || w.day !== day) {
-      w = { day, responses: 0, average: 0, recipients: 0 }
+      w = { day, responses: 0, average: 0, recipients: 0, counted: 0 }
       out.push(w)
     }
-    if (d.responses > 0) w.average = (w.average * w.responses + d.average * d.responses) / (w.responses + d.responses)
+    const n = counted(d)
+    if (n > 0) w.average = (w.average * w.counted + d.average * n) / (w.counted + n)
+    w.counted += n
     w.responses += d.responses
+    w.withheld = w.responses > 0 && w.counted === 0
     // Unknown for the week if the bot didn't report it for one of its days.
     w.recipients = w.recipients === undefined || d.recipients === undefined ? undefined : w.recipients + d.recipients
   }
@@ -372,7 +379,7 @@ export function trendTable(days: DayStat[], byWeek = false, comments?: (i: numbe
           'tr',
           {},
           h('td', {}, weekOrDay(d, byWeek)),
-          h('td', { class: 'num' }, d.responses > 0 ? `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}` : '–'),
+          h('td', { class: 'num' }, hasAverage(d) ? `${moodEmoji(d.average)} ${formatNumber(d.average, 1)}` : d.responses > 0 ? h('span', { class: 'muted' }, t('chart.withheld')) : '–'),
           h('td', { class: 'num' }, formatNumber(d.responses)),
           comments ? commentCell(i) : null,
         ),
@@ -391,9 +398,10 @@ function bar(pct: number): HTMLElement {
 // How many answers each mood got, best first, as horizontal bars.
 export function distributionChart(r: Report): HTMLElement {
   const max = Math.max(1, ...Object.values(r.distribution))
+  const total = countedAnswers(r)
   const rows = [5, 4, 3, 2, 1].map((mood) => {
     const n = r.distribution[String(mood)] ?? 0
-    const pct = r.responses > 0 ? Math.round((n / r.responses) * 100) : 0
+    const pct = total > 0 ? Math.round((n / total) * 100) : 0
     return h(
       'div',
       { class: 'bar-row', title: `${moodLabel(mood)}: ${answers(n)} (${pct}%)` },

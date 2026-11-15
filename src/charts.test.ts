@@ -28,10 +28,27 @@ it('adds days up by week, weighting each day by its answers', () => {
     { day: '2026-10-13', responses: 3, average: 1 },
   ])
   expect(weeks).toEqual([
-    { day: '2026-10-05', responses: 4, average: 3, recipients: 10 },
-    { day: '2026-10-12', responses: 4, average: 2, recipients: undefined },
+    { day: '2026-10-05', responses: 4, average: 3, recipients: 10, counted: 4, withheld: false },
+    { day: '2026-10-12', responses: 4, average: 2, recipients: undefined, counted: 4, withheld: false },
   ])
   expect(trendSummary(weeks, true)).toBe('Average mood per week, from October 5 to October 12: between 2.0 and 3.0, average 2.5. Use «Show as table» for the data.')
+})
+
+it('leaves withheld days out of averages, but not out of the answers', () => {
+  const weeks = weeklyStats([
+    { day: '2026-10-12', responses: 3, average: 4 },
+    { day: '2026-10-13', responses: 2, average: 0, withheld: true },
+    { day: '2026-10-19', responses: 1, average: 0, withheld: true },
+  ])
+  expect(weeks.map((w) => [w.responses, w.counted, w.average, w.withheld])).toEqual([
+    [5, 3, 4, false],
+    [1, 0, 0, true],
+  ])
+  const days = [
+    { day: '2026-10-12', responses: 3, average: 4 },
+    { day: '2026-10-13', responses: 2, average: 0, withheld: true },
+  ]
+  expect(trendSummary(days)).toContain('between 4.0 and 4.0, average 4.0')
 })
 
 it('marks the last week as partial when the period ends before its Sunday', () => {

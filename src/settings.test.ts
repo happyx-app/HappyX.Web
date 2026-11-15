@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { channelGroups, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
 
-const base: Settings = { anonymous: true, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
+const base: Settings = { anonymous: true, anonymity_threshold: 3, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
 
 it('sends only what changed', () => {
   expect(changes(base, base)).toEqual({})
