@@ -906,7 +906,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 // myMode says whether the admins see who answers in g. Anonymity turned off today: names
 // start on named_since, and until then answers stay anonymous.
 function myMode(g: api.MyGuildMoods) {
-  if (g.anonymous && g.named_since) return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { weekday: 'long', day: 'numeric', month: 'long' }) })
+  if (g.anonymous && g.named_since) return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
   if (g.anonymous) return t('me.mode.anonymous', { k: Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold) })
   return t('me.mode.named')
 }
@@ -924,7 +924,7 @@ function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null) {
   return h(
     'section',
     { class: 'card withheld' },
-    h('h2', {}, icons.inline(icons.lock), t('withheld.title')),
+    h('h2', {}, icons.inline(icons.lock), t('withheld.title', { k })),
     h('p', { class: 'secondary' }, t('withheld.body', { k })),
     h(
       'div',
@@ -1782,6 +1782,7 @@ function messagesCard(r: api.Report) {
     ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map(radio),
     clear,
   )
+  const hiddenNote = h('p', { class: 'muted small', hidden: true }, t('messages.anonymous.filtered'))
   const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' })
   more.addEventListener('click', () => {
     all = true
@@ -1814,6 +1815,8 @@ function messagesCard(r: api.Report) {
           )
         : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
     )
+    // A mood filter or a picked day leaves the anonymous comments out: they have neither.
+    hiddenNote.hidden = (current === 'all' && !days) || !r.messages.some((msg) => msg.mood === undefined)
     for (const [f, input] of radios) input.checked = !days && f === current
     clear.hidden = !days
     if (days) clearText.textContent = t('messages.filter.clear', { day: days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) }) })
@@ -1830,18 +1833,17 @@ function messagesCard(r: api.Report) {
     all = true
     draw()
   }
+  // One line on what the comments leave out: their authors, and the withheld days' comments.
+  const withheld = r.days.some((d) => d.withheld) ? ` ${t('messages.withheld', { k: threshold(r) })}` : ''
+  const privacy = r.anonymous ? t('messages.anonymous') + withheld : r.messages.some((m) => !m.username) ? t('messages.earlier_anonymous') + withheld : withheld.trim()
   const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
     h('h2', {}, t('messages.title')),
-    r.anonymous
-      ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.anonymous'))
-      : r.messages.some((m) => !m.username)
-        ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.earlier_anonymous'))
-        : null,
-    r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, t('messages.withheld', { k: threshold(r) })) : null,
+    privacy ? h('p', { class: 'muted small privacy-note' }, icons.lock(), privacy) : null,
     moods ? chips : null,
+    hiddenNote,
     list,
     more,
   )

@@ -272,6 +272,8 @@ svg.pickable { cursor: pointer; }
 .messages { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .messages li { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
 .messages li:last-child { border-bottom: 0; }
+/* A withheld day on the trend chart: answers, but no average to plot. */
+.chart .dot-hollow { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
 /* An anonymous comment is only its text: no mood, author or day. */
 .messages li.msg-plain { grid-template-columns: 1fr; }
 .msg-mood { font-size: 1.25rem; line-height: 1.3; }
@@ -373,7 +375,7 @@ svg.pickable { cursor: pointer; }
 .field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .field > label, .field legend { font-weight: 600; font-size: 0.9375rem; padding: 0; }
 .field-row { display: grid; gap: 20px 28px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: start; }
-.settings select, .settings input:not([type]), .settings input[list] {
+.settings select, .settings input:not([type]), .settings input[list], .settings input[type='number'] {
   font: inherit; color: var(--ink); background: var(--surface); width: 100%;
   border: 1px solid var(--control-border); border-radius: 10px; padding: 9px 12px;
 }
@@ -381,11 +383,7 @@ svg.pickable { cursor: pointer; }
   font: inherit; color: var(--ink); background: var(--surface); width: 100%;
   border: 1px solid var(--control-border); border-radius: 10px; padding: 8px 12px;
 }
-.settings input[type='number'] {
-  font: inherit; color: var(--ink); background: var(--surface); width: 7rem;
-  border: 1px solid var(--control-border); border-radius: 10px; padding: 9px 12px;
-  font-variant-numeric: tabular-nums;
-}
+.settings input[type='number'] { width: 7rem; font-variant-numeric: tabular-nums; }
 /* The minimum belongs to anonymity, a step below its switch. */
 .field.threshold { margin-top: 4px; }
 .settings select:disabled, .settings input:disabled { opacity: 0.6; }

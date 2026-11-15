@@ -157,9 +157,11 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     step: 1,
     required: true,
     value: saved.anonymity_threshold,
-    'aria-describedby': 'anonymity-threshold-help',
+    'aria-describedby': 'anonymity-threshold-error anonymity-threshold-help',
   }) as HTMLInputElement
-  const thresholdError = h('p', { class: 'error small', hidden: true }, t('settings.threshold.invalid', { min: minAnonymityThreshold, max: maxAnonymityThreshold }))
+  const thresholdError = h('p', { class: 'error small', id: 'anonymity-threshold-error', hidden: true }, t('settings.threshold.invalid', { min: minAnonymityThreshold, max: maxAnonymityThreshold }))
+  // With names on, the minimum only matters for the days that were anonymous.
+  const thresholdOff = h('p', { class: 'muted small', hidden: true }, t('settings.threshold.off'))
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
   // Who plays is chosen right under the switch, once the game is on and the roles have loaded.
@@ -251,6 +253,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing || !thresholdValid
     save.dataset.dirty = String(dirty)
     anonWarning.hidden = now.anonymous || saved.anonymous === false
+    thresholdOff.hidden = now.anonymous
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     if (dirty) status.textContent = ''
     unsaved.textContent = t(dirty ? 'settings.unsaved' : 'settings.saved.none')
@@ -314,6 +317,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         threshold,
         thresholdError,
         h('p', { class: 'muted small', id: 'anonymity-threshold-help' }, t('settings.threshold.help')),
+        thresholdOff,
       ),
     ),
     sub('settings.sub.game',

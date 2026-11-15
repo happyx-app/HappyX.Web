@@ -28,6 +28,9 @@ interface LineChartOptions {
   // A dot on every point (default). Without, only lone points get one.
   dots?: boolean
   marked?: (i: number) => boolean // with dots off, these points still get one (e.g. days with comments)
+  // Points with answers but no value to show (withheld days): a hollow ring on the baseline,
+  // titled with this text, so they don't look like days nobody answered.
+  hollow?: { at: (i: number) => boolean; title: string }
   // A faint vertical line where a new week starts (xs are days).
   weekLines?: boolean
   // Whether point i can be picked, and what picking it does (a click or tap on the chart).
@@ -72,6 +75,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       weekLines: !byWeek,
       pickable: (i) => !!comments && comments(i) > 0,
       marked: (i) => !!comments && comments(i) > 0,
+      hollow: { at: (i) => days[i].responses > 0 && !hasAverage(days[i]), title: t('chart.withheld') },
       pick,
       tooltip: (i) => {
         const d = days[i]
@@ -250,6 +254,13 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       dot.style.fill = se.color
       svg.append(dot)
     })
+  }
+
+  if (opts.hollow) {
+    for (let i = 0; i < n; i++) {
+      if (!opts.hollow.at(i)) continue
+      svg.append(s('circle', { cx: x(i), cy: m.top + ih, r: 4, class: 'dot-hollow' }, s('title', {}, opts.hollow.title)))
+    }
   }
 
   // Notes sit above (or below) their point, kept inside the chart.
