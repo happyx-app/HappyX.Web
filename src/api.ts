@@ -183,7 +183,8 @@ export interface Health {
   audience: number
   opted_out: number
   on_vacation?: number // older APIs don't send it
-  last_survey: { day: string; recipients: number; failed: number } | null
+  // closed_dms: of the failed DMs, how many because the person has DMs closed (older APIs don't send it).
+  last_survey: { day: string; recipients: number; failed: number; closed_dms?: number } | null
 }
 
 export interface MyMood {
