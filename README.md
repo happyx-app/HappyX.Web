@@ -29,7 +29,9 @@ HappyX is, an **Add to Discord** button (`/api/web/auth/invite`, which redirects
 login. Anyone logs in with Discord and sees **My evolution**: their own answers,
 one line per server, by week, month or year, with each server's average, streak and latest
 comments. Server admins also see how their servers feel: the daily average mood, answers by mood
-and the (anonymous by default) messages for any period.
+and the (anonymous by default) messages for any period. On anonymous servers, a day with answers
+from fewer people than the server's minimum (3 by default) shows only how many answered, and its
+answers count in no average or comment; anonymous comments show without day or mood.
 
 TypeScript without a framework, built with Vite. Charts are plain SVG, no chart library.
 Served by nginx, which also forwards `/api/web/*` to [HappyX.Api](https://github.com/happyx-app/HappyX.Api),

@@ -7,7 +7,7 @@ import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, m
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
 import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
-import { botLanguages, dangerZone, daysLabel, settingsForm, surveyMessageCard } from './settings'
+import { botLanguages, dangerZone, daysLabel, minAnonymityThreshold, settingsForm, surveyMessageCard } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
 import { guildVacationsCard, myVacationCard } from './vacation'
@@ -805,9 +805,13 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     )
     return
   }
+  if (r.withheld) {
+    showData(withheldCard(g, r, health, range.to >= todayIn(g.timezone)), kudosCard(r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }), ...extra)
+    return
+  }
   // With answers on fewer than 3 days there is no tone or trend yet. If they all fall in this week,
   // the dashboard opens on it, unless the period was chosen.
-  const answeredDays = r.days.filter((d) => d.responses > 0)
+  const answeredDays = r.days.filter(api.hasAverage)
   const few = answeredDays.length < fewDays
   if (few && !chosen && preset !== 'this-week' && answeredDays.every((d) => d.day >= thisWeek.from)) {
     history.replaceState(null, '', `#/g/${guildID}?p=this-week`)
@@ -882,19 +886,59 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
       // Without hover nothing says the points open their comments; the CSS shows this only on touch screens.
       points.some((_, i) => comments(i) > 0) ? h('p', { class: 'muted small tap-hint' }, t('chart.tapHint')) : null,
+      r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.ring), t('chart.withheld.note')) : null,
       tableWrap,
     ),
     week
-      ? h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r))
+      ? h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(api.countedAnswers(r))), distributionChart(r))
       : h('div', { class: 'grid-2' },
           weekdayCard(weekdays),
-          h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(r.responses)), distributionChart(r)),
+          h('section', { class: 'card' }, h('h2', {}, t('chart.distribution')), h('p', { class: 'muted small' }, answers(api.countedAnswers(r))), distributionChart(r)),
         ),
     h('div', { class: 'grid-2' },
       messages.card,
       kudosCard(kudos),
     ),
     ...extra,
+  )
+}
+
+// myMode says whether the admins see who answers in g. Anonymity turned off today: names
+// start on named_since, and until then answers stay anonymous.
+function myMode(g: api.MyGuildMoods) {
+  if (g.anonymous && g.named_since) return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
+  if (g.anonymous) return t('me.mode.anonymous', { k: Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold) })
+  return t('me.mode.named')
+}
+
+// threshold is the fewest people whose anonymous answers a day needs to show more than counts.
+const threshold = (r: api.Report) => Math.max(r.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold)
+
+// A period where no day reached the anonymity threshold: how many answered, and why nothing
+// else shows. Kudos are public, so they still show below.
+function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null, reachesToday: boolean) {
+  // k is the minimum the hidden days had; now is the server's minimum, which applies to new days.
+  const k = threshold(r)
+  const now = Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold)
+  const rate = participationRate(r.participation)
+  // Lowering the minimum only changes days still to come, so the link shows only when the period
+  // reaches today, to whoever can change it, when it is above the lowest allowed.
+  const lower = reachesToday && now > minAnonymityThreshold && api.canManage(g)
+  return h(
+    'section',
+    { class: 'card withheld' },
+    h('h2', {}, icons.inline(icons.lock), t(reachesToday ? 'withheld.title' : 'withheld.title.past', { k })),
+    // A period already over gets no more days, so only one that reaches today says what is to come.
+    h('p', { class: 'secondary' }, reachesToday ? `${t('withheld.body')} ${t('withheld.next', { k: now })}` : t('withheld.body')),
+    h(
+      'div',
+      { class: 'stats' },
+      stat(t('stat.respondents'), h('span', {}, formatNumber(r.respondents), health && health.audience > 0 ? h('span', { class: 'stat-unit' }, ` ${t('stat.of', { n: formatNumber(health.audience) })}`) : null), t('stat.respondents.note')),
+      rate !== null
+        ? stat(t('stat.participation'), h('span', {}, formatNumber(rate), h('span', { class: 'stat-unit' }, ' %')), t('stat.participation.note', { n: formatNumber(r.participation!.answered), of: formatNumber(r.participation!.recipients) }))
+        : stat(t('stat.responses'), formatNumber(r.responses)),
+    ),
+    lower ? h('a', { href: `#/g/${g.discord_guild_id}/settings?f=anonymity-threshold` }, `${t('withheld.lower', { k: now })} →`) : null,
   )
 }
 
@@ -1381,7 +1425,7 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     // Older APIs don't say whether the server is anonymous: then the line is left out.
     g.anonymous === undefined
       ? null
-      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), t(g.anonymous ? 'me.mode.anonymous' : 'me.mode.named')),
+      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), myMode(g)),
     h('h3', { class: 'small secondary' }, t('me.latest')),
     msgs.length
       ? h(
@@ -1716,7 +1760,8 @@ function messagesCard(r: api.Report) {
   let current: MoodFilter = 'all'
   // A day or week picked on the chart or its table: only its comments, whatever the mood.
   let days: { from: string; to: string } | null = null
-  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day >= d.from && msg.day <= d.to
+  // Anonymous comments have no day, so a picked day never shows them.
+  const inDays = (msg: api.ReportMessage, d: { from: string; to: string }) => msg.day !== undefined && msg.day >= d.from && msg.day <= d.to
   let all = false
   const counts = Object.fromEntries(moodFilters.map((f) => [f, filterMessages(r.messages, f).length])) as Record<MoodFilter, number>
   // «browser-ui-theming»: one choice among a few, laid out inline = native radios inside labels,
@@ -1732,6 +1777,8 @@ function messagesCard(r: api.Report) {
   // A day picked on the chart isn't one of the choices: a button that removes it.
   const clearText = h('span', {})
   const clear = h('button', { type: 'button', class: 'chip chip-clear', onclick: () => { show(current); radios.get(current)?.focus() } }, clearText, h('span', { 'aria-hidden': 'true' }, ' ×'))
+  // Anonymous comments have no mood: filtering by mood only makes sense when some have one.
+  const moods = moodFilters.some((f) => f !== 'all' && counts[f] > 0)
   const chips = h(
     'fieldset',
     { class: 'chips' },
@@ -1739,33 +1786,41 @@ function messagesCard(r: api.Report) {
     ...moodFilters.filter((f) => f === 'all' || counts[f] > 0).map(radio),
     clear,
   )
+  const hiddenNote = h('p', { class: 'muted small', hidden: true }, t('messages.anonymous.filtered'))
   const more = h('button', { class: 'btn btn-ghost small more-btn', type: 'button' })
   more.addEventListener('click', () => {
     all = true
     draw()
   })
   const draw = () => {
-    const matching = [...(days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current))].reverse()
+    // Named comments newest first; anonymous ones after them, in the order they came, which has
+    // nothing to do with when they were written.
+    const picked = days ? r.messages.filter((msg) => inDays(msg, days!)) : filterMessages(r.messages, current)
+    const matching = [...picked.filter((msg) => msg.mood !== undefined).reverse(), ...picked.filter((msg) => msg.mood === undefined)]
     const shown = all ? matching : matching.slice(0, 8)
     more.hidden = shown.length === matching.length
     more.textContent = t('messages.more', { n: formatNumber(matching.length) })
     list.replaceChildren(
       ...(shown.length
         ? shown.map((msg) =>
-            h(
-              'li',
-              {},
-              h('span', { class: 'msg-mood', title: moodLabel(msg.mood) }, moodEmoji(msg.mood)),
-              h(
-                'div',
-                {},
-                h('p', { class: 'msg-text' }, msg.message),
-                h('span', { class: 'muted small' }, [msg.username, formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
-              ),
-            ),
+            msg.mood === undefined || msg.day === undefined
+              ? h('li', { class: 'msg-plain' }, h('p', { class: 'msg-text' }, msg.message))
+              : h(
+                  'li',
+                  {},
+                  h('span', { class: 'msg-mood', title: moodLabel(msg.mood) }, moodEmoji(msg.mood)),
+                  h(
+                    'div',
+                    {},
+                    h('p', { class: 'msg-text' }, msg.message),
+                    h('span', { class: 'muted small' }, [msg.username, formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
+                  ),
+                ),
           )
         : [h('li', { class: 'muted' }, t(r.messages.length ? 'messages.filter.none' : 'messages.empty'))]),
     )
+    // A mood filter or a picked day leaves the anonymous comments out: they have neither.
+    hiddenNote.hidden = (current === 'all' && !days) || !r.messages.some((msg) => msg.mood === undefined)
     for (const [f, input] of radios) input.checked = !days && f === current
     clear.hidden = !days
     if (days) clearText.textContent = t('messages.filter.clear', { day: days.from === days.to ? formatDay(days.from, { weekday: 'short', day: 'numeric', month: 'short' }) : t('me.weekOf', { day: formatDay(days.from, { day: 'numeric', month: 'short' }) }) })
@@ -1782,17 +1837,17 @@ function messagesCard(r: api.Report) {
     all = true
     draw()
   }
+  // One line on what the comments leave out: their authors, and the withheld days' comments.
+  const withheld = r.days.some((d) => d.withheld) ? ` ${t('messages.withheld')}` : ''
+  const privacy = r.anonymous ? t('messages.anonymous') + withheld : r.messages.some((m) => !m.username) ? t('messages.earlier_anonymous') + withheld : withheld.trim()
   const countIn = (from: string, to: string) => r.messages.filter((msg) => inDays(msg, { from, to })).length
   const card = h(
     'section',
     { class: 'card' },
     h('h2', {}, t('messages.title')),
-    r.anonymous
-      ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.anonymous'))
-      : r.messages.some((m) => !m.username)
-        ? h('p', { class: 'muted small privacy-note' }, icons.lock(), t('messages.earlier_anonymous'))
-        : null,
-    r.messages.length > 0 ? chips : null,
+    privacy ? h('p', { class: 'muted small privacy-note' }, icons.lock(), privacy) : null,
+    moods ? chips : null,
+    hiddenNote,
     list,
     more,
   )

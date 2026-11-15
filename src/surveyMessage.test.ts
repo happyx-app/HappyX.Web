@@ -5,13 +5,16 @@ const ana = { id: '2', name: 'Ana', streak: 5 }
 const friday = new Date(2026, 9, 23)
 
 it('accepts the same messages as the API', () => {
-  for (const ok of ['', '👋 Hola {{user.name}}! ({{ guild.name }})', '{{user.mention}} {{user.streak}} {{date}} {{weekday}}', 'é'.repeat(maxSurveyMessage)]) {
+  for (const ok of ['', '👋 Hola {{user.name}}! ({{ guild.name }})', '{{user.mention}} {{date}} {{weekday}}', 'é'.repeat(maxSurveyMessage)]) {
     expect(isValid(check(ok)), ok).toBe(true)
   }
   expect(check('Hola {{user.nmae}} y {{user.guild}} y {{user.nmae}}').unknown).toEqual(['user.nmae', 'user.guild'])
   expect(check('Hola {{user.name').unclosed).toBe(true)
   expect(check('Hola user.name}}').unclosed).toBe(true)
   expect(check('a'.repeat(maxSurveyMessage + 1)).tooLong).toBe(true)
+  // The streak can no longer be used, but it isn't unknown: the message gets its own reason.
+  const streak = check('Llevas {{user.streak}} días')
+  expect([streak.retired, streak.unknown, isValid(streak)]).toEqual([['user.streak'], [], false])
 })
 
 it('fills the variables like the bot', () => {

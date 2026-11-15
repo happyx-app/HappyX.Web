@@ -12,6 +12,7 @@ import * as survey from './surveyMessage'
 import { filterOf, needsRoles, type RoleFilterEditor, roleFilterEditor, toSave } from './surveyRoles'
 import { unsavedNote } from './unsaved'
 import { canvasState, confirmClear, countDrawings, onCanvasChange } from './canvas'
+import { todayIn } from './periods'
 
 // Languages the bot speaks (HappyX.Bot internal/i18n/locales), named in their own language.
 export const botLanguages: [code: string, name: string][] = [
@@ -31,6 +32,7 @@ export type Settings = Required<Omit<api.SettingsPatch, 'survey_message' | 'surv
 export const settingsOf = (g: api.Guild): Settings => ({
   survey_enabled: g.survey_enabled ?? true,
   anonymous: g.anonymous,
+  anonymity_threshold: g.anonymity_threshold ?? minAnonymityThreshold,
   timezone: g.timezone,
   language: g.language,
   survey_hour: g.survey_hour,
@@ -44,6 +46,19 @@ export const settingsOf = (g: api.Guild): Settings => ({
 })
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
+
+// Anonymous results show only when at least this many people answered: 3 by default, which suits
+// small teams, and never fewer. The same range as the API (HappyX.Api internal/domain/domain.go).
+export const minAnonymityThreshold = 3
+export const maxAnonymityThreshold = 50
+
+export const validThreshold = (n: number) => Number.isInteger(n) && n >= minAnonymityThreshold && n <= maxAnonymityThreshold
+
+// namedFrom is the day answers start carrying names when anonymity was just turned off and that
+// day hasn't come yet; otherwise null.
+export function namedFrom(g: api.Guild, today: string): string | null {
+  return !g.anonymous && g.named_since && today < g.named_since ? g.named_since : null
+}
 
 // weekdayName names an ISO day (1 is Monday) in the page's language.
 export const weekdayName = (iso: number, width: 'short' | 'long' = 'short') =>
@@ -125,6 +140,28 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
 
   const anon = h('input', { id: 'anonymous', type: 'checkbox', role: 'switch', checked: saved.anonymous })
   const anonWarning = h('p', { class: 'warning small', hidden: true }, icons.inline(icons.alert), t('settings.anonymous.off'))
+  // Turned off today: names start tomorrow, and the form says so until then.
+  const anonFrom = h('p', { class: 'muted small', hidden: true }, icons.inline(icons.info))
+  const sayAnonFrom = (guild: api.Guild) => {
+    const day = namedFrom(guild, todayIn(guild.timezone))
+    anonFrom.hidden = day === null
+    if (day) anonFrom.replaceChildren(icons.inline(icons.info), t('settings.anonymous.from', { date: formatDay(day, { day: 'numeric', month: 'long' }) }))
+  }
+  sayAnonFrom(g)
+  const threshold = h('input', {
+    id: 'anonymity-threshold',
+    type: 'number',
+    inputmode: 'numeric',
+    min: minAnonymityThreshold,
+    max: maxAnonymityThreshold,
+    step: 1,
+    required: true,
+    value: saved.anonymity_threshold,
+    'aria-describedby': 'anonymity-threshold-error anonymity-threshold-help',
+  }) as HTMLInputElement
+  const thresholdError = h('p', { class: 'error small', id: 'anonymity-threshold-error', hidden: true }, t('settings.threshold.invalid', { min: minAnonymityThreshold, max: maxAnonymityThreshold }))
+  // With names on, the minimum only matters for the days that were anonymous.
+  const thresholdOff = h('p', { class: 'muted small', hidden: true }, t('settings.threshold.off'))
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
   // Who plays is chosen right under the switch, once the game is on and the roles have loaded.
@@ -194,6 +231,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     report_dm: reportDM.checked,
     survey_enabled: surveyOn.checked,
     anonymous: anon.checked,
+    anonymity_threshold: threshold.valueAsNumber,
     games_enabled: games.checked,
     kudos_channel_id: kudosChannel.value,
     working_days: days.map((l) => l.querySelector('input')!).filter((i) => i.checked).map((i) => Number(i.value)),
@@ -208,9 +246,14 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     daysError.hidden = now.working_days.length > 0
     gameRolesBox.hidden = !now.games_enabled
     const gameRolesMissing = now.games_enabled && gameRoles !== null && needsRoles(gameRoles.value())
-    save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing
+    const thresholdValid = validThreshold(now.anonymity_threshold)
+    threshold.setCustomValidity(thresholdValid ? '' : t('settings.threshold.invalid', { min: minAnonymityThreshold, max: maxAnonymityThreshold }))
+    threshold.setAttribute('aria-invalid', String(!thresholdValid))
+    thresholdError.hidden = thresholdValid
+    save.disabled = !dirty || !tzValid || now.working_days.length === 0 || gameRolesMissing || !thresholdValid
     save.dataset.dirty = String(dirty)
     anonWarning.hidden = now.anonymous || saved.anonymous === false
+    thresholdOff.hidden = now.anonymous
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     if (dirty) status.textContent = ''
     unsaved.textContent = t(dirty ? 'settings.unsaved' : 'settings.saved.none')
@@ -265,6 +308,16 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('label', { class: 'switch', for: 'anonymous' }, anon, h('span', {}, t('settings.anonymous'))),
         h('p', { class: 'muted small' }, t('settings.anonymous.help')),
         anonWarning,
+        anonFrom,
+      ),
+      h(
+        'div',
+        { class: 'field threshold' },
+        h('label', { for: 'anonymity-threshold' }, t('settings.threshold')),
+        threshold,
+        thresholdError,
+        h('p', { class: 'muted small', id: 'anonymity-threshold-help' }, t('settings.threshold.help')),
+        thresholdOff,
       ),
     ),
     sub('settings.sub.game',
@@ -310,6 +363,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     try {
       const updated = await api.updateSettings(g.discord_guild_id, patch)
       saved = settingsOf(updated)
+      sayAnonFrom(updated)
       status.className = 'small success'
       status.replaceChildren(icons.inline(icons.check), t('settings.saved'))
       react('proud')
@@ -377,9 +431,11 @@ export function surveyMessageCard(g: api.Guild, onSaved: (g: api.Guild) => void,
       ? t('survey.unclosed')
       : p.unknown.length
         ? t('survey.unknown', { vars: p.unknown.map((v) => `{{${v}}}`).join(', ') })
-        : p.tooLong
-          ? t('survey.tooLong', { max: survey.maxSurveyMessage })
-          : ''
+        : p.retired.length
+          ? t('survey.retired', { vars: p.retired.map((v) => `{{${v}}}`).join(', ') })
+          : p.tooLong
+            ? t('survey.tooLong', { max: survey.maxSurveyMessage })
+            : ''
     problem.hidden = problem.textContent === ''
     input.setAttribute('aria-invalid', String(!survey.isValid(p)))
     reset.hidden = text.trim() === ''

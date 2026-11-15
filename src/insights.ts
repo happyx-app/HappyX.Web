@@ -2,7 +2,7 @@
 // a number moved, the average per weekday, which comments a mood filter keeps, the response
 // rate and when the next survey and report go out.
 
-import type { DayStat, Report, ReportMessage } from './api'
+import { counted, hasAverage, type DayStat, type Report, type ReportMessage } from './api'
 import { addDays, type Preset, type Range } from './periods'
 
 // The rate as a whole percentage, or null without surveys sent.
@@ -88,11 +88,11 @@ export interface WeekdayStat {
 export function weekdayAverages(days: DayStat[]): WeekdayStat[] {
   const acc = new Map<number, WeekdayStat & { sum: number }>()
   for (const d of days) {
-    if (d.responses === 0) continue
+    if (!hasAverage(d)) continue
     const weekday = ((new Date(`${d.day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1
     const w = acc.get(weekday) ?? { weekday, day: d.day, responses: 0, average: 0, sum: 0 }
-    w.responses += d.responses
-    w.sum += d.average * d.responses
+    w.responses += counted(d)
+    w.sum += d.average * counted(d)
     acc.set(weekday, w)
   }
   return [...acc.values()]
@@ -117,7 +117,7 @@ export function moodGroup(mood: number): Exclude<MoodFilter, 'all'> {
 }
 
 export function filterMessages(messages: ReportMessage[], f: MoodFilter): ReportMessage[] {
-  return f === 'all' ? messages : messages.filter((m) => moodGroup(m.mood) === f)
+  return f === 'all' ? messages : messages.filter((m) => m.mood !== undefined && moodGroup(m.mood) === f)
 }
 
 export type Tone = 'great' | 'good' | 'mixed' | 'tough'
@@ -128,7 +128,7 @@ export function tone(average: number): Tone {
 
 // Whether the period before has enough to compare against.
 export function comparable(prev: Report | null): prev is Report {
-  return prev !== null && prev.responses > 0
+  return prev !== null && prev.responses > 0 && !prev.withheld
 }
 
 // The days worth pointing out on the trend chart: the highest and the lowest, each only when
@@ -136,13 +136,13 @@ export function comparable(prev: Report | null): prev is Report {
 // count (so one person can't decide it), and it sits at least 0.5 from the period's average.
 // On a tie the most recent day wins. Returns indexes into days.
 export function extremeDays(days: DayStat[], average: number): { high: number | null; low: number | null } {
-  const answered = days.map((d, i) => ({ d, i })).filter(({ d }) => d.responses > 0)
+  const answered = days.map((d, i) => ({ d, i })).filter(({ d }) => hasAverage(d))
   if (answered.length < 7) return { high: null, low: null }
-  const counts = answered.map(({ d }) => d.responses).sort((a, b) => a - b)
+  const counts = answered.map(({ d }) => counted(d)).sort((a, b) => a - b)
   const mid = Math.floor(counts.length / 2)
   const median = counts.length % 2 ? counts[mid] : (counts[mid - 1] + counts[mid]) / 2
   // A week still in progress isn't comparable with whole ones.
-  const solid = answered.filter(({ d }) => d.responses >= 3 && d.responses >= median / 2 && !(d as { partial?: boolean }).partial)
+  const solid = answered.filter(({ d }) => counted(d) >= 3 && counted(d) >= median / 2 && !(d as { partial?: boolean }).partial)
   const round = (v: number) => Math.round(v * 10) / 10
   let high: number | null = null
   let low: number | null = null

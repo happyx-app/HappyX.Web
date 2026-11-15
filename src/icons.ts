@@ -23,6 +23,8 @@ export const gear: Icon = () =>
 
 export const alert: Icon = () => icon(path('M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01'))
 export const info: Icon = () => icon(s('circle', { cx: 12, cy: 12, r: 10 }), path('M12 16v-4M12 8h.01'))
+// The ring that marks a withheld day on the trend chart.
+export const ring: Icon = () => icon(s('circle', { cx: 12, cy: 12, r: 6 }))
 export const lock: Icon = () => icon(s('rect', { x: 3, y: 11, width: 18, height: 11, rx: 2 }), path('M7 11V7a5 5 0 0 1 10 0v4'))
 export const eye: Icon = () => icon(path('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'), s('circle', { cx: 12, cy: 12, r: 3 }))
 export const logOut: Icon = () => icon(path('M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'))

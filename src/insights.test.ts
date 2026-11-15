@@ -38,6 +38,10 @@ describe('weekdayAverages', () => {
     expect(w[0].responses).toBe(3)
     expect(w[0].average).toBeCloseTo(3.5)
   })
+  it('leaves withheld days out', () => {
+    const w = weekdayAverages([...days, { day: '2026-10-27', responses: 2, average: 0, withheld: true }])
+    expect(w.map((x) => x.weekday)).toEqual([1, 5])
+  })
   it('finds a clearly lowest day only', () => {
     expect(lowestWeekday(weekdayAverages(days))?.weekday).toBe(1)
     expect(lowestWeekday(weekdayAverages([{ day: '2026-10-26', responses: 1, average: 4 }, { day: '2026-10-27', responses: 1, average: 3.9 }]))).toBeNull()
@@ -52,6 +56,11 @@ describe('mood filter', () => {
     expect([1, 2, 3, 4, 5].map(moodGroup)).toEqual(['low', 'low', 'mid', 'high', 'high'])
     expect(filterMessages(all, 'all')).toHaveLength(5)
     expect(filterMessages(all, 'low').map((m) => m.mood)).toEqual([1, 2])
+  })
+  it('keeps anonymous comments, which have no mood, out of the mood groups', () => {
+    const anonymous: ReportMessage = { message: 'sin ánimo' }
+    expect(filterMessages([...all, anonymous], 'all')).toHaveLength(6)
+    expect(filterMessages([...all, anonymous], 'low')).toHaveLength(2)
   })
 })
 
