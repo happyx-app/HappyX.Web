@@ -185,6 +185,9 @@ export interface Health {
   on_vacation?: number // older APIs don't send it
   // closed_dms: of the failed DMs, how many because the person has DMs closed (older APIs don't send it).
   last_survey: { day: string; recipients: number; failed: number; closed_dms?: number } | null
+  // team_channel: where HappyX posts to the team (the team channel, or else the kudos one), null
+  // with neither; can_post is left out when unknown. Older APIs don't send it.
+  team_channel?: { id: string; can_post?: boolean } | null
 }
 
 export interface MyMood {

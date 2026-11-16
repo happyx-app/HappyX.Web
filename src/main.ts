@@ -1051,12 +1051,17 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
-  // Whoever has DMs closed answers in the team channel; without one they have nowhere to answer.
+  // Whoever has DMs closed answers in the team channel; without one, or where HappyX can't post,
+  // they have nowhere to answer.
   const closed = last?.closed_dms ?? 0
   if (closed > 0) {
-    const channel = g.team_channel_id || g.kudos_channel_id
-    const key = channel ? 'health.closedDMs.channel' : 'health.closedDMs.none'
-    todo.push(item(channel ? null : false, t(closed === 1 ? `${key}.one` : key, { n: formatNumber(closed) }), channel ? undefined : [`${settings}?f=team-channel`, t('health.chooseChannel')]))
+    const channel: api.Health['team_channel'] = x.team_channel !== undefined ? x.team_channel : g.team_channel_id || g.kudos_channel_id ? { id: '' } : null
+    const [key, link]: [`health.closedDMs.${"none" | "noPost" | "channel"}`, string] = !channel
+      ? ['health.closedDMs.none', t('health.chooseChannel')]
+      : channel.can_post === false
+        ? ['health.closedDMs.noPost', t('health.checkChannel')]
+        : ['health.closedDMs.channel', '']
+    todo.push(item(link ? false : null, t(closed === 1 ? `${key}.one` : key, { n: formatNumber(closed) }), link ? [`${settings}?f=team-channel`, link] : undefined))
   }
   todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   // «content-first-noise-reduction»: rarely needed detail goes in <details>, closed. The summary
