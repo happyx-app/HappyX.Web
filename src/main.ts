@@ -7,7 +7,7 @@ import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, m
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
 import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
-import { botLanguages, dangerZone, daysLabel, minAnonymityThreshold, settingsForm, surveyMessageCard } from './settings'
+import { botLanguages, dangerZone, daysLabel, safeAnonymityThreshold, settingsForm, surveyMessageCard, thresholdOf } from './settings'
 import { accessCard } from './access'
 import { surveyRolesCard } from './surveyRoles'
 import { guildVacationsCard, myVacationCard } from './vacation'
@@ -906,24 +906,30 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 // myMode says whether the admins see who answers in g. Anonymity turned off today: names
 // start on named_since, and until then answers stay anonymous.
 function myMode(g: api.MyGuildMoods) {
-  if (g.anonymous && g.named_since) return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
-  if (g.anonymous) return t('me.mode.anonymous', { k: Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold) })
+  if (g.anonymous && g.named_since)
+    return t(thresholdOf(g.anonymity_threshold) < safeAnonymityThreshold ? 'me.mode.anonymous_until_low' : 'me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
+  if (g.anonymous) {
+    // Below 3 an answer can point to whoever gave it, and members are told so plainly.
+    const k = thresholdOf(g.anonymity_threshold)
+    return k === 1 ? t('me.mode.anonymous_k1') : k === 2 ? t('me.mode.anonymous_k2') : t('me.mode.anonymous', { k })
+  }
   return t('me.mode.named')
 }
 
 // threshold is the fewest people whose anonymous answers a day needs to show more than counts.
-const threshold = (r: api.Report) => Math.max(r.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold)
+const threshold = (r: api.Report) => thresholdOf(r.anonymity_threshold)
 
 // A period where no day reached the anonymity threshold: how many answered, and why nothing
 // else shows. Kudos are public, so they still show below.
 function withheldCard(g: api.Guild, r: api.Report, health: api.Health | null, reachesToday: boolean) {
   // k is the minimum the hidden days had; now is the server's minimum, which applies to new days.
   const k = threshold(r)
-  const now = Math.max(g.anonymity_threshold ?? minAnonymityThreshold, minAnonymityThreshold)
+  const now = thresholdOf(g.anonymity_threshold)
   const rate = participationRate(r.participation)
   // Lowering the minimum only changes days still to come, so the link shows only when the period
-  // reaches today, to whoever can change it, when it is above the lowest allowed.
-  const lower = reachesToday && now > minAnonymityThreshold && api.canManage(g)
+  // reaches today, to whoever can change it, when it is above 3: going lower is the admin's own
+  // choice, never one the dashboard suggests.
+  const lower = reachesToday && now > safeAnonymityThreshold && api.canManage(g)
   return h(
     'section',
     { class: 'card withheld' },
@@ -1456,7 +1462,7 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     // Older APIs don't say whether the server is anonymous: then the line is left out.
     g.anonymous === undefined
       ? null
-      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), myMode(g)),
+      : h('p', { class: 'muted small' }, icons.inline(g.anonymous && thresholdOf(g.anonymity_threshold) >= safeAnonymityThreshold ? icons.lock : icons.eye), myMode(g)),
     h('h3', { class: 'small secondary' }, t('me.latest')),
     msgs.length
       ? h(

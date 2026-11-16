@@ -19,6 +19,10 @@ export interface Guild {
   // Anonymous results are shown only when at least this many people answered. Older APIs leave
   // it out, which means 3.
   anonymity_threshold?: number
+  // A lowered threshold counts from anonymity_threshold_since (the day after it was lowered);
+  // until then anonymity_threshold_before stays. Both left out otherwise.
+  anonymity_threshold_since?: string
+  anonymity_threshold_before?: number
   // Whether members get the survey and the game. A server the bot just joined has it off until an
   // admin starts it. Older APIs leave it out, which means on.
   survey_enabled?: boolean
