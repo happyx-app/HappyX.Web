@@ -183,6 +183,18 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
   const thresholdOff = h('p', { class: 'muted small', hidden: true }, t('settings.threshold.off'))
   // Below 3 an answer can point to whoever gave it: said before saving, as the survey tells members.
   const thresholdLow = h('p', { class: 'warning small', id: 'anonymity-threshold-low', hidden: true })
+  // Lowered: it counts from the next day, and the form says so until then.
+  const thresholdFrom = h('p', { class: 'muted small', hidden: true })
+  const sayThresholdFrom = (guild: api.Guild) => {
+    const since = guild.anonymity_threshold_since
+    thresholdFrom.hidden = !since
+    if (since)
+      thresholdFrom.replaceChildren(
+        icons.inline(icons.info),
+        t('settings.threshold.since', { k: thresholdOf(guild.anonymity_threshold), date: formatDay(since, { day: 'numeric', month: 'long' }), before: guild.anonymity_threshold_before ?? defaultAnonymityThreshold }),
+      )
+  }
+  sayThresholdFrom(g)
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
   // Who plays is chosen right under the switch, once the game is on and the roles have loaded.
@@ -366,6 +378,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         threshold,
         thresholdError,
         thresholdLow,
+        thresholdFrom,
         h('p', { class: 'muted small', id: 'anonymity-threshold-help' }, t('settings.threshold.help')),
         thresholdOff,
       ),
@@ -423,6 +436,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
       const updated = await api.updateSettings(g.discord_guild_id, patch)
       saved = settingsOf(updated)
       sayAnonFrom(updated)
+      sayThresholdFrom(updated)
       status.className = 'small success'
       status.replaceChildren(icons.inline(icons.check), t('settings.saved'))
       react('proud')

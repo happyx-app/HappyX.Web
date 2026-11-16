@@ -906,7 +906,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 // myMode says whether the admins see who answers in g. Anonymity turned off today: names
 // start on named_since, and until then answers stay anonymous.
 function myMode(g: api.MyGuildMoods) {
-  if (g.anonymous && g.named_since) return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
+  if (g.anonymous && g.named_since)
+    return t(thresholdOf(g.anonymity_threshold) < safeAnonymityThreshold ? 'me.mode.anonymous_until_low' : 'me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
   if (g.anonymous) {
     // Below 3 an answer can point to whoever gave it, and members are told so plainly.
     const k = thresholdOf(g.anonymity_threshold)
@@ -1461,7 +1462,7 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     // Older APIs don't say whether the server is anonymous: then the line is left out.
     g.anonymous === undefined
       ? null
-      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), myMode(g)),
+      : h('p', { class: 'muted small' }, icons.inline(g.anonymous && thresholdOf(g.anonymity_threshold) >= safeAnonymityThreshold ? icons.lock : icons.eye), myMode(g)),
     h('h3', { class: 'small secondary' }, t('me.latest')),
     msgs.length
       ? h(
