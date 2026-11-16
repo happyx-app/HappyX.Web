@@ -907,9 +907,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
 // start on named_since, and until then answers stay anonymous.
 function myMode(g: api.MyGuildMoods) {
   if (g.anonymous && g.named_since)
-    return t(thresholdOf(g.anonymity_threshold) < safeAnonymityThreshold ? 'me.mode.anonymous_until_low' : 'me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
+    return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
   if (g.anonymous) {
-    // Below 3 an answer can point to whoever gave it, and members are told so plainly.
+    // Anonymous at any minimum, since the name is never shown. Below the safe minimum it says only
+    // that, not «never who answered what».
     const k = thresholdOf(g.anonymity_threshold)
     return k === 1 ? t('me.mode.anonymous_k1') : k === 2 ? t('me.mode.anonymous_k2') : t('me.mode.anonymous', { k })
   }
@@ -1462,7 +1463,7 @@ function myGuildCard(g: api.MyGuildMoods, color: string | null) {
     // Older APIs don't say whether the server is anonymous: then the line is left out.
     g.anonymous === undefined
       ? null
-      : h('p', { class: 'muted small' }, icons.inline(g.anonymous && thresholdOf(g.anonymity_threshold) >= safeAnonymityThreshold ? icons.lock : icons.eye), myMode(g)),
+      : h('p', { class: 'muted small' }, icons.inline(g.anonymous ? icons.lock : icons.eye), myMode(g)),
     h('h3', { class: 'small secondary' }, t('me.latest')),
     msgs.length
       ? h(
