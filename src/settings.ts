@@ -32,7 +32,7 @@ export type Settings = Required<Omit<api.SettingsPatch, 'survey_message' | 'surv
 export const settingsOf = (g: api.Guild): Settings => ({
   survey_enabled: g.survey_enabled ?? true,
   anonymous: g.anonymous,
-  anonymity_threshold: g.anonymity_threshold ?? minAnonymityThreshold,
+  anonymity_threshold: thresholdOf(g.anonymity_threshold),
   timezone: g.timezone,
   language: g.language,
   survey_hour: g.survey_hour,
@@ -56,14 +56,20 @@ export function teamChannelFallback(kudosChannelID: string, names: Map<string, s
 
 // summaryMinPeople is the fewest people who must answer before the Monday summary says how many
 // did: 5, or the server's minimum when higher (HappyX.Bot internal/bot/team.go).
-export const summaryMinPeople = (threshold: number) => Math.max(5, validThreshold(threshold) ? threshold : minAnonymityThreshold)
+export const summaryMinPeople = (threshold: number) => Math.max(5, validThreshold(threshold) ? threshold : defaultAnonymityThreshold)
 
 export const mondayToFriday = [1, 2, 3, 4, 5]
 
 // Anonymous results show only when at least this many people answered: 3 by default, which suits
-// small teams, and never fewer. The same range as the API (HappyX.Api internal/domain/domain.go).
-export const minAnonymityThreshold = 3
+// small teams. Below 3 an answer can point to whoever gave it; an admin may still choose so, and
+// members are told. The same range as the API (HappyX.Api internal/domain/domain.go).
+export const minAnonymityThreshold = 1
+export const safeAnonymityThreshold = 3
+export const defaultAnonymityThreshold = safeAnonymityThreshold
 export const maxAnonymityThreshold = 50
+
+// thresholdOf is a threshold from the API, the default from an older one that doesn't send it.
+export const thresholdOf = (k: number | undefined) => (k !== undefined && k >= minAnonymityThreshold ? k : defaultAnonymityThreshold)
 
 export const validThreshold = (n: number) => Number.isInteger(n) && n >= minAnonymityThreshold && n <= maxAnonymityThreshold
 
@@ -170,11 +176,13 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     step: 1,
     required: true,
     value: saved.anonymity_threshold,
-    'aria-describedby': 'anonymity-threshold-error anonymity-threshold-help',
+    'aria-describedby': 'anonymity-threshold-error anonymity-threshold-low anonymity-threshold-help',
   }) as HTMLInputElement
   const thresholdError = h('p', { class: 'error small', id: 'anonymity-threshold-error', hidden: true }, t('settings.threshold.invalid', { min: minAnonymityThreshold, max: maxAnonymityThreshold }))
   // With names on, the minimum only matters for the days that were anonymous.
   const thresholdOff = h('p', { class: 'muted small', hidden: true }, t('settings.threshold.off'))
+  // Below 3 an answer can point to whoever gave it: said before saving, as the survey tells members.
+  const thresholdLow = h('p', { class: 'warning small', id: 'anonymity-threshold-low', hidden: true })
 
   const games = h('input', { id: 'games', type: 'checkbox', role: 'switch', checked: saved.games_enabled })
   // Who plays is chosen right under the switch, once the game is on and the roles have loaded.
@@ -286,6 +294,9 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
     save.dataset.dirty = String(dirty)
     anonWarning.hidden = now.anonymous || saved.anonymous === false
     thresholdOff.hidden = now.anonymous
+    const low = thresholdValid && now.anonymous && now.anonymity_threshold < safeAnonymityThreshold
+    thresholdLow.hidden = !low
+    if (low) thresholdLow.replaceChildren(icons.inline(icons.alert), t(now.anonymity_threshold === 1 ? 'settings.threshold.low1' : 'settings.threshold.low2'))
     kudosWarning.hidden = kudosChannel.disabled || now.kudos_channel_id === '' || postable.has(now.kudos_channel_id)
     teamWarning.hidden = teamChannel.disabled || now.team_channel_id === '' || postable.has(now.team_channel_id)
     // With no team channel of its own, HappyX tells the team in the kudos channel, if there is one.
@@ -354,6 +365,7 @@ export function settingsForm(g: api.Guild, onSaved: (g: api.Guild) => void, onLo
         h('label', { for: 'anonymity-threshold' }, t('settings.threshold')),
         threshold,
         thresholdError,
+        thresholdLow,
         h('p', { class: 'muted small', id: 'anonymity-threshold-help' }, t('settings.threshold.help')),
         thresholdOff,
       ),

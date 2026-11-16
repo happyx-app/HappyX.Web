@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { channelGroups, summaryMinPeople, teamChannelFallback, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
+import { channelGroups, summaryMinPeople, thresholdOf, validThreshold, teamChannelFallback, changes, confirmed, type Settings, settingsOf, weekdayName, daysLabel } from './settings'
 
 const base: Settings = { anonymous: true, anonymity_threshold: 3, timezone: 'Europe/Madrid', language: 'en', survey_hour: 13, report_frequency: 'weekly', report_dm: true, games_enabled: false, kudos_channel_id: '', team_channel_id: '', team_summary: true, working_days: [1, 2, 3, 4, 5], game_roles: { mode: 'all', role_ids: [] }, canvas_enabled: false, survey_enabled: true }
 
@@ -73,4 +73,11 @@ it('team channel: its own, else the kudos channel, else none', () => {
   expect(teamChannelFallback('9', new Map())).toBe('#?')
   expect(summaryMinPeople(3)).toBe(5)
   expect(summaryMinPeople(8)).toBe(8)
+})
+
+it('takes thresholds from 1 to 50, and the default from an older API', () => {
+  expect([0, 1, 2, 3, 50, 51, 2.5].map(validThreshold)).toEqual([false, true, true, true, true, false, false])
+  expect(thresholdOf(undefined)).toBe(3)
+  expect(thresholdOf(1)).toBe(1)
+  expect(summaryMinPeople(1)).toBe(5)
 })
