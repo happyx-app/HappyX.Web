@@ -909,9 +909,10 @@ function myMode(g: api.MyGuildMoods) {
   if (g.anonymous && g.named_since)
     return t('me.mode.anonymous_until', { date: formatDay(g.named_since, { day: 'numeric', month: 'long' }) })
   if (g.anonymous) {
-    // Anonymous at any minimum: the name is never shown. At 1 there are no «at least 1 people».
+    // Anonymous at any minimum, since the name is never shown. Below the safe minimum it says only
+    // that, not «never who answered what».
     const k = thresholdOf(g.anonymity_threshold)
-    return k === 1 ? t('me.mode.anonymous_k1') : t('me.mode.anonymous', { k })
+    return k === 1 ? t('me.mode.anonymous_k1') : k === 2 ? t('me.mode.anonymous_k2') : t('me.mode.anonymous', { k })
   }
   return t('me.mode.named')
 }
