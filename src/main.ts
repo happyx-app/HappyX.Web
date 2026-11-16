@@ -855,7 +855,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   showData(
     summaryCard(r, old, week ? [] : weekdays, few),
     ...[toWatch([
-      ...(health && healthSection ? [healthAlert(health, healthSection, ask)] : []),
+      ...(health && healthSection ? [healthAlert(g, health, healthSection, ask)] : []),
       lowComments(r, messages),
       rate !== null && oldRate !== null && oldRate - rate >= participationDrop && healthSection
         ? { text: t('watch.participation', { n: formatNumber(oldRate - rate) }), go: () => focusCard(healthSection), ask }
@@ -1003,14 +1003,30 @@ function focusCard(card: HTMLElement) {
   card.focus({ preventScroll: true })
 }
 
-// When the last survey didn't reach everyone, or reaches nobody: «Server status», at the bottom.
-function healthAlert(x: api.Health, card: HTMLElement, ask?: string): Watch | null {
+// teamChannelState is whether HappyX has a team channel to post in (the team channel, or else the
+// kudos one): 'none', 'noPost' when it knows it can't post there, 'ok' otherwise. Older APIs don't
+// say, so it goes by the guild's settings.
+function teamChannelState(g: api.Guild, x: api.Health): 'none' | 'noPost' | 'ok' {
+  const channel = x.team_channel !== undefined ? x.team_channel : g.team_channel_id || g.kudos_channel_id ? { id: '' } : null
+  return !channel ? 'none' : channel.can_post === false ? 'noPost' : 'ok'
+}
+
+// viaChannel is how many of the last survey's undelivered DMs went to people with DMs closed who
+// can answer in the team channel instead: nothing to fix there.
+function viaChannel(g: api.Guild, x: api.Health): number {
+  return teamChannelState(g, x) === 'ok' ? (x.last_survey?.closed_dms ?? 0) : 0
+}
+
+// When the last survey didn't reach someone who has nowhere else to answer, or reaches nobody:
+// «Server status», at the bottom.
+function healthAlert(g: api.Guild, x: api.Health, card: HTMLElement, ask?: string): Watch | null {
   const last = x.last_survey
+  const missed = last ? last.failed - viaChannel(g, x) : 0
   const text =
     x.audience === 0
       ? t('health.audience.none')
-      : last && last.failed > 0
-        ? t(last.failed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(last.failed), day: formatDay(last.day, { weekday: 'long' }) })
+      : last && missed > 0
+        ? t(missed === 1 ? 'health.alert.failed.one' : 'health.alert.failed', { n: formatNumber(missed), day: formatDay(last.day, { weekday: 'long' }) })
         : null
   return text ? { text, go: () => focusCard(card), ask } : null
 }
@@ -1051,12 +1067,14 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
   if (x.opted_out > 0) todo.push(item(null, x.opted_out === 1 ? t('health.optedOut.one') : t('health.optedOut', { n: formatNumber(x.opted_out) })))
   const away = x.on_vacation ?? 0
   if (away > 0) todo.push(item(null, away === 1 ? t('health.onVacation.one') : t('health.onVacation', { n: formatNumber(away) })))
-  // Whoever has DMs closed answers in the team channel; without one they have nowhere to answer.
+  // Whoever has DMs closed answers in the team channel; without one, or where HappyX can't post,
+  // they have nowhere to answer. When they can, «Last survey» already says so.
   const closed = last?.closed_dms ?? 0
-  if (closed > 0) {
-    const channel = g.team_channel_id || g.kudos_channel_id
-    const key = channel ? 'health.closedDMs.channel' : 'health.closedDMs.none'
-    todo.push(item(channel ? null : false, t(closed === 1 ? `${key}.one` : key, { n: formatNumber(closed) }), channel ? undefined : [`${settings}?f=team-channel`, t('health.chooseChannel')]))
+  const state = teamChannelState(g, x)
+  if (closed > 0 && state !== 'ok') {
+    const key = state === 'none' ? 'health.closedDMs.none' : 'health.closedDMs.noPost'
+    const link = state === 'none' ? t('health.chooseChannel') : t('health.checkChannel')
+    todo.push(item(false, t(closed === 1 ? `${key}.one` : key, { n: formatNumber(closed) }), [`${settings}?f=team-channel`, link]))
   }
   todo.push(item(g.games_enabled, t(!g.games_enabled ? 'health.game.off' : surveyOn ? 'health.game.on' : 'health.game.web'), g.games_enabled ? undefined : [`${settings}?f=games`, t('health.turnOn')]))
   // «content-first-noise-reduction»: rarely needed detail goes in <details>, closed. The summary
@@ -1079,7 +1097,13 @@ function healthCard(g: api.Guild, x: api.Health, surveyOffItem = true) {
       tile(
         t('health.lastSurvey'),
         last ? t('health.sent', { n: formatNumber(last.recipients - last.failed), of: formatNumber(last.recipients) }) : t(isNewGuild(g.created_at) ? 'health.none.yet' : 'health.none'),
-        last ? `${formatDay(last.day, long)} · ${last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) })}` : '',
+        last
+          ? [
+              formatDay(last.day, long),
+              last.failed === 0 ? t('health.noFailures') : t(last.failed === 1 ? 'health.failed.one' : 'health.failed', { n: formatNumber(last.failed) }),
+              ...(viaChannel(g, x) > 0 ? [t(viaChannel(g, x) === 1 ? 'health.viaChannel.one' : 'health.viaChannel', { n: formatNumber(viaChannel(g, x)) })] : []),
+            ].join(' · ')
+          : '',
       ),
       // Without answers there is no report to send, so while the survey is off there is no date.
       surveyOn
