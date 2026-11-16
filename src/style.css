@@ -661,6 +661,8 @@ main:focus { outline: none; }
 .todo li { display: grid; grid-template-columns: 1.25em 1fr auto; gap: 10px; align-items: baseline; }
 .todo li > :nth-child(2) { min-width: 0; }
 .todo-info svg { width: 1em; height: 1em; vertical-align: -0.15em; }
+/* On a phone the link goes under its text instead of squeezing it. */
+@media (max-width: 560px) { .todo li { grid-template-columns: 1.25em 1fr; } .todo a { grid-column: 2; justify-self: start; margin-left: 0; } }
 .more-btn { justify-self: start; margin-top: 8px; }
 .day-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .day-chip { position: relative; display: inline-grid; place-items: center; min-width: 52px; padding: 8px 12px; border: 1px solid var(--control-border); border-radius: 999px; cursor: pointer; font-weight: 600; color: var(--ink-2); }
