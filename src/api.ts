@@ -214,6 +214,12 @@ export interface MyGuildMoods {
   average: number
   streak: number
   entries: MyMood[]
+  // The days of the range when the survey went out in this server, to anyone (so days of the
+  // person's vacation too). Older APIs leave it out.
+  survey_days?: string[]
+  // The person's vacations that touch the range, their own and any set in this server. Older APIs
+  // leave it out.
+  vacations?: { from: string; to: string }[]
 }
 
 export interface MyMoods {
