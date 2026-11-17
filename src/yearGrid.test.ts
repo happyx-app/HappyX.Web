@@ -24,7 +24,6 @@ describe('toYear', () => {
     expect(y.weeks[1][0]!.kind).toBe('vacation')
     expect(y.weeks[0][5]!.kind).toBe('none') // a Saturday in the vacation, without a survey
     expect(y.weeks[1][1]!.kind).toBe('none')
-    expect([y.answered, y.asked]).toEqual([1, 2])
   })
   it('counts an answer in any server, and a missed survey over a vacation elsewhere', () => {
     const a = guild({ entries: [{ day: '2026-11-04', mood: 2 }], survey_days: ['2026-11-04', '2026-11-05'] })
@@ -61,5 +60,4 @@ it("doesn't count today as missed, nor a vacation on a day without a survey", ()
   expect(y.weeks[0][2]!.kind).toBe('none')
   expect(y.weeks[0][3]!.kind).toBe('missed')
   expect(y.weeks[0][4]!.kind).toBe('pending')
-  expect(y.asked).toBe(1)
 })

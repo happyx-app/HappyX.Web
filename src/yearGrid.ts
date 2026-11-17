@@ -29,8 +29,6 @@ export interface Year {
   // weeks[w][d]: week w (oldest first), weekday d (0 Monday … 6 Sunday); null before the range
   // starts or after today.
   weeks: (YearDay | null)[][]
-  answered: number
-  asked: number // days with a survey: answered plus missed
   // The weekdays (0 Monday … 6 Sunday) with anything to show; a weekend without surveys, answers
   // or vacations is left out.
   rows: number[]
@@ -69,8 +67,6 @@ export function toYear(guilds: MyGuildMoods[], range: Range): Year {
   const moods = new Map(guilds.map((g) => [g.discord_guild_id, new Map(g.entries.map((e) => [e.day, { mood: e.mood, message: e.message }]))]))
   const surveyed = new Map(guilds.map((g) => [g.discord_guild_id, new Set(g.survey_days)]))
   const weeks: (YearDay | null)[][] = []
-  let answered = 0
-  let asked = 0
   for (let start = addDays(range.from, -weekday(range.from)); start <= range.to; start = addDays(start, 7)) {
     weeks.push(
       [0, 1, 2, 3, 4, 5, 6].map((d) => {
@@ -78,14 +74,12 @@ export function toYear(guilds: MyGuildMoods[], range: Range): Year {
         if (day < range.from || day > range.to) return null
         const gs = guilds.map((g) => guildDay(g, day, range.to, moods.get(g.discord_guild_id)!, surveyed.get(g.discord_guild_id)!))
         const c = combine(gs)
-        if (c.kind === 'mood') answered++
-        if (c.kind === 'mood' || c.kind === 'missed') asked++
         return { day, ...c, guilds: gs }
       }),
     )
   }
   const rows = [0, 1, 2, 3, 4, 5, 6].filter((d) => d < 5 || weeks.some((w) => w[d] && w[d].kind !== 'none'))
-  return { weeks, answered, asked, rows }
+  return { weeks, rows }
 }
 
 // The mood step a day is painted with: 1 to 5, as the emojis.

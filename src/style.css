@@ -1105,7 +1105,7 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
    strongest mood in both schemes. Days without an answer are only an outline, vacations are
    striped and days without a survey a small dot, so none of them reads as a mood. */
 .year-slot:empty { display: none; }
-.sk-year { height: 300px; }
+.sk-year { height: 220px; }
 .me-period { display: grid; gap: 8px; }
 .me-period .me-dates { margin: 0; }
 .year-card {
@@ -1115,7 +1115,7 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
   --yd-4: light-dark(#ac93f7, #6a4bc4);
   --yd-5: light-dark(#6d28d9, #b49afb);
   --yd-cell: 16px;
-  display: grid; gap: 12px; min-width: 0;
+  display: grid; gap: 10px; min-width: 0; padding-block: 16px 14px;
 }
 .year-wrap { position: relative; min-width: 0; }
 /* On a phone the grid scrolls; the weekday column stays, and a fade on the left says there is more. */
@@ -1128,17 +1128,19 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
   grid-template-columns: auto repeat(var(--weeks), var(--yd-cell));
   grid-template-rows: auto repeat(var(--rows), auto);
 }
-@media (min-width: 720px) { .year-grid { min-width: 0; grid-template-columns: auto repeat(var(--weeks), minmax(0, 1fr)); } }
+/* From a tablet up the squares share the card's width, never under 12px: below that it scrolls. */
+@media (min-width: 720px) { .year-grid { grid-template-columns: auto repeat(var(--weeks), minmax(12px, 1fr)); } }
+@media (min-width: 1000px) { .year-grid { min-width: 0; } }
+/* On a touch screen, squares big enough to tap the right day. */
+@media (pointer: coarse) and (max-width: 719px) { .year-card { --yd-cell: 20px; } .year-grid { gap: 4px; } }
 .year-row { display: contents; }
 .year-month { grid-row: 1; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 .year-weekday {
   grid-column: 1; font-size: 0.75rem; line-height: 1; color: var(--muted); display: flex; align-items: center;
-  padding-right: 6px; margin-right: -3px; position: sticky; left: 0; z-index: 2; background: var(--surface);
-  box-shadow: 6px 0 6px -2px var(--surface);
+  padding-right: 9px; margin-right: -6px; position: sticky; left: 0; z-index: 2; background: var(--surface);
 }
 .yd { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--yd-3); cursor: pointer; }
 .yd:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; box-shadow: 0 0 0 1px var(--surface); position: relative; z-index: 1; }
-.yd[aria-selected='true'] { outline: 2px solid var(--ink); outline-offset: 1px; position: relative; z-index: 1; }
 .yd-m1 { background: var(--yd-1); }
 .yd-m2 { background: var(--yd-2); }
 .yd-m3 { background: var(--yd-3); }
@@ -1146,26 +1148,32 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .yd-m5 { background: var(--yd-5); }
 .yd-missed { background: transparent; box-shadow: inset 0 0 0 1.5px var(--control-border); }
 /* Answered in one server, missed in another: the mood, with the gap's outline inside. */
-.yd-partial { box-shadow: inset 0 0 0 1.5px var(--surface), inset 0 0 0 3px var(--control-border); }
+.yd-partial { box-shadow: inset 0 0 0 1px var(--surface), inset 0 0 0 2px var(--muted); }
 .yd-pending { background: transparent; outline: 1.5px dashed var(--control-border); outline-offset: -1.5px; }
 .yd-vacation {
   background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--sun) 70%, transparent) 0 1.5px, transparent 1.5px 4px);
   box-shadow: inset 0 0 0 1px var(--sun);
 }
 .yd-none { background: radial-gradient(circle, var(--axis) 0 22%, transparent 25%); cursor: default; }
-.year-detail { display: grid; gap: 4px; min-height: 3.25rem; font-size: 0.9375rem; }
-.year-comment { color: var(--ink-2); font-style: italic; }
-.year-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--ink-2); }
-.year-legend li { display: flex; align-items: center; gap: 6px; }
-.year-legend .yd { width: 14px; cursor: default; }
-.year-ramp { display: flex; align-items: center; gap: 2px; }
-.year-ramp .yd:first-of-type { margin-left: 4px; }
-.year-ramp .yd:last-of-type { margin-right: 4px; }
+.year-tip { white-space: normal; max-width: 260px; display: grid; gap: 2px; }
+.year-tip-mood { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.year-tip-face { font-size: 1.5rem; line-height: 1.2; }
+.year-tip-msg { color: var(--ink-2); font-size: 0.875rem; overflow-wrap: anywhere; }
+.year-tip-server { display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--ink-2); }
+.year-tip-server ~ .year-tip-server { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.year-tip-server ~ .year-tip-mood .year-tip-face { font-size: 1.25rem; }
+/* The key, small and to the right, as on GitHub. */
+.year-legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 0.75rem; color: var(--muted); }
+.year-legend li { display: flex; align-items: center; gap: 4px; }
+.year-legend li:first-child .yd:first-of-type { margin-left: 2px; }
+.year-legend li:first-child .yd:last-of-type { margin-right: 2px; }
+.year-legend li:first-child { gap: 2px; }
+.year-legend .yd { width: 11px; cursor: default; }
 .swatch-ring { background: transparent; box-shadow: inset 0 0 0 2px currentColor; border-radius: 50%; }
 .year-wrap .tooltip { z-index: 2; }
 @media (forced-colors: active) {
   .yd { forced-color-adjust: none; }
   .yd-missed { box-shadow: inset 0 0 0 1.5px CanvasText; }
   .yd-none { background: radial-gradient(circle, GrayText 0 22%, transparent 25%); }
-  .yd:focus-visible, .yd[aria-selected='true'] { outline-color: Highlight; }
+  .yd:focus-visible { outline-color: Highlight; }
 }

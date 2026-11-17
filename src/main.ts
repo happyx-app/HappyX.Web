@@ -3,7 +3,7 @@ import * as api from './api'
 import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
 import { h } from './dom'
 import * as icons from './icons'
-import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodEmojis, moodLabel, setLanguage, t } from './i18n'
+import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
 import { hasYearData, monthStarts, moodStep, toYear, type Year, type YearDay } from './yearGrid'
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
 import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
@@ -1292,13 +1292,20 @@ function surveyOffCard(m: api.Me) {
   )
 }
 
+let yearCache: { to: string; data: Promise<api.MyMoods> } | null = null
+
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
   const moods = api.myMoods(range.from, range.to)
   // «Your year» always covers the last 12 months, whatever the period; it is extra, like the game.
   const yearRange = evolutionRange('year', range.to)
-  const yearMoods = period === 'year' ? moods.catch(() => null) : api.myMoods(yearRange.from, yearRange.to).catch(() => null)
+  // Kept between periods, so switching them doesn't reload it or move the periods under the pointer.
+  const cached = yearCache?.to === yearRange.to ? yearCache.data : null
+  const yearMoods = cached ?? (period === 'year' ? moods : api.myMoods(yearRange.from, yearRange.to)).then(
+    (data) => ((yearCache = { to: yearRange.to, data: Promise.resolve(data) }), data),
+    () => null,
+  )
   // Holds the year's height while it loads, so the periods and the chart don't jump.
   const yearSlot = h('div', { class: 'year-slot' }, h('div', { class: 'sk sk-year' }))
   // Your game score is extra: if it fails to load, the rest of the page still works.
@@ -1453,19 +1460,21 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   )
 }
 
-// «Your last 12 months»: a square per day, coloured by mood. Hovering a square previews the day;
-// clicking, tapping or Enter shows it under the grid, with any comment. Arrow keys move a day
-// (up, down) or a week (left, right), Home and End go along the row, Ctrl+Home and Ctrl+End to the
-// first day and today; only one square is in the tab order.
+// The last 12 months above the chart: a square per day, coloured by mood, and nothing else but
+// the key. Hovering, focusing or tapping a square shows that day's face and comment. Arrow keys
+// move a day (up, down) or a week (left, right), Home and End go along the row, Ctrl+Home and
+// Ctrl+End to the first day and today; only one square is in the tab order.
 function yearCard(year: Year, guilds: { id: string; name: string; color: string | null }[]) {
   const state = (k: YearDay['kind'], mood?: number) =>
     k === 'mood' ? moodLabel(mood!) : t(k === 'missed' ? 'me.year.missed' : k === 'pending' ? 'me.year.pending' : k === 'vacation' ? 'me.year.vacation' : 'me.year.none')
-  const withFace = (k: YearDay['kind'], mood?: number) => (k === 'mood' ? `${moodEmoji(mood!)} ${moodLabel(mood!)}` : state(k))
   const cellClass = (d: YearDay) => `yd ${d.kind === 'mood' ? `yd-m${moodStep(d.mood!)}` : `yd-${d.kind}`}${d.partial ? ' yd-partial' : ''}`
   const long = (day: string) => formatDay(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const many = guilds.length > 1
-  const ariaState = (d: YearDay) =>
-    many && d.partial ? d.guilds.map((g) => `${guilds.find((x) => x.id === g.id)!.name}: ${state(g.kind, g.mood)}`).join(', ') : state(d.kind, d.mood)
+  const nameOf = (id: string) => guilds.find((x) => x.id === id)!.name
+  // What a screen reader says for a square: the same as the tooltip, comments included.
+  const spoken = (d: YearDay) =>
+    (many ? d.guilds.filter((g) => g.kind !== 'none').map((g) => `${nameOf(g.id)}: ${state(g.kind, g.mood)}${g.message ? `. «${g.message}»` : ''}`) : [])
+      .join('; ') || `${state(d.kind, d.mood)}${d.guilds[0]?.message ? `. «${d.guilds[0].message}»` : ''}`
 
   const grid = h('div', { class: 'year-grid', role: 'grid', 'aria-label': t('me.year.label') })
   grid.style.setProperty('--weeks', String(year.weeks.length))
@@ -1493,7 +1502,7 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
     year.weeks.forEach((w, i) => {
       const day = w[d]
       if (!day) return
-      const cell = h('span', { role: 'gridcell', class: cellClass(day), tabindex: '-1', 'aria-label': `${long(day.day)}: ${ariaState(day)}` })
+      const cell = h('span', { role: 'gridcell', class: cellClass(day), tabindex: '-1', 'aria-label': `${long(day.day)}: ${spoken(day)}` })
       cell.style.gridColumn = String(i + 2)
       cell.style.gridRow = String(r + 2)
       cell.dataset.i = String(days.length)
@@ -1510,54 +1519,46 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
   let current = today
   cells[current].tabIndex = 0
 
-  // The day as rows: one per server when there are several, with the comment if there is one.
-  // The server's colour as a ring, so it isn't read as a mood.
+  // The day: its face and comment, one line per server when there are several.
+  const answer = (kind: YearDay['kind'], mood: number | undefined, message: string | undefined): Node[] => {
+    if (kind !== 'mood') return [h('div', { class: 'muted' }, state(kind))]
+    const face = h('div', { class: 'year-tip-mood' }, h('span', { class: 'year-tip-face' }, moodEmoji(mood!)), moodLabel(mood!))
+    return message ? [face, h('p', { class: 'year-tip-msg' }, message)] : [face]
+  }
   const ring = (color: string) => {
     const el = h('span', { class: 'swatch swatch-ring', 'aria-hidden': 'true' })
     el.style.color = color
     return el
   }
-  const describe = (d: YearDay, withComments: boolean): Node[] =>
-    many
-      ? d.guilds.flatMap((g) => {
-          const info = guilds.find((x) => x.id === g.id)!
-          const rows: Node[] = [
-            h('div', { class: 'tooltip-row' }, info.color ? ring(info.color) : null, h('span', { class: 'tooltip-name' }, info.name), h(g.kind === 'mood' ? 'strong' : 'span', g.kind === 'mood' ? {} : { class: 'muted' }, withFace(g.kind, g.mood))),
-          ]
-          if (withComments && g.message) rows.push(h('p', { class: 'year-comment' }, `«${g.message}»`))
-          return rows
-        })
-      : [
-          h(d.kind === 'mood' ? 'strong' : 'div', d.kind === 'mood' ? {} : { class: 'muted' }, withFace(d.kind, d.mood)),
-          ...(withComments && d.guilds[0].message ? [h('p', { class: 'year-comment' }, `«${d.guilds[0].message}»`)] : []),
-        ]
+  const describe = (d: YearDay): Node[] => {
+    if (!many || d.kind === 'none') return answer(d.kind, d.mood, d.guilds[0]?.message)
+    return d.guilds
+      .filter((g) => g.kind !== 'none')
+      .flatMap((g) => {
+        const info = guilds.find((x) => x.id === g.id)!
+        return [h('div', { class: 'year-tip-server' }, info.color ? ring(info.color) : null, info.name), ...answer(g.kind, g.mood, g.message)]
+      })
+  }
 
-  // The preview is for sight only: each square already says the same to a screen reader.
-  const tooltip = h('div', { class: 'tooltip', 'aria-hidden': 'true', hidden: true })
+  // For sight only: each square already says the same to a screen reader.
+  const tooltip = h('div', { class: 'tooltip year-tip', 'aria-hidden': 'true', hidden: true })
   const scroller = h('div', { class: 'year-scroll' }, grid)
   const wrap = h('div', { class: 'year-wrap' }, scroller, tooltip)
-  const preview = (i: number) => {
+  let shownAt = -1
+  const show = (i: number) => {
+    shownAt = i
     const d = days[i]
-    tooltip.replaceChildren(h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })), ...describe(d, false))
+    tooltip.replaceChildren(h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })), ...describe(d))
     tooltip.hidden = false
     const c = cells[i].getBoundingClientRect()
     const box = wrap.getBoundingClientRect()
     const left = Math.min(Math.max(c.left - box.left + c.width / 2 - tooltip.offsetWidth / 2, 0), box.width - tooltip.offsetWidth)
     const above = c.top - box.top - tooltip.offsetHeight - 8
     tooltip.style.left = `${left}px`
-    // Below the square when the card has no room above it.
-    tooltip.style.top = `${above >= 0 ? above : c.bottom - box.top + 8}px`
+    // Below the square when there is no room above it.
+    tooltip.style.top = `${above >= -box.top ? above : c.bottom - box.top + 8}px`
   }
   const hide = () => (tooltip.hidden = true)
-
-  // The chosen day, under the grid; it starts on today.
-  const detail = h('div', { class: 'year-detail', 'aria-live': 'polite' })
-  const select = (i: number) => {
-    cells.forEach((c) => c.removeAttribute('aria-selected'))
-    cells[i].setAttribute('aria-selected', 'true')
-    const d = days[i]
-    detail.replaceChildren(h('div', { class: 'tooltip-title' }, long(d.day)), ...describe(d, true))
-  }
   const moveTo = (i: number) => {
     cells[current].tabIndex = -1
     current = i
@@ -1565,31 +1566,35 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
     cells[current].focus()
   }
   const cellOf = (e: Event) => (e.target instanceof HTMLElement && e.target.dataset.i ? Number(e.target.dataset.i) : null)
-  // Only a mouse previews: on a touch screen the tap selects.
   grid.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return
     const i = cellOf(e)
-    if (e.pointerType !== 'mouse' || i === null) hide()
-    else preview(i)
+    if (i === null) hide()
+    else show(i)
   })
-  grid.addEventListener('pointerleave', hide)
+  grid.addEventListener('pointerleave', (e) => e.pointerType === 'mouse' && hide())
+  // A tap shows the day until the next tap elsewhere, or a scroll.
   grid.addEventListener('click', (e) => {
     const i = cellOf(e)
-    if (i === null) return
-    hide()
+    // A second tap on the same day closes it.
+    if (i === null || (!tooltip.hidden && i === shownAt)) return hide()
     moveTo(i)
-    select(i)
+    show(i)
   })
+  const tapAway = (e: PointerEvent) => {
+    if (!grid.isConnected) return document.removeEventListener('pointerdown', tapAway)
+    if (!grid.contains(e.target as Node)) hide()
+  }
+  document.addEventListener('pointerdown', tapAway)
+  scroller.addEventListener('scroll', hide, { passive: true })
+  window.addEventListener('scroll', () => grid.isConnected && hide(), { passive: true })
   grid.addEventListener('focusin', (e) => {
     const i = cellOf(e)
-    if (i !== null && cells[i].matches(':focus-visible')) preview(i)
+    if (i !== null && cells[i].matches(':focus-visible')) show(i)
   })
   grid.addEventListener('focusout', hide)
   grid.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') return hide()
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      return select(current)
-    }
     const at = days[current].day
     const row = (dir: number) => {
       // The next square up or down in the same week, skipping rows that aren't shown.
@@ -1600,7 +1605,7 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
       }
       return undefined
     }
-    const sameRow = days.map((d, i) => ({ d, i })).filter(({ d }) => (new Date(`${d.day}T00:00:00Z`).getUTCDay() === new Date(`${at}T00:00:00Z`).getUTCDay()))
+    const sameRow = days.map((d, i) => ({ d, i })).filter(({ d }) => new Date(`${d.day}T00:00:00Z`).getUTCDay() === new Date(`${at}T00:00:00Z`).getUTCDay())
     const target =
       e.key === 'ArrowLeft' ? indexOf.get(addDays(at, -7))
       : e.key === 'ArrowRight' ? indexOf.get(addDays(at, 7))
@@ -1613,7 +1618,6 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
     e.preventDefault()
     moveTo(target)
   })
-  select(today)
   // Today is on the right: on a narrow screen the grid scrolls and starts there.
   requestAnimationFrame(() => (scroller.scrollLeft = scroller.scrollWidth))
 
@@ -1621,26 +1625,13 @@ function yearCard(year: Year, guilds: { id: string; name: string; color: string 
   const legend = h(
     'ul',
     { class: 'year-legend' },
-    h('li', {}, h('span', { class: 'year-ramp' }, `${moodEmojis[0]} ${t('mood.1')}`, ...[1, 2, 3, 4, 5].map((n) => sample(`yd-m${n}`)), `${moodEmojis[4]} ${t('mood.5')}`)),
+    h('li', {}, t('mood.1'), ...[1, 2, 3, 4, 5].map((n) => sample(`yd-m${n}`)), t('mood.5')),
     h('li', {}, sample('yd-missed'), t('me.year.missed')),
     many && days.some((d) => d.partial) ? h('li', {}, sample('yd-m4 yd-partial'), t('me.year.partial')) : null,
     h('li', {}, sample('yd-vacation'), t('me.year.vacation')),
     h('li', {}, sample('yd-none'), t('me.year.none')),
   )
-  const pct = year.asked > 0 ? Math.round((year.answered / year.asked) * 100) : 0
-  return h(
-    'section',
-    { class: 'card year-card' },
-    h('h2', {}, t('me.year')),
-    h(
-      'p',
-      { class: 'muted small' },
-      year.asked === 0 ? t('me.year.summary.none') : t(year.asked === 1 ? 'me.year.summary.one' : 'me.year.summary', { n: formatNumber(year.answered), total: formatNumber(year.asked), pct: formatNumber(pct) }),
-    ),
-    wrap,
-    detail,
-    legend,
-  )
+  return h('section', { class: 'card year-card' }, wrap, legend)
 }
 
 function myGuildCard(g: api.MyGuildMoods, color: string | null) {
