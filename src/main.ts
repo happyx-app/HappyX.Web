@@ -4,6 +4,7 @@ import { answers, distributionChart, lineChart, trendChart, trendTable, weeklySt
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
+import { hasYearData, monthStarts, moodStep, toYear, type Year, type YearDay } from './yearGrid'
 import { evolutionPeriods, evolutionRange, gameTotals, isEvolutionPeriod, latestMessages, seriesColor, share, toPoints, type EvolutionPeriod } from './evolution'
 import { addDays, defaultPreset, isPreset, presets, rangeFor, todayIn, type Preset } from './periods'
 import { comparable, delta, extremeDays, isNewGuild, filterMessages, highestWeekday, lowestWeekday, moodFilters, nextReportDay, nextSurveyDay, participationRate, previousRange, tone, weekdayAverages, type MoodFilter, type WeekdayStat } from './insights'
@@ -1291,10 +1292,22 @@ function surveyOffCard(m: api.Me) {
   )
 }
 
+let yearCache: { to: string; data: Promise<api.MyMoods> } | null = null
+
 async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | null) {
   const range = evolutionRange(period, todayIn(Intl.DateTimeFormat().resolvedOptions().timeZone))
   const href = (p: EvolutionPeriod, g: string | null) => `#/me?p=${p}${g ? `&g=${g}` : ''}`
   const moods = api.myMoods(range.from, range.to)
+  // «Your year» always covers the last 12 months, whatever the period; it is extra, like the game.
+  const yearRange = evolutionRange('year', range.to)
+  // Kept between periods, so switching them doesn't reload it or move the periods under the pointer.
+  const cached = yearCache?.to === yearRange.to ? yearCache.data : null
+  const yearMoods = cached ?? (period === 'year' ? moods : api.myMoods(yearRange.from, yearRange.to)).then(
+    (data) => ((yearCache = { to: yearRange.to, data: Promise.resolve(data) }), data),
+    () => null,
+  )
+  // Holds the year's height while it loads, so the periods and the chart don't jump.
+  const yearSlot = h('div', { class: 'year-slot' }, h('div', { class: 'sk sk-year' }))
   // Your game score is extra: if it fails to load, the rest of the page still works.
   const games = api.myGames(range.from, range.to).catch(() => null)
   await whileLoading(Promise.all([moods, games]))
@@ -1317,8 +1330,10 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     h(
       'main',
       { class: 'container' },
-      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle')), dates),
-      periods,
+      h('div', {}, h('h1', {}, t('nav.me')), h('p', { class: 'muted privacy-note' }, icons.lock(), t('me.subtitle'))),
+      yearSlot,
+      // The dates go under the periods: they belong to them, not to the year above.
+      h('div', { class: 'me-period' }, periods, dates),
       // Under the periods, where «the survey is off» also shows.
       ...pausedIn(m).map(pausedNotice),
       body,
@@ -1354,6 +1369,13 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const all = data.guilds.map((g, i) => ({ g, color: seriesColor(i) }))
   const selected = all.some(({ g }) => g.discord_guild_id === filter) ? filter : null
   const shown = all.filter(({ g }) => selected === null || g.discord_guild_id === selected)
+  void yearMoods.then((y) => {
+    if (!y || !hasYearData(y.guilds)) return yearSlot.replaceChildren()
+    // Every server, whatever the chart's filter below: a day counts as answered wherever it was.
+    const gs = y.guilds
+    const colors = new Map(all.map(({ g, color }) => [g.discord_guild_id, color]))
+    yearSlot.replaceChildren(yearCard(toYear(gs, yearRange), gs.map((g) => ({ id: g.discord_guild_id, name: g.name, color: colors.get(g.discord_guild_id) ?? null }))))
+  })
   const pts = toPoints(data.guilds, range, period)
   const lines = shown.filter((s): s is { g: api.MyGuildMoods; color: string } => s.color !== null)
   const series: Series[] = lines.map(({ g, color }) => ({ name: g.name, color, values: pts.values.get(g.discord_guild_id)! }))
@@ -1436,6 +1458,180 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
     ),
     h('div', { class: 'grid-2' }, ...shown.map(({ g, color }) => myGuildCard(g, color))),
   )
+}
+
+// The last 12 months above the chart: a square per day, coloured by mood, and nothing else but
+// the key. Hovering, focusing or tapping a square shows that day's face and comment. Arrow keys
+// move a day (up, down) or a week (left, right), Home and End go along the row, Ctrl+Home and
+// Ctrl+End to the first day and today; only one square is in the tab order.
+function yearCard(year: Year, guilds: { id: string; name: string; color: string | null }[]) {
+  const state = (k: YearDay['kind'], mood?: number) =>
+    k === 'mood' ? moodLabel(mood!) : t(k === 'missed' ? 'me.year.missed' : k === 'pending' ? 'me.year.pending' : k === 'vacation' ? 'me.year.vacation' : 'me.year.none')
+  const cellClass = (d: YearDay) => `yd ${d.kind === 'mood' ? `yd-m${moodStep(d.mood!)}` : `yd-${d.kind}`}${d.partial ? ' yd-partial' : ''}`
+  const long = (day: string) => formatDay(day, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const many = guilds.length > 1
+  const nameOf = (id: string) => guilds.find((x) => x.id === id)!.name
+  // What a screen reader says for a square: the same as the tooltip, comments included.
+  const spoken = (d: YearDay) =>
+    (many ? d.guilds.filter((g) => g.kind !== 'none').map((g) => `${nameOf(g.id)}: ${state(g.kind, g.mood)}${g.message ? `. «${g.message}»` : ''}`) : [])
+      .join('; ') || `${state(d.kind, d.mood)}${d.guilds[0]?.message ? `. «${d.guilds[0].message}»` : ''}`
+
+  const grid = h('div', { class: 'year-grid', role: 'grid', 'aria-label': t('me.year.label') })
+  grid.style.setProperty('--weeks', String(year.weeks.length))
+  grid.style.setProperty('--rows', String(year.rows.length))
+  for (const m of monthStarts(year)) {
+    const label = h('span', { class: 'year-month', 'aria-hidden': 'true' }, formatDay(`${m.month}-01`, { month: 'short' }))
+    label.style.gridColumn = String(m.week + 2)
+    grid.append(label)
+  }
+  // Monday, Wednesday and Friday name their rows, as on a calendar. The column stays put while a
+  // narrow grid scrolls, so every row gets its piece of it, named or not.
+  const aMonday = year.weeks[1][0]!.day
+  const corner = h('span', { class: 'year-weekday', 'aria-hidden': 'true' })
+  corner.style.gridRow = '1'
+  grid.append(corner)
+  year.rows.forEach((d, r) => {
+    const label = h('span', { class: 'year-weekday', 'aria-hidden': 'true' }, [0, 2, 4].includes(d) ? formatDay(addDays(aMonday, d), { weekday: 'short' }) : '')
+    label.style.gridRow = String(r + 2)
+    grid.append(label)
+  })
+  const cells: HTMLElement[] = []
+  const days: YearDay[] = []
+  year.rows.forEach((d, r) => {
+    const row = h('div', { role: 'row', class: 'year-row' })
+    year.weeks.forEach((w, i) => {
+      const day = w[d]
+      if (!day) return
+      const cell = h('span', { role: 'gridcell', class: cellClass(day), tabindex: '-1', 'aria-label': `${long(day.day)}: ${spoken(day)}` })
+      cell.style.gridColumn = String(i + 2)
+      cell.style.gridRow = String(r + 2)
+      cell.dataset.i = String(days.length)
+      cells.push(cell)
+      days.push(day)
+      row.append(cell)
+    })
+    grid.append(row)
+  })
+  const indexOf = new Map(days.map((d, i) => [d.day, i]))
+  const allDays = days.map((d) => d.day).sort()
+  const first = indexOf.get(allDays[0])!
+  const today = indexOf.get(allDays[allDays.length - 1])!
+  let current = today
+  cells[current].tabIndex = 0
+
+  // The day: its face and comment, one line per server when there are several.
+  const answer = (kind: YearDay['kind'], mood: number | undefined, message: string | undefined): Node[] => {
+    if (kind !== 'mood') return [h('div', { class: 'muted' }, state(kind))]
+    const face = h('div', { class: 'year-tip-mood' }, h('span', { class: 'year-tip-face' }, moodEmoji(mood!)), moodLabel(mood!))
+    return message ? [face, h('p', { class: 'year-tip-msg' }, message)] : [face]
+  }
+  const ring = (color: string) => {
+    const el = h('span', { class: 'swatch swatch-ring', 'aria-hidden': 'true' })
+    el.style.color = color
+    return el
+  }
+  const describe = (d: YearDay): Node[] => {
+    if (!many || d.kind === 'none') return answer(d.kind, d.mood, d.guilds[0]?.message)
+    return d.guilds
+      .filter((g) => g.kind !== 'none')
+      .flatMap((g) => {
+        const info = guilds.find((x) => x.id === g.id)!
+        return [h('div', { class: 'year-tip-server' }, info.color ? ring(info.color) : null, info.name), ...answer(g.kind, g.mood, g.message)]
+      })
+  }
+
+  // For sight only: each square already says the same to a screen reader.
+  const tooltip = h('div', { class: 'tooltip year-tip', 'aria-hidden': 'true', hidden: true })
+  const scroller = h('div', { class: 'year-scroll' }, grid)
+  const wrap = h('div', { class: 'year-wrap' }, scroller, tooltip)
+  let shownAt = -1
+  const show = (i: number) => {
+    shownAt = i
+    const d = days[i]
+    tooltip.replaceChildren(h('div', { class: 'tooltip-title' }, formatDay(d.day, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })), ...describe(d))
+    tooltip.hidden = false
+    const c = cells[i].getBoundingClientRect()
+    const box = wrap.getBoundingClientRect()
+    const left = Math.min(Math.max(c.left - box.left + c.width / 2 - tooltip.offsetWidth / 2, 0), box.width - tooltip.offsetWidth)
+    const above = c.top - box.top - tooltip.offsetHeight - 8
+    tooltip.style.left = `${left}px`
+    // Below the square when there is no room above it.
+    tooltip.style.top = `${above >= -box.top ? above : c.bottom - box.top + 8}px`
+  }
+  const hide = () => (tooltip.hidden = true)
+  const moveTo = (i: number) => {
+    cells[current].tabIndex = -1
+    current = i
+    cells[current].tabIndex = 0
+    cells[current].focus()
+  }
+  const cellOf = (e: Event) => (e.target instanceof HTMLElement && e.target.dataset.i ? Number(e.target.dataset.i) : null)
+  grid.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return
+    const i = cellOf(e)
+    if (i === null) hide()
+    else show(i)
+  })
+  grid.addEventListener('pointerleave', (e) => e.pointerType === 'mouse' && hide())
+  // A tap shows the day until the next tap elsewhere, or a scroll.
+  grid.addEventListener('click', (e) => {
+    const i = cellOf(e)
+    // A second tap on the same day closes it.
+    if (i === null || (!tooltip.hidden && i === shownAt)) return hide()
+    moveTo(i)
+    show(i)
+  })
+  const tapAway = (e: PointerEvent) => {
+    if (!grid.isConnected) return document.removeEventListener('pointerdown', tapAway)
+    if (!grid.contains(e.target as Node)) hide()
+  }
+  document.addEventListener('pointerdown', tapAway)
+  scroller.addEventListener('scroll', hide, { passive: true })
+  window.addEventListener('scroll', () => grid.isConnected && hide(), { passive: true })
+  grid.addEventListener('focusin', (e) => {
+    const i = cellOf(e)
+    if (i !== null && cells[i].matches(':focus-visible')) show(i)
+  })
+  grid.addEventListener('focusout', hide)
+  grid.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') return hide()
+    const at = days[current].day
+    const row = (dir: number) => {
+      // The next square up or down in the same week, skipping rows that aren't shown.
+      for (let n = 1; n < 7; n++) {
+        const i = indexOf.get(addDays(at, dir * n))
+        if (i !== undefined) return i
+        if ((((new Date(`${at}T00:00:00Z`).getUTCDay() + 6) % 7) + dir * n) % 7 === (dir > 0 ? 6 : 0)) break
+      }
+      return undefined
+    }
+    const sameRow = days.map((d, i) => ({ d, i })).filter(({ d }) => new Date(`${d.day}T00:00:00Z`).getUTCDay() === new Date(`${at}T00:00:00Z`).getUTCDay())
+    const target =
+      e.key === 'ArrowLeft' ? indexOf.get(addDays(at, -7))
+      : e.key === 'ArrowRight' ? indexOf.get(addDays(at, 7))
+      : e.key === 'ArrowUp' ? row(-1)
+      : e.key === 'ArrowDown' ? row(1)
+      : e.key === 'Home' ? (e.ctrlKey ? first : sameRow[0].i)
+      : e.key === 'End' ? (e.ctrlKey ? today : sameRow[sameRow.length - 1].i)
+      : undefined
+    if (target === undefined) return
+    e.preventDefault()
+    moveTo(target)
+  })
+  // Today is on the right: on a narrow screen the grid scrolls and starts there.
+  requestAnimationFrame(() => (scroller.scrollLeft = scroller.scrollWidth))
+
+  const sample = (cls: string) => h('span', { class: `yd ${cls}`, 'aria-hidden': 'true' })
+  const legend = h(
+    'ul',
+    { class: 'year-legend' },
+    h('li', {}, t('mood.1'), ...[1, 2, 3, 4, 5].map((n) => sample(`yd-m${n}`)), t('mood.5')),
+    h('li', {}, sample('yd-missed'), t('me.year.missed')),
+    many && days.some((d) => d.partial) ? h('li', {}, sample('yd-m4 yd-partial'), t('me.year.partial')) : null,
+    h('li', {}, sample('yd-vacation'), t('me.year.vacation')),
+    h('li', {}, sample('yd-none'), t('me.year.none')),
+  )
+  return h('section', { class: 'card year-card' }, wrap, legend)
 }
 
 function myGuildCard(g: api.MyGuildMoods, color: string | null) {
