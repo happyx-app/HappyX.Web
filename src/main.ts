@@ -35,7 +35,7 @@ import { face, react } from './face'
 import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
-//   #/                       my mood; the landing page when logged out
+//   #/                       my team's dashboard (the list with several), my mood without one; the landing page when logged out
 //   #/about                  the landing page
 //   #/g/<guildID>?p=<preset> one server's dashboard
 //   #/g/<guildID>/settings   its settings
@@ -106,7 +106,9 @@ async function route() {
     if (g && q.has('added')) return location.replace(`#/g/${guildID}`)
     return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30', isPreset(p))
   }
-  // Everyone lands on their own mood, the one page every user has.
+  // Who has a dashboard lands on their team; everyone else on their own mood.
+  if (path === '' && me.guilds.length === 1) return location.replace(`#/g/${me.guilds[0].discord_guild_id}`)
+  if (path === '' && me.guilds.length > 1) return location.replace('#/teams')
   const q = new URLSearchParams(query)
   const p = q.get('p')
   return renderMe(me, isEvolutionPeriod(p) ? p : 'month', q.get('g'))
@@ -435,9 +437,13 @@ function renderLanding(m: api.Me | null) {
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
   const add = () => h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add'))
   const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
-  // Signed in, the button leads where signing in does: «My mood».
+  // Signed in, the button leads where signing in does: the team for who has a dashboard, else «My mood».
   const enter = (cls = 'btn btn-outline') =>
-    !m ? h('a', { class: cls, href: api.loginURL }, t('landing.login')) : h('a', { class: cls, href: '#/' }, t('nav.me'))
+    !m
+      ? h('a', { class: cls, href: api.loginURL }, t('landing.login'))
+      : m.guilds.length
+        ? h('a', { class: cls, href: '#/' }, t(teams(m).length > 1 ? 'nav.teams' : 'nav.team'))
+        : h('a', { class: cls, href: '#/me' }, t('nav.me'))
   // «card»: an <article> with a heading and one paragraph, nothing else.
   const feature = (title: string, body: string) => h('li', {}, h('article', { class: 'feature' }, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
   // A real capture of the demo dashboard, in the page's language and theme.
