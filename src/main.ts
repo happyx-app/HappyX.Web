@@ -35,12 +35,12 @@ import { face, react } from './face'
 import { reloadCanvas, showCanvas } from './canvas'
 
 // Routes live in the hash so nginx only has to serve index.html:
-//   #/                       servers (or my evolution for someone who manages none); the landing page when logged out
+//   #/                       my mood; the landing page when logged out
 //   #/about                  the landing page
 //   #/g/<guildID>?p=<preset> one server's dashboard
 //   #/g/<guildID>/settings   its settings
-//   #/me?p=<period>&g=<id>   my own answers, optionally one server only
-//   #/games                  servers where I can play «Who's who?»
+//   #/me?p=<period>&g=<id>   my own answers, optionally one server only (also #/)
+//   #/teams                  my teams, the servers with HappyX I am in (the only one when there is one)
 //   #/game/<guildID>         the game in one server (the bot links here)
 //   #/privacy                the user's own data: download or erase it
 //   #/privacy-policy         the privacy policy, public (the URL given to Discord)
@@ -86,9 +86,12 @@ async function route() {
   const gameID = path.match(/^\/game\/(\d+)$/)?.[1]
   // ?history (from «My evolution») scrolls to the past rounds.
   if (gameID) return renderGame(me, gameID, new URLSearchParams(query).has('history'))
-  if (path === '/games') {
-    if (me.games.length === 1) return location.replace(`#/game/${me.games[0].discord_guild_id}`)
-    return renderGames(me)
+  // «Game» was a section of its own: the game now lives in each team.
+  if (path === '/games') return location.replace('#/teams')
+  if (path === '/teams') {
+    const all = teams(me)
+    if (all.length === 1) return location.replace(teamHome(me, all[0].discord_guild_id))
+    return renderTeams(me)
   }
   if (path === '/privacy') return renderPrivacy(me)
   const settingsID = path.match(/^\/g\/(\d+)\/settings$/)?.[1]
@@ -103,17 +106,10 @@ async function route() {
     if (g && q.has('added')) return location.replace(`#/g/${guildID}`)
     return renderGuild(me, guildID, isPreset(p) ? p : g ? defaultPreset(g.report_frequency, todayIn(g.timezone)) : 'last-30', isPreset(p))
   }
-  if (path === '/me' || (path === '' && me.guilds.length === 0)) {
-    const q = new URLSearchParams(query)
-    const p = q.get('p')
-    return renderMe(me, isEvolutionPeriod(p) ? p : 'month', q.get('g'))
-  }
-  // With one server, the list would be a single card: go straight to it. «Servers» links to #/.
-  if (me.guilds.length === 1 && (path === '' || path === '/')) {
-    location.replace(`#/g/${me.guilds[0].discord_guild_id}`)
-    return
-  }
-  renderGuilds(me)
+  // Everyone lands on their own mood, the one page every user has.
+  const q = new URLSearchParams(query)
+  const p = q.get('p')
+  return renderMe(me, isEvolutionPeriod(p) ? p : 'month', q.get('g'))
 }
 
 // Draws a page. The promise settles once the new content is in the document (with a view
@@ -336,12 +332,17 @@ const brand = (slot = 'header') =>
     api.isDemo ? h('span', { class: 'demo-back', 'aria-hidden': 'true' }, t('demo.home')) : null,
   )
 
-type Section = 'me' | 'servers' | 'games' | 'privacy' | 'none'
+type Section = 'me' | 'team' | 'privacy' | 'none'
 
 // The signed-in top bar. It is the same bar on every page, so it is built once and kept (see
 // shell); a page only moves the «you are here» mark between its links.
-function header(m: api.Me, active: Section = 'servers') {
-  const links = { me: true, servers: m.guilds.length > 0 || memberGuilds(m).length > 0, games: m.games.length > 0 }
+function header(m: api.Me, active: Section = 'team') {
+  const all = teams(m)
+  // One team: the link opens it. Several: the list. Someone who only plays, with no dashboard
+  // anywhere, finds just the game there, and the link says so.
+  const gameOnly = m.guilds.length === 0 && all.every((g) => plays(m, g.discord_guild_id))
+  const label = gameOnly ? ('nav.game' as const) : all.length > 1 ? ('nav.teams' as const) : ('nav.team' as const)
+  const links = { team: all.length === 0 ? null : all.length === 1 ? teamHome(m, all[0].discord_guild_id) : '#/teams', label }
   const key = JSON.stringify(['header', m.user.discord_user_id, m.user.username, m.user.avatar, links])
   const bar = shell(key, () => buildHeader(m, links))
   sectionOf.set(bar, active)
@@ -359,7 +360,7 @@ function markSection(bar: HTMLElement, active: Section) {
   }
 }
 
-function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolean>) {
+function buildHeader(m: api.Me, links: { team: string | null; label: 'nav.game' | 'nav.teams' | 'nav.team' }) {
   const u = m.user
   // Some networks block Discord's image server: show the name's initial instead of a broken image.
   const avatar: HTMLElement = h('img', {
@@ -379,8 +380,7 @@ function buildHeader(m: api.Me, links: Record<'me' | 'servers' | 'games', boolea
         'nav',
         { class: 'nav', 'aria-label': t('nav.main') },
         h('a', { href: '#/me', class: 'nav-link', 'data-section': 'me' }, t('nav.me')),
-        links.servers ? h('a', { href: '#/', class: 'nav-link', 'data-section': 'servers' }, t('nav.servers')) : null,
-        links.games ? h('a', { href: '#/games', class: 'nav-link', 'data-section': 'games' }, t('nav.games')) : null,
+        links.team ? h('a', { href: links.team, class: 'nav-link', 'data-section': 'team' }, t(links.label)) : null,
       ),
     ),
     // «content-first-noise-reduction»: theme, language and log out go in a popover behind the
@@ -435,13 +435,9 @@ function renderLanding(m: api.Me | null) {
   if (failed) history.replaceState(null, '', location.pathname + location.hash)
   const add = () => h('a', { class: 'btn btn-discord', href: api.inviteURL }, discordLogo(), t('landing.add'))
   const demo = () => h('a', { class: 'btn btn-outline', href: '/demo' }, t('landing.demo'))
-  // Someone without any dashboard goes to «My evolution», and the button says so.
+  // Signed in, the button leads where signing in does: «My mood».
   const enter = (cls = 'btn btn-outline') =>
-    !m
-      ? h('a', { class: cls, href: api.loginURL }, t('landing.login'))
-      : m.guilds.length
-        ? h('a', { class: cls, href: '#/' }, t('landing.dashboard'))
-        : h('a', { class: cls, href: '#/me' }, t('nav.me'))
+    !m ? h('a', { class: cls, href: api.loginURL }, t('landing.login')) : h('a', { class: cls, href: '#/' }, t('nav.me'))
   // «card»: an <article> with a heading and one paragraph, nothing else.
   const feature = (title: string, body: string) => h('li', {}, h('article', { class: 'feature' }, h('h3', {}, title), h('p', { class: 'secondary' }, body)))
   // A real capture of the demo dashboard, in the page's language and theme.
@@ -558,17 +554,60 @@ function surveyMock() {
 
 const memberGuilds = (m: api.Me) => m.member_guilds ?? []
 
+const plays = (m: api.Me, guildID: string) => m.games.some((x) => x.discord_guild_id === guildID)
+
+// A team is a server with HappyX the user is in: with access to its dashboard, as a member, or
+// as a player. Each one once, dashboards first.
+function teams(m: api.Me): api.GameGuild[] {
+  const all: api.GameGuild[] = [...m.guilds, ...memberGuilds(m), ...m.games].map((g) => ({ discord_guild_id: g.discord_guild_id, name: g.name }))
+  return all.filter((g, i) => all.findIndex((x) => x.discord_guild_id === g.discord_guild_id) === i)
+}
+
+// Where a team opens: its dashboard for who can see it, else its game.
+function teamHome(m: api.Me, guildID: string) {
+  if (m.guilds.some((g) => g.discord_guild_id === guildID) || !plays(m, guildID)) return `#/g/${guildID}`
+  return `#/game/${guildID}`
+}
+
+type TeamTab = 'panel' | 'game' | 'settings'
+
+// The top of every page of a team: back to the list when there are several, its name, and its
+// parts (dashboard, game, settings) as links when there is more than one.
+function teamHead(m: api.Me, guildID: string, name: string, active: TeamTab) {
+  const g = m.guilds.find((x) => x.discord_guild_id === guildID)
+  const canView = g !== undefined
+  // Who can only look gets no «Settings»: there would be nothing there to change.
+  const tabs: [TeamTab, string, string][] = [
+    ...(canView ? [['panel', `#/g/${guildID}${periodOf.has(guildID) ? `?p=${periodOf.get(guildID)}` : ''}`, t('team.tab.panel')] as [TeamTab, string, string]] : []),
+    ...(plays(m, guildID) ? [['game', `#/game/${guildID}`, t('team.tab.game')] as [TeamTab, string, string]] : []),
+    ...(g && api.canManage(g) ? [['settings', `#/g/${guildID}/settings`, t('settings.link')] as [TeamTab, string, string]] : []),
+  ]
+  return h(
+    'div',
+    { class: 'team-head' },
+    teams(m).length > 1 ? h('a', { class: 'back', href: '#/teams' }, `← ${t('nav.teams')}`) : null,
+    h('h1', {}, name),
+    tabs.length > 1
+      ? h(
+          'nav',
+          { class: 'team-tabs', 'aria-label': t('team.tabs', { name }) },
+          ...tabs.map(([id, href, label]) => h('a', { href, class: 'team-tab', ...(id === active ? { 'aria-current': 'page' } : {}) }, label)),
+        )
+      : null,
+  )
+}
+
 // A server where the user is a member without access to the dashboard: its name, and its page
 // shows the team canvas.
-const memberGuildCard = (g: api.GameGuild, paused = false) =>
+const memberGuildCard = (m: api.Me, g: api.GameGuild, paused = false) =>
   h(
     'li',
     {},
     h(
       'a',
-      { class: 'card guild-card', href: `#/g/${g.discord_guild_id}` },
+      { class: 'card guild-card', href: teamHome(m, g.discord_guild_id) },
       h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
-      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, [t('guilds.access.none'), paused ? t('guilds.paused') : ''].filter(Boolean).join(' · '))),
+      h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, [plays(m, g.discord_guild_id) ? t('guilds.gameOnly') : t('guilds.access.none'), paused ? t('guilds.paused') : ''].filter(Boolean).join(' · '))),
     ),
   )
 
@@ -576,8 +615,8 @@ const memberGuildCard = (g: api.GameGuild, paused = false) =>
 const refreshLine = (next?: string, label = t('guilds.refresh')) =>
   h('p', { class: 'muted small refresh-line' }, t('guilds.added'), ' ', h('a', { class: 'btn btn-outline', href: api.refreshURL(next) }, label))
 
-function renderGuilds(m: api.Me) {
-  const list = m.guilds.length || memberGuilds(m).length
+function renderTeams(m: api.Me) {
+  const list = m.guilds.length || memberGuilds(m).length || m.games.length
     ? h(
         'ul',
         { class: 'guild-list' },
@@ -604,7 +643,7 @@ function renderGuilds(m: api.Me) {
             ),
           ),
         ),
-        ...memberGuilds(m).map((g) => memberGuildCard(g, pausedIn(m, g.discord_guild_id).length > 0)),
+        ...teams(m).filter((g) => !m.guilds.some((x) => x.discord_guild_id === g.discord_guild_id)).map((g) => memberGuildCard(m, g, pausedIn(m, g.discord_guild_id).length > 0)),
       )
     : h(
         'div',
@@ -680,13 +719,13 @@ const pausedIn = (m: api.Me, guildID?: string) => (m.paused_guilds ?? []).filter
 // A member without access to the dashboard sees the server's name and its team canvas behind,
 // and the way to their own answers and the game.
 function renderMemberGuild(m: api.Me, g: api.GameGuild) {
-  const plays = m.games.some((x) => x.discord_guild_id === g.discord_guild_id)
+  const playing = plays(m, g.discord_guild_id)
   page(
     header(m),
     h(
       'main',
       { class: 'container' },
-      h('h1', {}, g.name),
+      teamHead(m, g.discord_guild_id, g.name, 'panel'),
       ...pausedIn(m, g.discord_guild_id).map(pausedNotice),
       h(
         'div',
@@ -697,7 +736,7 @@ function renderMemberGuild(m: api.Me, g: api.GameGuild) {
           'p',
           { class: 'no-access-links' },
           h('a', { class: 'btn btn-primary', href: '#/me' }, t('nav.me')),
-          plays ? h('a', { class: 'btn btn-outline', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
+          playing ? h('a', { class: 'btn btn-outline', href: `#/game/${g.discord_guild_id}` }, t('signin.game.short')) : null,
         ),
       ),
     ),
@@ -712,7 +751,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   if (!g) {
     const member = memberGuilds(m).find((x) => x.discord_guild_id === guildID)
     if (member) return renderMemberGuild(m, member)
-    page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
+    page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/teams' }, t('nav.teams')))))
     return
   }
   if (chosen) periodOf.set(guildID, preset)
@@ -745,15 +784,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'main',
       { class: 'container' },
-      m.guilds.length > 1 ? h('a', { class: 'back', href: '#/' }, `← ${t('nav.servers')}`) : null,
-      h(
-        'div',
-        { class: 'title-row' },
-        h('div', {}, h('h1', {}, g.name), dates),
-        // Also for who can only look: the settings page then says whom to ask.
-        h('a', { class: 'btn btn-ghost', href: `#/g/${guildID}/settings` }, icons.gear(), h('span', { class: 'gear-label' }, t('settings.link'))),
-      ),
-      picker,
+      // «Settings» is also for who can only look: the page then says whom to ask.
+      teamHead(m, guildID, g.name, 'panel'),
+      h('div', { class: 'period-head' }, picker, dates),
       body,
     ),
   )
@@ -1282,7 +1315,7 @@ function noServerCard() {
 function surveyOffCard(m: api.Me) {
   if (api.isDemo || m.guilds.length === 0 || memberGuilds(m).length > 0 || m.guilds.some((g) => g.survey_enabled !== false)) return null
   const one = m.guilds.length === 1 ? m.guilds[0] : null
-  const start = one && api.canManage(one) ? h('a', { class: 'btn btn-primary', href: `#/g/${one.discord_guild_id}/settings?f=survey-on` }, t('health.start')) : !one ? h('a', { class: 'btn btn-primary', href: '#/' }, t('nav.servers')) : null
+  const start = one && api.canManage(one) ? h('a', { class: 'btn btn-primary', href: `#/g/${one.discord_guild_id}/settings?f=survey-on` }, t('health.start')) : !one ? h('a', { class: 'btn btn-primary', href: '#/teams' }, t('nav.teams')) : null
   return h(
     'div',
     { class: 'card empty' },
@@ -1687,14 +1720,11 @@ function swatch(color: string) {
 async function renderSettings(m: api.Me, guildID: string, focus: string | null = null) {
   const g = m.guilds.find((x) => x.discord_guild_id === guildID)
   if (!g) {
-    page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/' }, t('nav.servers')))))
+    page(header(m), h('main', { class: 'container' }, h('div', { class: 'card empty' }, h('p', {}, t('guild.notFound')), h('a', { class: 'btn', href: '#/teams' }, t('nav.teams')))))
     return
   }
-  // Back to the charts as they were left: the same period.
-  const period = periodOf.get(guildID)
-  const back = h('a', { class: 'back', href: `#/g/${guildID}${period ? `?p=${period}` : ''}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
-    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
+    page(header(m), h('main', { class: 'container' }, teamHead(m, guildID, g.name, 'settings'), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
     return
   }
   // Who has access, the server export and deleting it are for owners only. The demo can show who
@@ -1739,10 +1769,12 @@ async function renderSettings(m: api.Me, guildID: string, focus: string | null =
     h(
       'main',
       { class: 'container settings-page' },
+      // As wide as the dashboard's, so the name and the tabs stay put when moving between them.
+      h('div', { class: 'settings-top' }, teamHead(m, guildID, g.name, 'settings')),
       h(
         'div',
         { class: 'settings-layout' },
-        h('div', { class: 'settings-head' }, back, h('h1', {}, g.name), h('p', { class: 'muted' }, t('settings.assistant'))),
+        h('div', { class: 'settings-head' }, h('p', { class: 'muted' }, t('settings.assistant'))),
         sectionNav(cards),
         h('div', { class: 'settings-sections' }, ...cards.map((c) => c.card)),
       ),
@@ -1842,7 +1874,7 @@ function renderDeleted(m: api.Me, name: string) {
         { class: 'card empty' },
         h('h1', {}, t('danger.done.title')),
         h('p', {}, t('danger.done.body', { name })),
-        h('a', { class: 'btn', href: '#/' }, t('nav.servers')),
+        h('a', { class: 'btn', href: '#/teams' }, t('nav.teams')),
       ),
     ),
   )
@@ -1920,41 +1952,20 @@ function renderErased(m: api.Me) {
   )
 }
 
-function renderGames(m: api.Me) {
-  const list = m.games.length
-    ? h(
-        'ul',
-        { class: 'guild-list' },
-        ...m.games.map((g) =>
-          h(
-            'li',
-            {},
-            h(
-              'a',
-              { class: 'card guild-card', href: `#/game/${g.discord_guild_id}` },
-              h('span', { class: 'guild-icon', 'aria-hidden': 'true' }, g.name.slice(0, 1).toUpperCase()),
-              h('span', { class: 'guild-text' }, h('strong', {}, g.name), h('span', { class: 'muted small' }, t('game.title'))),
-            ),
-          ),
-        ),
-      )
-    : h('div', { class: 'card empty' }, h('p', {}, t('games.empty')))
-  page(header(m, 'games'), h('main', { class: 'container' }, h('h1', {}, t(m.games.length ? 'games.title' : 'game.title')), list))
-}
 
 async function renderGame(m: api.Me, guildID: string, toHistory = false) {
   const name = m.games.find((g) => g.discord_guild_id === guildID)?.name ?? ''
   const loading = api.game(guildID)
   await whileLoading(loading)
   const body = h('div', { class: 'dashboard', 'aria-busy': 'true' }, skeleton('game'))
-  const subtitle = h('p', { class: 'muted' }, name ? t('game.subtitle', { guild: name }) : '')
+  const subtitle = h('p', { class: 'muted' }, t('game.subtitle.short'))
   page(
-    header(m, 'games'),
+    header(m),
     h(
       'main',
       { class: 'container game-page' },
-      m.games.length > 1 ? h('a', { class: 'back', href: '#/games' }, `← ${t('games.title')}`) : null,
-      h('div', {}, h('h1', {}, t('game.title')), subtitle),
+      teamHead(m, guildID, name, 'game'),
+      h('div', { class: 'game-head' }, h('h2', {}, t('game.title')), subtitle),
       body,
     ),
   )
@@ -1972,7 +1983,6 @@ async function renderGame(m: api.Me, guildID: string, toHistory = false) {
     body.removeAttribute('aria-busy')
     return
   }
-  subtitle.textContent = t('game.subtitle', { guild: board.name })
   body.removeAttribute('aria-busy')
   body.replaceChildren(...gamePage(board, () => renderLanding(null)))
   if (toHistory) body.querySelector('#history')?.scrollIntoView()

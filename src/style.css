@@ -208,6 +208,22 @@ a { color: var(--accent); }
 .title-row { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
 .title-row > .icon-btn { flex: none; margin-top: 4px; }
 
+/* The top of a team's pages: its name and its parts. Tabs look like links on a line, not like the
+   period picker below them, so the two rows never read as one control. */
+.team-head { display: grid; gap: 8px; }
+.team-head h1 { overflow-wrap: anywhere; }
+.team-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-block-end: 1px solid var(--border); margin-block-start: 4px; }
+.team-tab { position: relative; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 0.9375rem; white-space: nowrap; }
+.team-tab:hover { color: var(--ink); }
+/* Ink text and a coloured line, like the settings' section list: violet text stays the period picker's. */
+.team-tab[aria-current] { color: var(--ink); }
+.team-tab[aria-current]::after { content: ''; position: absolute; inset-inline: 8px; inset-block-end: -1px; border-block-end: 3px solid var(--series); }
+.team-tab:focus-visible { outline-offset: -2px; border-radius: 6px; }
+@media (forced-colors: active) { .team-tab[aria-current]::after { border-color: Highlight; } }
+.period-head { display: grid; gap: 4px; }
+.settings-top { width: 100%; max-width: 1008px; margin-inline: auto; }
+.game-head h2 { margin: 0; }
+
 .segmented { display: flex; flex-wrap: nowrap; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 10px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
 .seg { flex: none; padding: 7px 14px; border-radius: 7px; color: var(--ink-2); text-decoration: none; font-size: 0.875rem; font-weight: 600; white-space: nowrap; }
 .seg:hover { color: var(--ink); }
