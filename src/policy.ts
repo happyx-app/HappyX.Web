@@ -9,7 +9,7 @@ import { lang } from './i18n'
 
 // The day the text last changed, shown at the top. When the change is one people should read
 // again, also move PrivacyPolicyDate in HappyX.Api: the survey links this page until they answer.
-export const updated = '2026-11-06'
+export const updated = '2026-11-20'
 
 // The shape of a legal page, shared with the terms of service (terms.ts).
 export type Inline = string | { text: string; href: string }
@@ -33,7 +33,7 @@ const es = (): Policy => ({
       body: [
         {
           ul: [
-            ['De cada miembro de un servidor con HappyX: su ID y nombre de usuario de Discord, sus roles en ese servidor y si participa en la encuesta.'],
+            ['De cada miembro de un servidor con HappyX: su ID y nombre de usuario de Discord, el nombre con el que aparece en ese servidor, sus roles en él y si participa en la encuesta.'],
             ['Las respuestas a la encuesta: el ánimo (de 1 a 5), el comentario si lo escribes, el día y si el servidor era anónimo en ese momento.'],
             ['Los kudos que das y recibes, con su texto.'],
             ['En «¿Quién es quién?»: tus respuestas, lo que adivinas y las preguntas que propones.'],
@@ -135,7 +135,7 @@ const en = (): Policy => ({
       body: [
         {
           ul: [
-            ['For each member of a server with HappyX: their Discord ID and username, their roles in that server and whether they take part in the survey.'],
+            ['For each member of a server with HappyX: their Discord ID and username, their name as that server shows it, their roles in it and whether they take part in the survey.'],
             ['Survey answers: the mood (1 to 5), the comment if you write one, the day and whether the server was anonymous at the time.'],
             ['Kudos you give and get, with their text.'],
             ["In «Who's who?»: your answers, your guesses and the questions you propose."],

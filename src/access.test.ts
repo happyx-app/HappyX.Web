@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Access } from './api'
-import { filterOptions, knownGrants, matches, roleColor, sameAccess, type Option } from './access'
+import { filterOptions, knownGrants, matches, memberOption, roleColor, sameAccess, type Option } from './access'
 
 const options: Option[] = [
   { kind: 'role', id: '1', label: 'Moderadores', color: 0x3498db },
@@ -44,4 +44,12 @@ it('notices any change', () => {
   expect(sameAccess(s, { ...s, grants: [...s.grants] })).toBe(true)
   expect(sameAccess(s, { ...s, admin: '3' })).toBe(false)
   expect(sameAccess(s, { ...s, grants: [{ ...s.grants[0], level: 'manage' }] })).toBe(false)
+})
+
+it('offers members by the name the server shows, and finds them by username too', () => {
+  const david = memberOption({ discord_user_id: '4', username: 'david.delcastillo_travelgate', display_name: 'David' })
+  expect(david).toEqual({ kind: 'user', id: '4', label: 'David', username: 'david.delcastillo_travelgate' })
+  expect(filterOptions([david], 'davi').map((o) => o.id)).toEqual(['4'])
+  expect(filterOptions([david], 'travelgate').map((o) => o.id)).toEqual(['4'])
+  expect(memberOption({ discord_user_id: '5', username: 'bea' }).label).toBe('bea') // an older API
 })

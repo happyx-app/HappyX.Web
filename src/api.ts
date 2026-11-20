@@ -9,6 +9,12 @@ export interface User {
   avatar?: string
 }
 
+// shownName is how HappyX names someone: the display name the API sends (the name their Discord
+// server shows, with their username in brackets when another member of the server goes by the
+// same name), or the username from an API older than display names.
+export const shownName = (p: { username?: string; display_name?: string } | undefined) => p?.display_name || p?.username || ''
+
+
 export interface Guild {
   discord_guild_id: string
   name: string
@@ -55,9 +61,13 @@ export interface Guild {
   created_at?: string
   // What the user may do here; only in /me. Older APIs leave it out, which means "owner".
   access?: AccessLevel
-  // The main admin's username, for viewers who aren't owners; only in /me, and older APIs leave it out.
+  // The main admin's names, for viewers who aren't owners; only in /me, and older APIs leave them out.
   admin_username?: string
+  admin_display_name?: string
 }
+
+// adminName is how the server shows its main admin; empty when the API didn't say.
+export const adminName = (g: Guild) => shownName({ username: g.admin_username, display_name: g.admin_display_name })
 
 // view: reports. manage: reports and settings. owner: also who has access, and deleting.
 export type AccessLevel = 'view' | 'manage' | 'owner'
@@ -90,6 +100,7 @@ export interface Role {
 export interface Member {
   discord_user_id: string
   username: string
+  display_name?: string // older APIs leave it out
 }
 
 export interface Access {
@@ -144,7 +155,9 @@ export interface ReportMessage {
   day?: string
   mood?: number
   message: string
+  discord_user_id?: string
   username?: string
+  display_name?: string
 }
 
 export interface Report {
@@ -169,17 +182,25 @@ export interface Report {
 
 export interface Kudos {
   day: string
+  from_discord_user_id?: string
+  to_discord_user_id?: string
   from_username: string
   to_username: string
+  // The names the server shows; older APIs leave them out.
+  from_display_name?: string
+  to_display_name?: string
   message: string
 }
+
+export const kudosGiver = (k: Kudos) => ({ discord_user_id: k.from_discord_user_id, username: k.from_username, display_name: k.from_display_name })
+export const kudosReceiver = (k: Kudos) => ({ discord_user_id: k.to_discord_user_id, username: k.to_username, display_name: k.to_display_name })
 
 export interface KudosSummary {
   count: number
   givers: number
   receivers: number
   highlights: Kudos[] // the latest, newest first
-  top_receivers?: { username: string; count: number }[] // most first; older APIs leave it out
+  top_receivers?: { discord_user_id?: string; username: string; display_name?: string; count: number }[] // most first; older APIs leave it out
 }
 
 // Who the survey reaches now and how the last one went.
@@ -240,6 +261,7 @@ export interface GameAnswer {
   // Only once the round is finished (and on your own answer).
   discord_user_id?: string
   username?: string
+  display_name?: string
   // How many guessed it right, in finished rounds.
   right?: number
 }
@@ -247,11 +269,13 @@ export interface GameAnswer {
 export interface GamePlayer {
   discord_user_id: string
   username: string
+  display_name?: string
 }
 
 export interface GameScore {
   discord_user_id: string
   username: string
+  display_name?: string
   correct: number
   guesses: number
 }
@@ -573,6 +597,7 @@ export interface MyVacations {
 export interface GuildVacation {
   discord_user_id: string
   username: string
+  display_name?: string
   from: string
   to: string
   set_here: boolean

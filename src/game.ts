@@ -121,7 +121,7 @@ function question(r: api.GameRound) {
 // proposedLine says the question came from the team: the proposer learns it is theirs, everyone
 // else finds out who once the round is over.
 export function proposedLine(r: api.GameRound) {
-  if (r.proposed_by) return h('p', { class: 'muted small' }, `${r.my_question ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })}`)
+  if (r.proposed_by) return h('p', { class: 'muted small' }, `${r.my_question ? t('game.proposedBy.you') : t('game.proposedBy', { name: api.shownName(r.proposed_by) })}`)
   if (r.my_question) return h('p', { class: 'small success' }, `${t('game.myQuestion')}`)
   if (r.proposed) return h('p', { class: 'muted small' }, `${t('game.proposed')}`)
   return null
@@ -259,7 +259,7 @@ function guessCard(guildID: string, r: api.GameRound, onLoggedOut: () => void) {
         'select',
         { id, 'aria-label': `${t('game.guess.pick')} ${i + 1}` },
         h('option', { value: '' }, t('game.guess.pick')),
-        ...others.map((p) => h('option', { value: p.discord_user_id, selected: r.my_guesses[a.id] === p.discord_user_id }, p.username)),
+        ...others.map((p) => h('option', { value: p.discord_user_id, selected: r.my_guesses[a.id] === p.discord_user_id }, api.shownName(p))),
       )
       selects.set(a.id, sel)
       return h('li', { class: 'guess' }, h('span', { class: 'guess-n' }, String(i + 1)), h('p', { class: 'msg-text' }, a.answer), sel)
@@ -314,7 +314,7 @@ function resultsCard(r: api.GameRound) {
             h(
               'span',
               { class: 'rank-text' },
-              h('strong', {}, s.username),
+              h('strong', {}, api.shownName(s)),
               h('span', { class: 'muted small' }, t('game.ranking.score', { correct: s.correct, guesses: s.guesses })),
             ),
           ),
@@ -334,12 +334,16 @@ function resultsCard(r: api.GameRound) {
   )
 }
 
+// withYou marks the viewer's own name: "Marina (tú)", or "David (david.moreno, tú)" when the
+// name already carries a username in brackets.
+export const withYou = (name: string) => (name.endsWith(')') ? `${name.slice(0, -1)}, ${t('game.you')})` : `${name} (${t('game.you')})`)
+
 // revealItem is one answer once the round is over: who wrote it, how many guessed it and, if
 // you guessed, whether you got it.
 function revealItem(a: api.GameAnswer, answers: api.GameAnswer[], guess: string | undefined) {
   const mine = guess === undefined ? null : guess === a.discord_user_id
     ? h('span', { class: 'pill pill-right' }, `✓ ${t('game.yourGuess.right')}`)
-    : h('span', { class: 'pill pill-wrong' }, `✗ ${t('game.yourGuess.wrong', { name: answers.find((x) => x.discord_user_id === guess)?.username ?? '?' })}`)
+    : h('span', { class: 'pill pill-wrong' }, `✗ ${t('game.yourGuess.wrong', { name: api.shownName(answers.find((x) => x.discord_user_id === guess)) || '?' })}`)
   const right = a.right ?? 0
   return h(
     'li',
@@ -348,7 +352,7 @@ function revealItem(a: api.GameAnswer, answers: api.GameAnswer[], guess: string 
     h(
       'div',
       { class: 'reveal-meta' },
-      h('strong', {}, a.mine ? `${a.username} (${t('game.you')})` : a.username ?? ''),
+      h('strong', {}, a.mine ? withYou(api.shownName(a)) : api.shownName(a)),
       h('span', { class: 'muted small' }, right === 0 ? t('game.right.none') : right === 1 ? t('game.right.one') : t('game.right', { n: right })),
       mine,
     ),
@@ -400,7 +404,7 @@ function historyRow(r: api.GameHistoryRound) {
   const guesses = r.my_guesses ?? {}
   const myID = r.answers.find((a) => a.mine)?.discord_user_id
   const players = r.players === 1 ? t('game.history.players.one') : t('game.history.players', { n: r.players })
-  const by = r.proposed_by ? (r.proposed_by.discord_user_id === myID ? t('game.proposedBy.you') : t('game.proposedBy', { name: r.proposed_by.username })) : null
+  const by = r.proposed_by ? (r.proposed_by.discord_user_id === myID ? t('game.proposedBy.you') : t('game.proposedBy', { name: api.shownName(r.proposed_by) })) : null
   const reveal = h(
     'ul',
     { class: 'reveal' },

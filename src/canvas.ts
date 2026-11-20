@@ -601,7 +601,7 @@ function openPop(st: api.CanvasStroke, x: number, y: number) {
       'p',
       { class: 'canvas-who' },
       penDot(st.color, true),
-      h('strong', {}, st.author?.username || (st.mine ? t('canvas.you') : '?')),
+      h('strong', {}, api.shownName(st.author) || (st.mine ? t('canvas.you') : '?')),
       h('span', { class: 'muted' }, ` · ${ago(st.created_at)}`),
     ),
     del,

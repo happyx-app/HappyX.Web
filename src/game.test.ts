@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { celebration, dayBefore, medal, myScore, places, proposalCount } from './game'
+import { celebration, dayBefore, medal, myScore, places, proposalCount, withYou } from './game'
 import type { GameRound } from './api'
 
 it('answers close the day before guessing starts', () => {
@@ -37,4 +37,9 @@ it('picks the logo gesture for your result', () => {
   expect(celebration(1, 3)).toBe('peek')
   expect(celebration(1, 1)).toBe('peek')
   expect(celebration(3, 3)).toBe('peek-all')
+})
+
+it('marks your own name once, inside the brackets a namesake gets', () => {
+  expect(withYou('Marina')).toMatch(/^Marina \((you|tú)\)$/)
+  expect(withYou('David (david.moreno)')).toMatch(/^David \(david\.moreno, (you|tú)\)$/)
 })

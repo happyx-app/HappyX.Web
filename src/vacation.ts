@@ -3,7 +3,7 @@
 // set one for a member there, in case they forgot.
 
 import * as api from './api'
-import { combobox, optionChip, type Option } from './access'
+import { combobox, memberOption, optionChip, type Option } from './access'
 import { h } from './dom'
 import { showSaveError } from './errors'
 import * as icons from './icons'
@@ -190,7 +190,7 @@ export function guildVacationsCard(g: api.Guild, onLoggedOut: () => void): HTMLE
 
 function guildVacationsForm(g: api.Guild, v: api.GuildVacations, reload: () => void, onLoggedOut: () => void): HTMLElement[] {
   const today = todayIn(g.timezone)
-  const members: Option[] = v.members.map((m) => ({ kind: 'user', id: m.discord_user_id, label: m.username }))
+  const members: Option[] = v.members.map(memberOption)
   const byID = new Map(members.map((o) => [o.id, o]))
   let picked: Option | undefined
   const status = h('p', { class: 'small', role: 'status' })
@@ -200,10 +200,10 @@ function guildVacationsForm(g: api.Guild, v: api.GuildVacations, reload: () => v
   }
 
   const row = (x: api.GuildVacation) => {
-    const who = optionChip(byID.get(x.discord_user_id) ?? { kind: 'user', id: x.discord_user_id, label: x.username })
+    const who = optionChip(byID.get(x.discord_user_id) ?? memberOption(x))
     let end: HTMLElement
     if (x.set_here) {
-      const name = x.username
+      const name = api.shownName(x)
       end = h('button', { class: 'btn btn-ghost btn-icon', type: 'button', 'aria-label': t('vacation.removeFor', { name }), title: t('vacation.removeFor', { name }) }, icons.x())
       end.addEventListener('click', async () => {
         ;(end as HTMLButtonElement).disabled = true
