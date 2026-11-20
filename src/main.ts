@@ -876,14 +876,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     hintText.textContent = t('event.mark.hint')
     chartSlot.classList.toggle('marking', on)
   }
-  const inPeriod = (e: api.TeamEvent) => e.to >= range.from && e.from <= range.to
+  const inPeriod = (e: { from: string; to: string }) => e.to >= range.from && e.from <= range.to
   // Saved outside the period, the event shows nowhere here: say so, instead of it seeming lost.
   const note = (e: api.TeamEvent | null) => {
     saved.textContent = e && !inPeriod(e) ? t('event.saved.outside', { dates: formatRange(e.from, e.to) }) : ''
   }
   const add = (from: string, to: string) => {
     setMarking(false)
-    eventDialog(guildID, { from, to }, null, (e) => {
+    eventDialog(guildID, todayIn(g.timezone), { from, to }, null, (e) => {
       if (e) events = [...events, e]
       note(e)
       drawEvents()
@@ -892,7 +892,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const edit = (id: string) => {
     const e = events.find((x) => x.id === id)
     if (!e) return
-    eventDialog(guildID, e, e, (changed, gone) => {
+    eventDialog(guildID, todayIn(g.timezone), e, e, (changed, gone) => {
       events = changed ? events.map((x) => (x.id === changed.id ? changed : x)) : events.filter((x) => x.id !== gone)
       note(changed)
       drawEvents()

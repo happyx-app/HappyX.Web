@@ -603,13 +603,14 @@ export const deleteGuildVacation = (guildID: string, userID: string) =>
 
 // Something that happened to the team over one or more days (from = to for one day), marked on
 // the chart so a change in mood can be read against it. Admins and whoever can edit set them;
-// every member sees them.
+// every member sees them. They can't end after today.
 export interface TeamEvent {
   id: string
   from: string // YYYY-MM-DD
   to: string
   title: string
   description?: string
+  color: string // yellow, orange, red, green, blue or pink
 }
 
 export interface TeamEventInput {
@@ -617,6 +618,7 @@ export interface TeamEventInput {
   to: string
   title: string
   description: string
+  color: string
 }
 
 const eventsPath = (guildID: string) => `/guilds/${encodeURIComponent(guildID)}/events`

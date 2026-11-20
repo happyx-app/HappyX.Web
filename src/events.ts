@@ -2,7 +2,7 @@
 // the chart that says the same as the bookmarks for whoever doesn't hover them.
 
 import * as api from './api'
-import type { ChartEvent } from './charts'
+import { eventClass, eventColors, type ChartEvent } from './charts'
 import { h } from './dom'
 import { showSaveError } from './errors'
 import { formatRange, lang, t } from './i18n'
@@ -15,14 +15,28 @@ let dialogs = 0
 
 // eventDialog opens a modal to create an event over from..to, or to change or delete one. done
 // gets the saved event, or null with the id when it was deleted. When it closes, focus goes to
-// what back() returns: the dialog may have been opened by a drag, or its button redrawn.
-export function eventDialog(guildID: string, start: { from: string; to: string }, existing: api.TeamEvent | null, done: (saved: api.TeamEvent | null, id?: string) => void, back: () => HTMLElement | null | undefined) {
+// what back() returns: the dialog may have been opened by a drag, or its button redrawn. Events
+// can't end after today (the server's), since the chart never goes past it.
+export function eventDialog(guildID: string, today: string, start: { from: string; to: string }, existing: api.TeamEvent | null, done: (saved: api.TeamEvent | null, id?: string) => void, back: () => HTMLElement | null | undefined) {
   const n = ++dialogs
   const ids = { title: `ev-title-${n}`, text: `ev-text-${n}`, from: `ev-from-${n}`, to: `ev-to-${n}`, head: `ev-head-${n}`, del: `ev-del-${n}` }
   const title = h('input', { id: ids.title, required: true, maxlength: titleMax, autocomplete: 'off', value: existing?.title ?? '', autofocus: true })
   const text = h('textarea', { id: ids.text, rows: 3, maxlength: descriptionMax }, existing?.description ?? '')
-  const from = h('input', { id: ids.from, type: 'date', required: true, value: existing?.from ?? start.from })
-  const to = h('input', { id: ids.to, type: 'date', required: true, value: existing?.to ?? start.to })
+  const from = h('input', { id: ids.from, type: 'date', required: true, max: today, value: existing?.from ?? start.from })
+  const to = h('input', { id: ids.to, type: 'date', required: true, max: today, value: existing?.to ?? start.to })
+  // The colour: one radio per swatch, named for screen readers, the event's own or yellow checked.
+  const chosen = existing?.color ?? eventColors[0]
+  const colors = h(
+    'fieldset',
+    { class: 'event-colors' },
+    h('legend', {}, t('event.field.color')),
+    ...eventColors.map((c) =>
+      h('label', { class: `event-color ${eventClass({ color: c })}` },
+        h('input', { type: 'radio', name: `ev-color-${n}`, value: c, checked: c === chosen, 'aria-label': t(`event.color.${c}`) }),
+        h('span', { 'aria-hidden': 'true' }),
+      ),
+    ),
+  )
   const error = h('p', { class: 'small error', role: 'alert', hidden: true })
   const save = h('button', { type: 'submit', class: 'btn btn-primary' }, t('event.save'))
   const cancel = h('button', { type: 'button', class: 'btn btn-ghost' }, t('event.cancel'))
@@ -45,6 +59,7 @@ export function eventDialog(guildID: string, start: { from: string; to: string }
       h('div', { class: 'field' }, h('label', { for: ids.from }, t('event.field.from')), from),
       h('div', { class: 'field' }, h('label', { for: ids.to }, t('event.field.to')), to),
     ),
+    colors,
     error,
     h('div', { class: 'event-actions' }, del ? h('div', { class: 'event-del-wrap' }, del, delNote) : null, h('div', { class: 'event-main' }, cancel, save)),
   )
@@ -67,11 +82,13 @@ export function eventDialog(guildID: string, start: { from: string; to: string }
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     error.hidden = true
-    const input = { title: title.value.trim(), description: text.value.trim(), from: from.value, to: to.value }
+    const color = colors.querySelector<HTMLInputElement>('input:checked')?.value ?? eventColors[0]
+    const input = { title: title.value.trim(), description: text.value.trim(), from: from.value, to: to.value, color }
     if (!input.title) return fail(t('event.error.title'), title)
     if (!input.from) return fail(t('event.error.dates'), from)
     if (!input.to) return fail(t('event.error.dates'), to)
     if (input.to < input.from) return fail(t('event.error.order'), to)
+    if (input.to > today) return fail(t('event.error.future'), to)
     save.disabled = true
     try {
       const saved = existing ? await api.updateEvent(guildID, existing.id, input) : await api.createEvent(guildID, input)
@@ -133,7 +150,7 @@ export function eventList(events: ChartEvent[], edit?: (id: string) => void): HT
       button?.addEventListener('click', () => edit!(e.id))
       return h(
         'li',
-        {},
+        { class: eventClass(e) },
         icons.inline(icons.bookmark),
         h(
           'div',

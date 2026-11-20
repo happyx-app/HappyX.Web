@@ -53,8 +53,15 @@ export interface ChartEvent {
   to: string
   title: string
   description?: string
+  color?: string // one of eventColors; yellow when left out
   where?: string // the server's name, when the chart shows more than one
 }
+
+// The colours a bookmark can have, as the API names them; the first is the default.
+export const eventColors = ['yellow', 'orange', 'red', 'green', 'blue', 'pink'] as const
+
+// The class that gives an event's marks its colour (see .ev-* in the CSS).
+export const eventClass = (e: { color?: string }) => `ev-${eventColors.includes(e.color as (typeof eventColors)[number]) ? e.color : eventColors[0]}`
 
 // Mood over time, one line per series, redrawn to fit its container.
 export function lineChart(xs: string[], series: Series[], opts: LineChartOptions): HTMLElement {
@@ -312,7 +319,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   // so it never mixes with the area into a muddy colour.
   for (const p of placed) {
     const [a, b] = p.edges
-    svg.append(s('rect', { x: a, y: m.top, width: b - a, height: ih, class: 'event-band' }))
+    svg.append(s('rect', { x: a, y: m.top, width: b - a, height: ih, class: `event-band ${eventClass(p.e)}` }))
   }
   // While marking: the days pressed so far, outlined so they don't look like a saved event.
   const preview = s('rect', { y: m.top, height: ih, class: 'event-preview', visibility: 'hidden' })
@@ -396,7 +403,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     const [title, ...rest] = opts.tooltip(i)
     tooltip.replaceChildren(
       title,
-      ...covering.map((p) => h('div', { class: 'tooltip-event' }, icons.inline(icons.bookmark), p.e.title)),
+      ...covering.map((p) => h('div', { class: `tooltip-event ${eventClass(p.e)}` }, icons.inline(icons.bookmark), p.e.title)),
       ...rest,
     )
     tooltip.hidden = false
@@ -474,7 +481,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     // The bookmark starts where its band does; a line from it to the band's end shows how long.
     const left = Math.min(Math.max(0, a), width - markWidth)
     if (b - (left + markWidth) > 4) {
-      const run = h('span', { class: 'event-run', 'aria-hidden': 'true' })
+      const run = h('span', { class: `event-run ${eventClass(p.e)}`, 'aria-hidden': 'true' })
       run.style.left = `${left + markWidth}px`
       run.style.width = `${b - left - markWidth}px`
       run.style.top = `${top + 11}px`
@@ -483,7 +490,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     const id = `event-tip-${++eventTips}`
     const name = t('event.bookmark', { title: p.e.title, dates: eventDates(p.e) })
     const button = h('button', {
-      type: 'button', class: 'event-mark', 'aria-label': name, 'aria-expanded': 'false',
+      type: 'button', class: `event-mark ${eventClass(p.e)}`, 'aria-label': name, 'aria-expanded': 'false',
       interestfor: id, popovertarget: id, popovertargetaction: 'show', 'data-toggletip': id,
     }, icons.bookmark())
     button.style.left = `${left}px`

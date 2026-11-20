@@ -1178,21 +1178,29 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
   .yd:focus-visible { outline-color: Highlight; }
 }
 
-/* Team events on the chart: a yellow bookmark above the lines and a faint band behind them over
-   the days the event lasts. */
-.chart .event-band { fill: var(--event-band); pointer-events: none; }
+/* Team events on the chart: a bookmark above the lines and a faint band behind them over the
+   days the event lasts, in the colour chosen for it. --ev is the bookmark's fill, --ev-ink its
+   outline and duration line (3:1 on the surface at least), --ev-band the band: a solid tint, so
+   it never mixes with the area fill into a muddy colour. None is the chart line's violet. */
+.ev-yellow { --ev: light-dark(#fbbf24, #fcd34d); --ev-ink: light-dark(#a16207, #fcd34d); }
+.ev-orange { --ev: light-dark(#fb923c, #fdba74); --ev-ink: light-dark(#c2410c, #fdba74); }
+.ev-red { --ev: light-dark(#f87171, #fca5a5); --ev-ink: light-dark(#b91c1c, #fca5a5); }
+.ev-green { --ev: light-dark(#4ade80, #86efac); --ev-ink: light-dark(#15803d, #86efac); }
+.ev-blue { --ev: light-dark(#60a5fa, #93c5fd); --ev-ink: light-dark(#1d4ed8, #93c5fd); }
+.ev-pink { --ev: light-dark(#f472b6, #f9a8d4); --ev-ink: light-dark(#be185d, #f9a8d4); }
+[class*='ev-'] { --ev-band: light-dark(color-mix(in oklab, var(--ev) 16%, #fff), color-mix(in oklab, var(--ev) 12%, #1c1c20)); }
+.chart .event-band { fill: var(--ev-band); pointer-events: none; }
 /* Overlapping events: the later band is see-through enough that the overlap reads as darker. */
 .chart .event-band + .event-band { fill-opacity: 0.75; }
-.chart .event-preview { fill: none; stroke: var(--event-ink); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+.chart .event-preview { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .event-layer { position: absolute; inset: 0; pointer-events: none; }
-.trend { --event-band: light-dark(color-mix(in oklab, #fbbf24 16%, #fff), color-mix(in oklab, #fcd34d 11%, #1c1c20)); --event-ink: light-dark(#a16207, #fcd34d); }
-.event-run { position: absolute; height: 2px; border-radius: 1px; background: light-dark(#ca8a04, var(--sun)); }
+.event-run { position: absolute; height: 2px; border-radius: 1px; background: var(--ev-ink); }
 .event-mark {
   position: absolute; pointer-events: auto; inline-size: 24px; block-size: 22px; padding: 0;
   display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent;
-  color: light-dark(#a16207, var(--sun)); cursor: pointer;
+  color: var(--ev-ink); cursor: pointer;
 }
-.event-mark .icon { inline-size: 16px; block-size: 16px; fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); }
+.event-mark .icon { inline-size: 16px; block-size: 16px; fill: var(--ev); stroke: var(--ev-ink); }
 .event-mark::after { content: ''; position: absolute; inset: -4px; }
 @media (pointer: coarse) { .event-mark::after { inset: -10px; } }
 .event-mark:hover, .event-mark[aria-expanded='true'] { background: var(--surface-2); }
@@ -1200,7 +1208,7 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .event-tip:is(:popover-open, .\:popover-open) { display: grid; gap: 2px; }
 .event-tip p { margin: 4px 0 0; }
 .tooltip-event { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.8125rem; color: var(--ink-2); }
-.tooltip-event .icon { fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); }
+.tooltip-event .icon { fill: var(--ev); stroke: var(--ev-ink); }
 .card-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .card-tools .btn[aria-pressed='true'] { background: var(--warm-soft); color: var(--ink); border-color: light-dark(#e9c46a, #7a6431); }
 .mark-hint { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--warm-soft); color: var(--ink); }
@@ -1211,7 +1219,7 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 
 .event-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--grid); display: grid; gap: 10px; }
 .event-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; font-size: 0.9375rem; }
-.event-list .icon { fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); margin-top: 3px; }
+.event-list .icon { fill: var(--ev); stroke: var(--ev-ink); margin-top: 3px; }
 .event-list p { margin: 2px 0 0; }
 
 .event-dialog {
@@ -1246,3 +1254,12 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 /* The bookmark keeps its drawn size on touch screens so it lines up with its run; ::after gives
    it the 44px touch target. */
 .event-mark { min-block-size: 0; min-inline-size: 0; }
+/* The colour picker: one round swatch per colour, a ring on the chosen one. */
+.event-colors { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.event-colors legend { font-weight: 600; font-size: 0.9375rem; padding: 0; margin-block-end: 6px; }
+.event-color { position: relative; display: grid; place-items: center; inline-size: 32px; block-size: 32px; border-radius: 50%; cursor: pointer; }
+.event-color input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.event-color span { inline-size: 22px; block-size: 22px; border-radius: 50%; background: var(--ev); border: 2px solid var(--ev-ink); }
+.event-color:has(input:checked) span { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.event-color:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 4px; }
+@media (pointer: coarse) { .event-colors { gap: 2px; } .event-color { inline-size: 44px; block-size: 44px; } }
