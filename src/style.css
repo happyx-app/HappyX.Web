@@ -1177,3 +1177,58 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
   .yd-none { background: radial-gradient(circle, GrayText 0 22%, transparent 25%); }
   .yd:focus-visible { outline-color: Highlight; }
 }
+
+/* Team events on the chart: a yellow bookmark above the lines and a faint band behind them over
+   the days the event lasts. */
+.chart .event-band { fill: var(--sun); fill-opacity: 0.16; pointer-events: none; }
+.chart .event-preview { fill-opacity: 0.28; }
+.event-layer { position: absolute; inset: 0; pointer-events: none; }
+.event-run { position: absolute; height: 3px; border-radius: 2px; background: var(--sun); opacity: 0.7; }
+.event-mark {
+  position: absolute; pointer-events: auto; inline-size: 24px; block-size: 22px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: 6px; background: var(--surface);
+  color: light-dark(#a16207, var(--sun)); cursor: pointer;
+}
+.event-mark .icon { inline-size: 16px; block-size: 16px; fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); }
+.event-mark::after { content: ''; position: absolute; inset: -4px; }
+@media (pointer: coarse) { .event-mark::after { inset: -10px; } }
+.event-mark:hover, .event-mark[aria-expanded='true'] { background: var(--surface-2); }
+.event-mark:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.event-tip:is(:popover-open, .\:popover-open) { display: grid; gap: 2px; }
+.event-tip p { margin: 4px 0 0; }
+.tooltip-event { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.8125rem; color: var(--ink-2); }
+.tooltip-event .icon { fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); }
+.card-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.card-tools .btn[aria-pressed='true'] { background: var(--warm-soft); color: var(--ink); border-color: light-dark(#e9c46a, #7a6431); }
+.mark-hint { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--warm-soft); color: var(--ink); }
+.marking .chart { cursor: crosshair; touch-action: pan-y; }
+.marking .event-layer { visibility: hidden; }
+
+.event-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--grid); display: grid; gap: 10px; }
+.event-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; font-size: 0.9375rem; }
+.event-list .icon { fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); margin-top: 3px; }
+.event-list p { margin: 2px 0 0; }
+
+.event-dialog {
+  inline-size: min(440px, calc(100dvw - 32px)); padding: 24px; border: 1px solid var(--pop-border);
+  border-radius: var(--radius); background: var(--surface); color: var(--ink); box-shadow: var(--dc-shadow);
+}
+.event-dialog:modal { overscroll-behavior: contain; }
+.event-dialog::backdrop { background: rgb(15 15 20 / 0.45); overflow: hidden; overscroll-behavior: contain; }
+.event-form { display: grid; gap: 16px; }
+.event-form h2 { margin: 0; }
+.event-form input, .event-form textarea {
+  font: inherit; color: var(--ink); background: var(--surface); inline-size: 100%;
+  border: 1px solid var(--control-border); border-radius: 10px; padding: 9px 12px;
+}
+.event-form textarea { resize: vertical; }
+.event-form [aria-invalid='true'] { border-color: var(--danger); }
+.event-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.event-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.event-main { display: flex; gap: 8px; margin-inline-start: auto; }
+.event-del-wrap { display: grid; gap: 4px; }
+.event-del { color: var(--danger); padding-inline: 0; }
+.event-del-note { visibility: hidden; }
+.confirm-delete .event-del-note { visibility: visible; }
+.event-form .error { margin: 0; color: var(--danger); }
+.event-dates .field, .event-dates input { min-inline-size: 0; }

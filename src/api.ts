@@ -220,6 +220,9 @@ export interface MyGuildMoods {
   // The person's vacations that touch the range, their own and any set in this server. Older APIs
   // leave it out.
   vacations?: { from: string; to: string }[]
+  // The server's events that touch the range, for every member to see on the chart. Older APIs
+  // leave it out.
+  events?: TeamEvent[]
 }
 
 export interface MyMoods {
@@ -597,3 +600,34 @@ export const setGuildVacation = (guildID: string, userID: string, from: string, 
 
 export const deleteGuildVacation = (guildID: string, userID: string) =>
   sendJSON<void>('DELETE', `/guilds/${encodeURIComponent(guildID)}/vacations/${encodeURIComponent(userID)}`, {})
+
+// Something that happened to the team over one or more days (from = to for one day), marked on
+// the chart so a change in mood can be read against it. Admins and whoever can edit set them;
+// every member sees them.
+export interface TeamEvent {
+  id: string
+  from: string // YYYY-MM-DD
+  to: string
+  title: string
+  description?: string
+}
+
+export interface TeamEventInput {
+  from: string
+  to: string
+  title: string
+  description: string
+}
+
+const eventsPath = (guildID: string) => `/guilds/${encodeURIComponent(guildID)}/events`
+
+// guildEvents lists the server's events that touch from..to, oldest first.
+export const guildEvents = (guildID: string, from: string, to: string) =>
+  getJSON<{ events: TeamEvent[] }>(`${eventsPath(guildID)}?from=${from}&to=${to}`).then((r) => r.events)
+
+export const createEvent = (guildID: string, e: TeamEventInput) => sendJSON<TeamEvent>('POST', eventsPath(guildID), e)
+
+export const updateEvent = (guildID: string, id: string, e: TeamEventInput) =>
+  sendJSON<TeamEvent>('PUT', `${eventsPath(guildID)}/${encodeURIComponent(id)}`, e)
+
+export const deleteEvent = (guildID: string, id: string) => sendJSON<void>('DELETE', `${eventsPath(guildID)}/${encodeURIComponent(id)}`, {})

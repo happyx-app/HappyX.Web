@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest'
-import { trendSummary, weekStarts, weeklyStats } from './charts'
+import { describe, expect, it } from 'vitest'
+import { trendSummary, weekStarts, weeklyStats, placeEvents } from './charts'
 
 it('sums up the trend chart for screen readers', () => {
   const days = [
@@ -55,4 +55,28 @@ it('marks the last week as partial when the period ends before its Sunday', () =
   const days = [{ day: '2026-10-12', responses: 2, average: 4 }]
   expect(weeklyStats(days, '2026-10-14')[0].partial).toBe(true)
   expect(weeklyStats(days, '2026-10-18')[0].partial).toBeUndefined()
+})
+
+describe('placeEvents', () => {
+  const xs = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-09', '2026-11-10']
+  const day = (i: number) => ({ from: xs[i], to: xs[i] })
+  const ev = (id: string, from: string, to: string) => ({ id, from, to, title: id })
+
+  it('covers the points an event spans and puts overlapping ones on separate rows', () => {
+    const placed = placeEvents(xs, [ev('b', '2026-11-04', '2026-11-05'), ev('a', '2026-11-03', '2026-11-04'), ev('c', '2026-11-09', '2026-11-09')], day)
+    expect(placed.map((p) => [p.e.id, p.lo, p.hi, p.row])).toEqual([
+      ['a', 1, 2, 0],
+      ['b', 2, 3, 1],
+      ['c', 5, 5, 0],
+    ])
+  })
+
+  it('places an event on a day without points between its neighbours', () => {
+    const [p] = placeEvents(xs, [ev('sat', '2026-11-07', '2026-11-07')], day)
+    expect([p.lo, p.hi]).toEqual([5, 4])
+  })
+
+  it('leaves out events outside the points', () => {
+    expect(placeEvents(xs, [ev('old', '2026-10-01', '2026-10-02'), ev('later', '2026-11-20', '2026-11-21')], day)).toEqual([])
+  })
 })
