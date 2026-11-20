@@ -1180,13 +1180,16 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 
 /* Team events on the chart: a yellow bookmark above the lines and a faint band behind them over
    the days the event lasts. */
-.chart .event-band { fill: var(--sun); fill-opacity: 0.16; pointer-events: none; }
-.chart .event-preview { fill-opacity: 0.28; }
+.chart .event-band { fill: var(--event-band); pointer-events: none; }
+/* Overlapping events: the later band is see-through enough that the overlap reads as darker. */
+.chart .event-band + .event-band { fill-opacity: 0.75; }
+.chart .event-preview { fill: none; stroke: var(--event-ink); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .event-layer { position: absolute; inset: 0; pointer-events: none; }
-.event-run { position: absolute; height: 3px; border-radius: 2px; background: var(--sun); opacity: 0.7; }
+.trend { --event-band: light-dark(color-mix(in oklab, #fbbf24 16%, #fff), color-mix(in oklab, #fcd34d 11%, #1c1c20)); --event-ink: light-dark(#a16207, #fcd34d); }
+.event-run { position: absolute; height: 2px; border-radius: 1px; background: light-dark(#ca8a04, var(--sun)); }
 .event-mark {
   position: absolute; pointer-events: auto; inline-size: 24px; block-size: 22px; padding: 0;
-  display: grid; place-items: center; border: 0; border-radius: 6px; background: var(--surface);
+  display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent;
   color: light-dark(#a16207, var(--sun)); cursor: pointer;
 }
 .event-mark .icon { inline-size: 16px; block-size: 16px; fill: var(--sun); stroke: light-dark(#a16207, var(--sun)); }
@@ -1201,8 +1204,10 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .card-tools { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .card-tools .btn[aria-pressed='true'] { background: var(--warm-soft); color: var(--ink); border-color: light-dark(#e9c46a, #7a6431); }
 .mark-hint { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: var(--warm-soft); color: var(--ink); }
-.marking .chart { cursor: crosshair; touch-action: pan-y; }
-.marking .event-layer { visibility: hidden; }
+/* While marking, a drag on a phone draws instead of scrolling; the rest of the page still scrolls. */
+.marking .chart { cursor: crosshair; touch-action: none; }
+.marking .event-layer { opacity: 0.35; pointer-events: none; }
+.marking .event-mark { pointer-events: none; }
 
 .event-list { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--grid); display: grid; gap: 10px; }
 .event-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; font-size: 0.9375rem; }
@@ -1227,8 +1232,17 @@ label.chip:has(:focus-visible) { outline: 2px solid var(--accent); outline-offse
 .event-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
 .event-main { display: flex; gap: 8px; margin-inline-start: auto; }
 .event-del-wrap { display: grid; gap: 4px; }
-.event-del { color: var(--danger); padding-inline: 0; }
-.event-del-note { visibility: hidden; }
-.confirm-delete .event-del-note { visibility: visible; }
+.event-del { color: var(--danger); padding-inline: 0; justify-self: start; }
+.confirm-delete .event-del { background: var(--danger); color: #fff; padding-inline: 14px; }
+.event-del-note { min-block-size: 1.3em; }
 .event-form .error { margin: 0; color: var(--danger); }
 .event-dates .field, .event-dates input { min-inline-size: 0; }
+.event-list .link-btn { text-decoration-color: transparent; align-self: start; }
+.event-list .link-btn:hover, .event-list .link-btn:focus-visible { text-decoration-color: currentColor; }
+.event-when { white-space: nowrap; }
+.event-tip { max-inline-size: min(34ch, calc(100dvw - 32px)); }
+.event-by { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--grid); }
+.event-by + .event-list { border-top: 0; padding-top: 0; margin-top: 8px; }
+/* The bookmark keeps its drawn size on touch screens so it lines up with its run; ::after gives
+   it the 44px touch target. */
+.event-mark { min-block-size: 0; min-inline-size: 0; }

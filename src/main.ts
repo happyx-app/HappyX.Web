@@ -860,7 +860,10 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   let marking = false
   const markButton = editable ? h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-pressed': 'false' }, icons.bookmark(), t('event.mark')) : null
   const typeDates = h('button', { type: 'button', class: 'link-btn' }, t('event.mark.type'))
-  const markHint = h('p', { class: 'mark-hint small', hidden: true }, t('event.mark.hint'), ' ', typeDates)
+  // While dragging, the days so far; otherwise what to do.
+  const hintText = h('span', {}, t('event.mark.hint'))
+  const markHint = h('p', { class: 'mark-hint small', hidden: true }, hintText, ' ', typeDates)
+  const saved = h('p', { class: 'muted small', role: 'status' })
   const chartSlot = h('div', {})
   const listSlot = h('div', {})
   const escape = (e: KeyboardEvent) => e.key === 'Escape' && setMarking(false)
@@ -870,22 +873,30 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     else document.removeEventListener('keydown', escape)
     markButton?.setAttribute('aria-pressed', String(on))
     markHint.hidden = !on
+    hintText.textContent = t('event.mark.hint')
     chartSlot.classList.toggle('marking', on)
+  }
+  const inPeriod = (e: api.TeamEvent) => e.to >= range.from && e.from <= range.to
+  // Saved outside the period, the event shows nowhere here: say so, instead of it seeming lost.
+  const note = (e: api.TeamEvent | null) => {
+    saved.textContent = e && !inPeriod(e) ? t('event.saved.outside', { dates: formatRange(e.from, e.to) }) : ''
   }
   const add = (from: string, to: string) => {
     setMarking(false)
-    eventDialog(guildID, { from, to }, null, (saved) => {
-      if (saved) events = [...events, saved]
+    eventDialog(guildID, { from, to }, null, (e) => {
+      if (e) events = [...events, e]
+      note(e)
       drawEvents()
-    })
+    }, () => markButton)
   }
   const edit = (id: string) => {
     const e = events.find((x) => x.id === id)
     if (!e) return
-    eventDialog(guildID, e, e, (saved, gone) => {
-      events = saved ? events.map((x) => (x.id === saved.id ? saved : x)) : events.filter((x) => x.id !== gone)
+    eventDialog(guildID, e, e, (changed, gone) => {
+      events = changed ? events.map((x) => (x.id === changed.id ? changed : x)) : events.filter((x) => x.id !== gone)
+      note(changed)
       drawEvents()
-    })
+    }, () => listSlot.querySelector<HTMLElement>(`[data-event="${CSS.escape(id)}"]`) ?? markButton)
   }
   markButton?.addEventListener('click', () => setMarking(!marking))
   // Typing the dates starts on today, or on the period's last day when it is over.
@@ -899,11 +910,13 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
       trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay, {
         events: shown,
         span,
-        mark: editable ? { on: () => marking, done: add } : undefined,
+        mark: editable
+          ? { on: () => marking, done: add, preview: (from, to) => (hintText.textContent = from && to ? formatRange(from, to, false) : t('event.mark.hint')) }
+          : undefined,
       }),
     )
-    const list = eventList(shown.filter((e) => e.to >= range.from && e.from <= range.to), editable ? edit : undefined)
-    listSlot.replaceChildren(...(list ? [list] : []))
+    const list = eventList(shown.filter(inPeriod), editable ? edit : undefined)
+    listSlot.replaceChildren(...(list ? [list] : []), saved)
   }
   drawEvents()
   const weekdays = weekdayAverages(r.days)
@@ -1440,7 +1453,7 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const xLabel = (x: string) => (pts.byWeek ? t('me.weekOf', { day: formatDay(x) }) : formatDay(x, { weekday: 'short', day: 'numeric', month: 'short' }))
 
   // The events of the servers shown, named by server when there are several.
-  const myEvents: ChartEvent[] = lines.flatMap(({ g }) => (g.events ?? []).map((e) => ({ ...e, where: lines.length > 1 ? g.name : undefined })))
+  const myEvents: ChartEvent[] = lines.flatMap(({ g }) => (g.events ?? []).map((e) => ({ ...e, where: g.name })))
   const chart = lineChart(pts.xs, series, {
     label: t('me.chart'),
     events: myEvents,
@@ -1516,7 +1529,10 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       h('p', { class: 'muted small' }, t(pts.byWeek ? 'me.chart.desc.week' : 'me.chart.desc.day')),
       chips,
       chart,
-      eventList(myEvents.filter((e) => e.to >= range.from && e.from <= range.to)),
+      // This page is private: the events are the server's, set by its admins, so it says so.
+      ...(myEvents.some((e) => e.to >= range.from && e.from <= range.to)
+        ? [h('p', { class: 'muted small event-by' }, t('event.list.member')), eventList(myEvents.filter((e) => e.to >= range.from && e.from <= range.to))]
+        : []),
       tableWrap,
     ),
     h('div', { class: 'grid-2' }, ...shown.map(({ g, color }) => myGuildCard(g, color))),

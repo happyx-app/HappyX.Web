@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { trendSummary, weekStarts, weeklyStats, placeEvents } from './charts'
+import { trendSummary, weekStarts, weeklyStats, placeEvents, stackRows } from './charts'
 
 it('sums up the trend chart for screen readers', () => {
   const days = [
@@ -62,13 +62,17 @@ describe('placeEvents', () => {
   const day = (i: number) => ({ from: xs[i], to: xs[i] })
   const ev = (id: string, from: string, to: string) => ({ id, from, to, title: id })
 
-  it('covers the points an event spans and puts overlapping ones on separate rows', () => {
+  it('covers the points an event spans, oldest first', () => {
     const placed = placeEvents(xs, [ev('b', '2026-11-04', '2026-11-05'), ev('a', '2026-11-03', '2026-11-04'), ev('c', '2026-11-09', '2026-11-09')], day)
-    expect(placed.map((p) => [p.e.id, p.lo, p.hi, p.row])).toEqual([
-      ['a', 1, 2, 0],
-      ['b', 2, 3, 1],
-      ['c', 5, 5, 0],
+    expect(placed.map((p) => [p.e.id, p.lo, p.hi])).toEqual([
+      ['a', 1, 2],
+      ['b', 2, 3],
+      ['c', 5, 5],
     ])
+  })
+
+  it('stacks overlapping spans on separate rows', () => {
+    expect(stackRows([[0, 50], [30, 60], [58, 90], [100, 124]])).toEqual([0, 1, 0, 0])
   })
 
   it('places an event on a day without points between its neighbours', () => {

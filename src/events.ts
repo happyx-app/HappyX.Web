@@ -5,7 +5,7 @@ import * as api from './api'
 import type { ChartEvent } from './charts'
 import { h } from './dom'
 import { showSaveError } from './errors'
-import { formatRange, t } from './i18n'
+import { formatRange, lang, t } from './i18n'
 import * as icons from './icons'
 
 export const titleMax = 60
@@ -14,8 +14,9 @@ export const descriptionMax = 280
 let dialogs = 0
 
 // eventDialog opens a modal to create an event over from..to, or to change or delete one. done
-// gets the saved event, or null with the id when it was deleted.
-export function eventDialog(guildID: string, start: { from: string; to: string }, existing: api.TeamEvent | null, done: (saved: api.TeamEvent | null, id?: string) => void) {
+// gets the saved event, or null with the id when it was deleted. When it closes, focus goes to
+// what back() returns: the dialog may have been opened by a drag, or its button redrawn.
+export function eventDialog(guildID: string, start: { from: string; to: string }, existing: api.TeamEvent | null, done: (saved: api.TeamEvent | null, id?: string) => void, back: () => HTMLElement | null | undefined) {
   const n = ++dialogs
   const ids = { title: `ev-title-${n}`, text: `ev-text-${n}`, from: `ev-from-${n}`, to: `ev-to-${n}`, head: `ev-head-${n}`, del: `ev-del-${n}` }
   const title = h('input', { id: ids.title, required: true, maxlength: titleMax, autocomplete: 'off', value: existing?.title ?? '', autofocus: true })
@@ -28,12 +29,13 @@ export function eventDialog(guildID: string, start: { from: string; to: string }
 
   // Deleting asks once more on the same button, with the reason next to it; the space for it is
   // kept so nothing moves under the pointer.
-  const delNote = h('span', { id: ids.del, class: 'muted small event-del-note' }, t('event.delete.note'))
+  const delNote = h('span', { id: ids.del, class: 'muted small event-del-note', 'aria-live': 'polite' })
   const del = existing ? h('button', { type: 'button', class: 'btn btn-ghost event-del', 'aria-describedby': ids.del }, t('event.delete')) : null
 
   const form = h(
     'form',
-    { class: 'event-form', novalidate: true },
+    // The date fields follow the page's language (day/month in Spanish), not the browser's.
+    { class: 'event-form', novalidate: true, lang },
     h('h2', { id: ids.head }, t(existing ? 'event.edit.title' : 'event.new.title')),
     h('div', { class: 'field' }, h('label', { for: ids.title }, t('event.field.title')), title),
     h('div', { class: 'field' }, h('label', { for: ids.text }, t('event.field.text')), text),
@@ -48,7 +50,10 @@ export function eventDialog(guildID: string, start: { from: string; to: string }
   )
   const dialog = h('dialog', { class: 'event-dialog', 'aria-labelledby': ids.head }, form)
   cancel.addEventListener('click', () => dialog.close())
-  dialog.addEventListener('close', () => dialog.remove())
+  dialog.addEventListener('close', () => {
+    dialog.remove()
+    back()?.focus()
+  })
 
   const fail = (msg: string, field?: HTMLInputElement) => {
     error.className = 'small error'
@@ -82,10 +87,19 @@ export function eventDialog(guildID: string, start: { from: string; to: string }
 
   if (del && existing) {
     let asked = false
+    // Asked once; moving away from the button takes the question back.
+    const disarm = () => {
+      asked = false
+      del.textContent = t('event.delete')
+      delNote.textContent = ''
+      form.classList.remove('confirm-delete')
+    }
+    del.addEventListener('blur', disarm)
     del.addEventListener('click', async () => {
       if (!asked) {
         asked = true
         del.textContent = t('event.delete.confirm')
+        delNote.textContent = t('event.delete.note')
         form.classList.add('confirm-delete')
         return
       }
@@ -115,7 +129,7 @@ export function eventList(events: ChartEvent[], edit?: (id: string) => void): HT
     'ul',
     { class: 'event-list', 'aria-label': t('event.list') },
     ...sorted.map((e) => {
-      const button = edit ? h('button', { type: 'button', class: 'link-btn small', 'aria-label': t('event.edit.named', { title: e.title }) }, t('event.edit')) : null
+      const button = edit ? h('button', { type: 'button', class: 'link-btn small', 'data-event': e.id, 'aria-label': t('event.edit.named', { title: e.title }) }, t('event.edit')) : null
       button?.addEventListener('click', () => edit!(e.id))
       return h(
         'li',
@@ -124,7 +138,7 @@ export function eventList(events: ChartEvent[], edit?: (id: string) => void): HT
         h(
           'div',
           { class: 'event-text' },
-          h('div', {}, h('strong', {}, e.title), h('span', { class: 'muted' }, ` · ${formatRange(e.from, e.to, false)}${e.where ? ` · ${e.where}` : ''}`)),
+          h('div', {}, h('strong', {}, e.title), ' ', h('span', { class: 'muted event-when' }, `${formatRange(e.from, e.to, false)}${e.where ? ` · ${e.where}` : ''}`)),
           e.description ? h('p', { class: 'secondary small' }, e.description) : null,
         ),
         button,

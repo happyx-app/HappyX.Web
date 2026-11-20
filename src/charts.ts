@@ -43,7 +43,8 @@ interface LineChartOptions {
   // The days point i stands for (default: its own day; a week by week).
   span?: (i: number) => { from: string; to: string }
   // While on() says so, a click on a day or a drag over several marks them: done gets their days.
-  mark?: { on: () => boolean; done: (from: string, to: string) => void }
+  // preview gets the days being dragged over, or nulls when the drag is dropped.
+  mark?: { on: () => boolean; done: (from: string, to: string) => void; preview?: (from: string | null, to: string | null) => void }
 }
 
 export interface ChartEvent {
@@ -70,27 +71,35 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
 }
 
 // Where each event sits: the first and last point it covers (lo > hi when it falls between two
-// points, e.g. on a weekend without a survey) and its row above the chart, so overlapping
-// events never hide each other. Events outside the points are left out.
+// points, e.g. on a weekend without a survey). Events outside the points are left out.
 export function placeEvents(xs: string[], events: ChartEvent[], span: (i: number) => { from: string; to: string }) {
   const n = xs.length
   if (n === 0) return []
-  const placed: { e: ChartEvent; lo: number; hi: number; row: number }[] = []
-  const rowsEnd: number[] = []
+  const placed: { e: ChartEvent; lo: number; hi: number }[] = []
   for (const e of [...events].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))) {
     if (e.to < span(0).from || e.from > span(n - 1).to) continue
     let lo = 0
     while (lo < n && span(lo).to < e.from) lo++
     let hi = n - 1
     while (hi >= 0 && span(hi).from > e.to) hi--
-    const start = Math.min(lo, hi + 0.5)
-    let row = rowsEnd.findIndex((end) => end < start)
-    if (row === -1) row = rowsEnd.push(0) - 1
-    rowsEnd[row] = Math.max(lo, hi)
-    placed.push({ e, lo, hi, row })
+    placed.push({ e, lo, hi })
   }
   return placed
 }
+
+// The row of each [start, end] (in pixels, sorted by start) so none overlaps another in its row.
+export function stackRows(spans: [number, number][], gap = 4): number[] {
+  const ends: number[] = []
+  return spans.map(([a, b]) => {
+    let row = ends.findIndex((end) => end + gap <= a)
+    if (row === -1) row = ends.push(0) - 1
+    ends[row] = b
+    return row
+  })
+}
+
+// The bookmark's width: its row keeps this much room even for a one-day event.
+const markWidth = 24
 
 let eventTips = 0
 
@@ -216,17 +225,30 @@ export function weekStarts(xs: string[]): number[] {
 
 function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): (SVGSVGElement | HTMLElement)[] {
   const span = opts.span ?? ((i: number) => ({ from: xs[i], to: xs[i] }))
-  const placed = placeEvents(xs, opts.events ?? [], span)
-  const rows = placed.reduce((r, p) => Math.max(r, p.row + 1), 0)
-  // One 22px row of bookmarks per overlapping event, above the top line.
-  const lane = 22
-  const height = 260 + rows * lane
-  const m = { top: 12 + rows * lane, right: 12, bottom: 28, left: 34 }
-  const iw = width - m.left - m.right
-  const ih = height - m.top - m.bottom
   const n = xs.length
+  const m = { top: 12, right: 12, bottom: 28, left: 34 }
+  const iw = width - m.left - m.right
   const step = n > 1 ? iw / (n - 1) : 0
   const x = (i: number) => m.left + (n > 1 ? i * step : iw / 2)
+  // Events: the band's left and right edge over the days they cover; a lone day gets a narrow one.
+  const edge = (lo: number, hi: number) => {
+    if (lo > hi) {
+      const xm = (x(hi) + x(lo)) / 2
+      return [xm - 2, xm + 2]
+    }
+    const half = Math.max(step / 2, 3)
+    return [Math.max(m.left, x(lo) - half), Math.min(width - m.right, x(hi) + half)]
+  }
+  const found = placeEvents(xs, opts.events ?? [], span).map((p) => ({ ...p, edges: edge(p.lo, p.hi) }))
+  // A row of bookmarks above the top line per overlap, worked out in pixels, so close events on a
+  // narrow chart don't cover each other either.
+  const rowOf = stackRows(found.map(({ edges: [a, b] }) => [a, Math.max(b, a + markWidth)]))
+  const placed = found.map((p, k) => ({ ...p, row: rowOf[k] }))
+  const rows = placed.reduce((r, p) => Math.max(r, p.row + 1), 0)
+  const lane = 26
+  m.top += rows * lane
+  const height = 260 + rows * lane
+  const ih = height - m.top - m.bottom
   const y = (v: number) => m.top + ((5 - v) / 4) * ih
   const tick = opts.tick ?? ((d: string) => formatDay(d))
 
@@ -247,22 +269,6 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       svg.append(s('line', { x1: xm, x2: xm, y1: m.top, y2: m.top + ih, class: 'week' }))
     }
   }
-
-  // Events: a faint band behind the lines over the days they cover; a lone day gets a narrow one.
-  const edge = (lo: number, hi: number) => {
-    if (lo > hi) {
-      const xm = (x(hi) + x(lo)) / 2
-      return [xm - 2, xm + 2]
-    }
-    const half = Math.max(step / 2, 3)
-    return [Math.max(m.left, x(lo) - half), Math.min(width - m.right, x(hi) + half)]
-  }
-  for (const p of placed) {
-    const [a, b] = edge(p.lo, p.hi)
-    svg.append(s('rect', { x: a, y: m.top, width: b - a, height: ih, class: 'event-band' }))
-  }
-  const preview = s('rect', { y: m.top, height: ih, class: 'event-band event-preview', visibility: 'hidden' })
-  svg.append(preview)
 
   // X ticks: about one every 80px. Evenly spaced (always including the last point), or
   // only at the points tickAt allows (at least 56px apart).
@@ -301,6 +307,16 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       svg.append(area)
     }
   }
+
+  // Events: a band over the days they cover, above the area and under the lines, in a solid tint
+  // so it never mixes with the area into a muddy colour.
+  for (const p of placed) {
+    const [a, b] = p.edges
+    svg.append(s('rect', { x: a, y: m.top, width: b - a, height: ih, class: 'event-band' }))
+  }
+  // While marking: the days pressed so far, outlined so they don't look like a saved event.
+  const preview = s('rect', { y: m.top, height: ih, class: 'event-preview', visibility: 'hidden' })
+  svg.append(preview)
 
   // Lines are joined only between consecutive points that both have a value.
   for (const se of series) {
@@ -376,9 +392,12 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       top = Math.min(top, y(v))
     })
     const covering = placed.filter((p) => p.lo <= i && i <= p.hi)
+    // The day's events go right under its date, so they read as that day's.
+    const [title, ...rest] = opts.tooltip(i)
     tooltip.replaceChildren(
-      ...opts.tooltip(i),
+      title,
       ...covering.map((p) => h('div', { class: 'tooltip-event' }, icons.inline(icons.bookmark), p.e.title)),
+      ...rest,
     )
     tooltip.hidden = false
     svg.classList.add('hovering')
@@ -392,13 +411,16 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     tooltip.hidden = true
     svg.classList.remove('hovering')
   }
-  // Marking: from the day pressed to the day let go, drawn as the band it will become.
+  // Marking: from the day pressed to the day let go, outlined as it goes. The click that follows
+  // the release must not also open that day's comments.
   let pressed: number | null = null
+  let justMarked = false
   const stretch = (a: number, b: number) => {
     const [l, r] = edge(Math.min(a, b), Math.max(a, b))
     preview.setAttribute('x', String(l))
     preview.setAttribute('width', String(r - l))
     preview.setAttribute('visibility', 'visible')
+    opts.mark?.preview?.(span(Math.min(a, b)).from, span(Math.max(a, b)).to)
   }
   hit.addEventListener('pointermove', (e) => {
     if (pressed !== null) stretch(pressed, at(e.clientX))
@@ -417,18 +439,24 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     const a = Math.min(pressed, at(e.clientX))
     const b = Math.max(pressed, at(e.clientX))
     pressed = null
+    justMarked = true
+    preview.setAttribute('visibility', 'hidden')
     hide()
     opts.mark!.done(span(a).from, span(b).to)
   })
   hit.addEventListener('pointercancel', () => {
     pressed = null
     preview.setAttribute('visibility', 'hidden')
+    opts.mark?.preview?.(null, null)
   })
   hit.addEventListener('pointerleave', () => {
     if (pressed === null) hide()
   })
   hit.addEventListener('click', (e) => {
-    if (opts.mark?.on()) return
+    if (justMarked || opts.mark?.on()) {
+      justMarked = false
+      return
+    }
     const i = at(e.clientX)
     if (opts.pick && opts.pickable?.(i)) opts.pick(i)
   })
@@ -441,13 +469,15 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
   // what happened. A line along their row shows how many days an event lasts.
   const layer = h('div', { class: 'event-layer' })
   for (const p of placed) {
-    const [a, b] = edge(p.lo, p.hi)
-    const top = 6 + p.row * lane
-    if (b - a > 12) {
+    const [a, b] = p.edges
+    const top = 4 + p.row * lane
+    // The bookmark starts where its band does; a line from it to the band's end shows how long.
+    const left = Math.min(Math.max(0, a), width - markWidth)
+    if (b - (left + markWidth) > 4) {
       const run = h('span', { class: 'event-run', 'aria-hidden': 'true' })
-      run.style.left = `${a}px`
-      run.style.width = `${b - a}px`
-      run.style.top = `${top + 9}px`
+      run.style.left = `${left + markWidth}px`
+      run.style.width = `${b - left - markWidth}px`
+      run.style.top = `${top + 11}px`
       layer.append(run)
     }
     const id = `event-tip-${++eventTips}`
@@ -456,7 +486,7 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       type: 'button', class: 'event-mark', 'aria-label': name, 'aria-expanded': 'false',
       interestfor: id, popovertarget: id, popovertargetaction: 'show', 'data-toggletip': id,
     }, icons.bookmark())
-    button.style.left = `${Math.max(0, a - 2)}px`
+    button.style.left = `${left}px`
     button.style.top = `${top}px`
     const tip = h('div', { id, popover: 'hint', role: 'tooltip', class: 'tip event-tip' },
       h('strong', {}, p.e.title),
