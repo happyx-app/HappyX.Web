@@ -828,7 +828,7 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   const week = preset === 'this-week' || preset === 'last-week'
   // Over 90 days one point a day can't be read: the chart and its table go by week.
   // Who can only look is told whom to tell, instead of a link to settings they can't change.
-  const ask = api.canManage(g) ? undefined : g.admin_username ? t('watch.ask.named', { name: g.admin_username }) : t('watch.ask')
+  const ask = api.canManage(g) ? undefined : api.adminName(g) ? t('watch.ask.named', { name: api.adminName(g) }) : t('watch.ask')
   const byWeek = preset === 'last-90'
   const points = byWeek ? weeklyStats(r.days, range.to) : r.days
   const peaks = week ? { high: null, low: null } : extremeDays(points, r.average)
@@ -1276,15 +1276,17 @@ function kudosCard(k: api.KudosSummary) {
     k.count === 0
       ? h('p', { class: 'muted' }, t('kudos.empty'))
       : h('p', { class: 'muted small' }, t('kudos.counts', { givers: formatNumber(k.givers), receivers: formatNumber(k.receivers) })),
+    // Titled, so the bars don't read as kudos given.
+    k.top_receivers?.length ? h('h3', { id: 'kudos-top', class: 'kudos-top' }, t('kudos.top')) : null,
     k.top_receivers?.length
       ? h(
           'div',
-          { class: 'bars', role: 'list', 'aria-label': t('kudos.top') },
+          { class: 'bars', role: 'list', 'aria-labelledby': 'kudos-top' },
           ...k.top_receivers.map((x) =>
             h(
               'div',
               { class: 'bar-row', role: 'listitem' },
-              h('span', { class: 'bar-label' }, x.username || '?'),
+              h('span', { class: 'bar-label' }, api.shownName(x) || '?'),
               h('span', { class: 'bar-track' }, fill((x.count / k.top_receivers![0].count) * 100)),
               h('span', { class: 'bar-value' }, formatNumber(x.count)),
             ),
@@ -1296,7 +1298,7 @@ function kudosCard(k: api.KudosSummary) {
         'figure',
         { class: 'kudo' },
         h('blockquote', {}, `«${x.message}»`),
-        h('figcaption', { class: 'muted small' }, `${x.from_username || '?'} → ${x.to_username || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
+        h('figcaption', { class: 'muted small' }, `${api.shownName(api.kudosGiver(x)) || '?'} → ${api.shownName(api.kudosReceiver(x)) || '?'} · ${formatDay(x.day, { weekday: 'short', day: 'numeric', month: 'short' })}`),
       )
       kudo.addEventListener('click', (e) => {
         confetti(e.clientX, e.clientY)
@@ -1773,7 +1775,7 @@ async function renderSettings(m: api.Me, guildID: string, focus: string | null =
   const period = periodOf.get(guildID)
   const back = h('a', { class: 'back', href: `#/g/${guildID}${period ? `?p=${period}` : ''}` }, `← ${t('settings.back')}`)
   if (!api.canManage(g)) {
-    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, g.admin_username ? t('settings.readonly.named', { name: g.admin_username }) : t('settings.readonly')))))
+    page(header(m), h('main', { class: 'container narrow' }, back, h('h1', {}, g.name), h('div', { class: 'card' }, h('p', {}, api.adminName(g) ? t('settings.readonly.named', { name: api.adminName(g) }) : t('settings.readonly')))))
     return
   }
   // Who has access, the server export and deleting it are for owners only. The demo can show who
@@ -2126,7 +2128,7 @@ function messagesCard(r: api.Report) {
                     'div',
                     {},
                     h('p', { class: 'msg-text' }, msg.message),
-                    h('span', { class: 'muted small' }, [msg.username, formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
+                    h('span', { class: 'muted small' }, [api.shownName(msg), formatDay(msg.day, { weekday: 'short', day: 'numeric', month: 'short' })].filter(Boolean).join(' · ')),
                   ),
                 ),
           )

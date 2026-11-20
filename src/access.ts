@@ -12,7 +12,10 @@ import { unsavedNote } from './unsaved'
 export interface Option {
   kind: 'user' | 'role'
   id: string
+  // label is a role's name, or the name a member's server shows for them.
   label: string
+  // username is a member's Discord username, which can be searched too.
+  username?: string
   color?: number
 }
 
@@ -23,16 +26,18 @@ const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
 
 export const matches = (query: string, label: string) => fold(label).includes(fold(query.trim()))
 
-// filterOptions keeps the options whose name contains the query, leaving out those in exclude.
+// filterOptions keeps the options whose name (or member's username) contains the query, leaving
+// out those in exclude.
 export function filterOptions(options: Option[], query: string, exclude: Set<string> = new Set()): Option[] {
-  return options.filter((o) => !exclude.has(optionKey(o)) && matches(query, o.label))
+  return options.filter((o) => !exclude.has(optionKey(o)) && (matches(query, o.label) || (o.username !== undefined && matches(query, o.username))))
 }
 
 // roleColor turns Discord's RGB number into CSS; 0 is Discord's "no colour".
 export const roleColor = (n: number | undefined) => (n ? `#${n.toString(16).padStart(6, '0')}` : '')
 
 export const roleOptions = (a: api.Access): Option[] => a.roles.map((r) => ({ kind: 'role', id: r.id, label: r.name, color: r.color }))
-export const memberOptions = (a: api.Access): Option[] => a.members.map((m) => ({ kind: 'user', id: m.discord_user_id, label: m.username }))
+export const memberOption = (m: api.Member): Option => ({ kind: 'user', id: m.discord_user_id, label: api.shownName(m), username: m.username })
+export const memberOptions = (a: api.Access): Option[] => a.members.map(memberOption)
 
 // knownGrants drops grants to people who left the server, which the API would refuse on save.
 export function knownGrants(a: api.Access): { grants: api.Grant[]; dropped: number } {
