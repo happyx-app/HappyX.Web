@@ -1,6 +1,7 @@
 import './style.css'
 import * as api from './api'
-import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type Series } from './charts'
+import { answers, distributionChart, lineChart, trendChart, trendTable, weeklyStats, type ChartEvent, type Series } from './charts'
+import { eventDialog, eventList } from './events'
 import { h } from './dom'
 import * as icons from './icons'
 import { formatDay, formatNumber, formatRange, lang, weekdayPlural, languages, moodEmoji, moodLabel, setLanguage, t } from './i18n'
@@ -724,6 +725,8 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     api.report(guildID, range.from, range.to),
     api.report(guildID, before.from, before.to).catch(() => null),
     api.health(guildID).catch(() => null),
+    // Older APIs have no events: the chart just shows none.
+    api.guildEvents(guildID, range.from, range.to).catch((): api.TeamEvent[] => []),
   ])
   await whileLoading(loading)
   const { body, show: showData } = dataArea()
@@ -764,8 +767,9 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
   let r: api.Report
   let prev: api.Report | null
   let health: api.Health | null
+  let events: api.TeamEvent[]
   try {
-    ;[r, prev, health] = await loading
+    ;[r, prev, health, events] = await loading
   } catch (err) {
     if (err instanceof api.Unauthorized) return renderLanding(null)
     showData(errorCard(err))
@@ -850,6 +854,71 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     toggle.setAttribute('aria-expanded', String(!tableWrap.hidden))
     toggle.textContent = t(tableWrap.hidden ? 'chart.table.show' : 'chart.table.hide')
   })
+  // Events: whoever can edit marks them on the chart (a day by clicking it, several by dragging
+  // over them) or types the dates; everyone sees them as bookmarks and in the list below.
+  const editable = api.canManage(g) && !api.isDemo
+  let marking = false
+  const markButton = editable ? h('button', { class: 'btn btn-ghost small', type: 'button', 'aria-pressed': 'false' }, icons.bookmark(), t('event.mark')) : null
+  const typeDates = h('button', { type: 'button', class: 'link-btn' }, t('event.mark.type'))
+  // While dragging, the days so far; otherwise what to do.
+  const hintText = h('span', {}, t('event.mark.hint'))
+  const markHint = h('p', { class: 'mark-hint small', hidden: true }, hintText, ' ', typeDates)
+  const saved = h('p', { class: 'muted small', role: 'status' })
+  const chartSlot = h('div', {})
+  const listSlot = h('div', {})
+  const escape = (e: KeyboardEvent) => e.key === 'Escape' && setMarking(false)
+  const setMarking = (on: boolean) => {
+    marking = on
+    if (on) document.addEventListener('keydown', escape)
+    else document.removeEventListener('keydown', escape)
+    markButton?.setAttribute('aria-pressed', String(on))
+    markHint.hidden = !on
+    hintText.textContent = t('event.mark.hint')
+    chartSlot.classList.toggle('marking', on)
+  }
+  const inPeriod = (e: { from: string; to: string }) => e.to >= range.from && e.from <= range.to
+  // Saved outside the period, the event shows nowhere here: say so, instead of it seeming lost.
+  const note = (e: api.TeamEvent | null) => {
+    saved.textContent = e && !inPeriod(e) ? t('event.saved.outside', { dates: formatRange(e.from, e.to) }) : ''
+  }
+  const add = (from: string, to: string) => {
+    setMarking(false)
+    eventDialog(guildID, todayIn(g.timezone), { from, to }, null, (e) => {
+      if (e) events = [...events, e]
+      note(e)
+      drawEvents()
+    }, () => markButton)
+  }
+  const edit = (id: string) => {
+    const e = events.find((x) => x.id === id)
+    if (!e) return
+    eventDialog(guildID, todayIn(g.timezone), e, e, (changed, gone) => {
+      events = changed ? events.map((x) => (x.id === changed.id ? changed : x)) : events.filter((x) => x.id !== gone)
+      note(changed)
+      drawEvents()
+    }, () => listSlot.querySelector<HTMLElement>(`[data-event="${CSS.escape(id)}"]`) ?? markButton)
+  }
+  markButton?.addEventListener('click', () => setMarking(!marking))
+  // Typing the dates starts on today, or on the period's last day when it is over.
+  typeDates.addEventListener('click', () => {
+    const day = range.to < todayIn(g.timezone) ? range.to : todayIn(g.timezone)
+    add(day, day)
+  })
+  const drawEvents = () => {
+    const shown: ChartEvent[] = events
+    chartSlot.replaceChildren(
+      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay, {
+        events: shown,
+        span,
+        mark: editable
+          ? { on: () => marking, done: add, preview: (from, to) => (hintText.textContent = from && to ? formatRange(from, to, false) : t('event.mark.hint')) }
+          : undefined,
+      }),
+    )
+    const list = eventList(shown.filter(inPeriod), editable ? edit : undefined)
+    listSlot.replaceChildren(...(list ? [list] : []), saved)
+  }
+  drawEvents()
   const weekdays = weekdayAverages(r.days)
   const kudos = r.kudos ?? { count: 0, givers: 0, receivers: 0, highlights: [] }
 
@@ -882,12 +951,14 @@ async function renderGuild(m: api.Me, guildID: string, preset: Preset, chosen = 
     h(
       'section',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), toggle),
+      h('div', { class: 'card-head' }, h('h2', {}, t(byWeek ? 'chart.trend.week' : 'chart.trend')), h('div', { class: 'card-tools' }, markButton, toggle)),
       old ? h('div', { class: 'legend' }, h('span', {}, h('i', { class: 'swatch-line' }), formatRange(range.from, range.to, false)), h('span', {}, h('i', { class: 'swatch-line swatch-dashed' }), formatRange(before.from, before.to, false))) : null,
-      trendChart(points, byWeek && old ? weeklyStats(old.days) : old?.days, notes, byWeek, comments, pickDay),
+      markHint,
+      chartSlot,
       // Without hover nothing says the points open their comments; the CSS shows this only on touch screens.
       points.some((_, i) => comments(i) > 0) ? h('p', { class: 'muted small tap-hint' }, t('chart.tapHint')) : null,
       r.days.some((d) => d.withheld) ? h('p', { class: 'muted small' }, icons.inline(icons.ring), t('chart.withheld.note')) : null,
+      listSlot,
       tableWrap,
     ),
     week
@@ -1381,8 +1452,12 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
   const series: Series[] = lines.map(({ g, color }) => ({ name: g.name, color, values: pts.values.get(g.discord_guild_id)! }))
   const xLabel = (x: string) => (pts.byWeek ? t('me.weekOf', { day: formatDay(x) }) : formatDay(x, { weekday: 'short', day: 'numeric', month: 'short' }))
 
+  // The events of the servers shown, named by server when there are several.
+  const myEvents: ChartEvent[] = lines.flatMap(({ g }) => (g.events ?? []).map((e) => ({ ...e, where: g.name })))
   const chart = lineChart(pts.xs, series, {
     label: t('me.chart'),
+    events: myEvents,
+    span: (i) => (pts.byWeek ? { from: pts.xs[i], to: addDays(pts.xs[i], 6) } : { from: pts.xs[i], to: pts.xs[i] }),
     tick: (x) => formatDay(x, pts.byWeek ? { month: 'short' } : { day: 'numeric', month: 'short' }),
     // By week, label the first week of each month.
     weekLines: !pts.byWeek,
@@ -1454,6 +1529,10 @@ async function renderMe(m: api.Me, period: EvolutionPeriod, filter: string | nul
       h('p', { class: 'muted small' }, t(pts.byWeek ? 'me.chart.desc.week' : 'me.chart.desc.day')),
       chips,
       chart,
+      // This page is private: the events are the server's, set by its admins, so it says so.
+      ...(myEvents.some((e) => e.to >= range.from && e.from <= range.to)
+        ? [h('p', { class: 'muted small event-by' }, t('event.list.member')), eventList(myEvents.filter((e) => e.to >= range.from && e.from <= range.to))]
+        : []),
       tableWrap,
     ),
     h('div', { class: 'grid-2' }, ...shown.map(({ g, color }) => myGuildCard(g, color))),

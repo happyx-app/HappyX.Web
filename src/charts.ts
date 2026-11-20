@@ -5,7 +5,8 @@ import { counted, countedAnswers, hasAverage, type DayStat, type Report } from '
 import { h, s } from './dom'
 import { monday } from './evolution'
 import { addDays } from './periods'
-import { formatDay, formatNumber, moodEmoji, moodLabel, t } from './i18n'
+import { formatDay, formatNumber, formatRange, moodEmoji, moodLabel, t } from './i18n'
+import * as icons from './icons'
 
 export interface Series {
   name: string
@@ -36,7 +37,31 @@ interface LineChartOptions {
   // Whether point i can be picked, and what picking it does (a click or tap on the chart).
   pickable?: (i: number) => boolean
   pick?: (i: number) => void
+  // Events of the team: a bookmark above the chart at their first day and, over several days, a
+  // faint band behind the lines. Hovering, focusing or tapping a bookmark shows what happened.
+  events?: ChartEvent[]
+  // The days point i stands for (default: its own day; a week by week).
+  span?: (i: number) => { from: string; to: string }
+  // While on() says so, a click on a day or a drag over several marks them: done gets their days.
+  // preview gets the days being dragged over, or nulls when the drag is dropped.
+  mark?: { on: () => boolean; done: (from: string, to: string) => void; preview?: (from: string | null, to: string | null) => void }
 }
+
+export interface ChartEvent {
+  id: string
+  from: string
+  to: string
+  title: string
+  description?: string
+  color?: string // one of eventColors; yellow when left out
+  where?: string // the server's name, when the chart shows more than one
+}
+
+// The colours a bookmark can have, as the API names them; the first is the default.
+export const eventColors = ['yellow', 'orange', 'red', 'green', 'blue', 'pink'] as const
+
+// The class that gives an event's marks its colour (see .ev-* in the CSS).
+export const eventClass = (e: { color?: string }) => `ev-${eventColors.includes(e.color as (typeof eventColors)[number]) ? e.color : eventColors[0]}`
 
 // Mood over time, one line per series, redrawn to fit its container.
 export function lineChart(xs: string[], series: Series[], opts: LineChartOptions): HTMLElement {
@@ -47,17 +72,53 @@ export function lineChart(xs: string[], series: Series[], opts: LineChartOptions
     const width = Math.round(wrap.clientWidth)
     if (width === 0 || width === drawnWidth) return
     drawnWidth = width
-    wrap.replaceChildren(drawLines(xs, series, opts, Math.max(280, width), tooltip), tooltip)
+    wrap.replaceChildren(...drawLines(xs, series, opts, Math.max(280, width), tooltip), tooltip)
   }).observe(wrap)
   return wrap
 }
+
+// Where each event sits: the first and last point it covers (lo > hi when it falls between two
+// points, e.g. on a weekend without a survey). Events outside the points are left out.
+export function placeEvents(xs: string[], events: ChartEvent[], span: (i: number) => { from: string; to: string }) {
+  const n = xs.length
+  if (n === 0) return []
+  const placed: { e: ChartEvent; lo: number; hi: number }[] = []
+  for (const e of [...events].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to))) {
+    if (e.to < span(0).from || e.from > span(n - 1).to) continue
+    let lo = 0
+    while (lo < n && span(lo).to < e.from) lo++
+    let hi = n - 1
+    while (hi >= 0 && span(hi).from > e.to) hi--
+    placed.push({ e, lo, hi })
+  }
+  return placed
+}
+
+// The row of each [start, end] (in pixels, sorted by start) so none overlaps another in its row.
+export function stackRows(spans: [number, number][], gap = 4): number[] {
+  const ends: number[] = []
+  return spans.map(([a, b]) => {
+    let row = ends.findIndex((end) => end + gap <= a)
+    if (row === -1) row = ends.push(0) - 1
+    ends[row] = b
+    return row
+  })
+}
+
+// The bookmark's width: its row keeps this much room even for a one-day event.
+const markWidth = 24
+
+let eventTips = 0
+
+// «Hackeo · 3–5 nov», as a screen reader hears a bookmark.
+const eventDates = (e: ChartEvent) => formatRange(e.from, e.to, false)
 
 // Average mood per day of a server, with gaps on days without answers. With previous (the
 // days of the period before), the n-th day of that period is drawn under the n-th day of this
 // one as a dashed line: matching by position keeps both lines on working days.
 // With byWeek, days are weeks (see weeklyStats), each with a dot. With comments(i) > 0, the
 // tooltip says point i has comments and a click shows them (pick).
-export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void): HTMLElement {
+export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: LineChartOptions['notes'] = [], byWeek = false, comments?: (i: number) => number, pick?: (i: number) => void, more: Pick<LineChartOptions, 'events' | 'span' | 'mark'> = {}): HTMLElement {
   const title = (d: DayStat) => weekOrDay(d, byWeek)
   const prevOf = (i: number) => (previous[i] && hasAverage(previous[i]) ? previous[i] : undefined)
   const series: Series[] = []
@@ -77,6 +138,7 @@ export function trendChart(days: DayStat[], previous: DayStat[] = [], notes: Lin
       marked: (i) => !!comments && comments(i) > 0,
       hollow: { at: (i) => days[i].responses > 0 && !hasAverage(days[i]), title: t('chart.withheld') },
       pick,
+      ...more,
       tooltip: (i) => {
         const d = days[i]
         const p = prevOf(i)
@@ -168,14 +230,32 @@ export function weekStarts(xs: string[]): number[] {
   return out
 }
 
-function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): SVGSVGElement {
-  const height = 260
+function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width: number, tooltip: HTMLElement): (SVGSVGElement | HTMLElement)[] {
+  const span = opts.span ?? ((i: number) => ({ from: xs[i], to: xs[i] }))
+  const n = xs.length
   const m = { top: 12, right: 12, bottom: 28, left: 34 }
   const iw = width - m.left - m.right
-  const ih = height - m.top - m.bottom
-  const n = xs.length
   const step = n > 1 ? iw / (n - 1) : 0
   const x = (i: number) => m.left + (n > 1 ? i * step : iw / 2)
+  // Events: the band's left and right edge over the days they cover; a lone day gets a narrow one.
+  const edge = (lo: number, hi: number) => {
+    if (lo > hi) {
+      const xm = (x(hi) + x(lo)) / 2
+      return [xm - 2, xm + 2]
+    }
+    const half = Math.max(step / 2, 3)
+    return [Math.max(m.left, x(lo) - half), Math.min(width - m.right, x(hi) + half)]
+  }
+  const found = placeEvents(xs, opts.events ?? [], span).map((p) => ({ ...p, edges: edge(p.lo, p.hi) }))
+  // A row of bookmarks above the top line per overlap, worked out in pixels, so close events on a
+  // narrow chart don't cover each other either.
+  const rowOf = stackRows(found.map(({ edges: [a, b] }) => [a, Math.max(b, a + markWidth)]))
+  const placed = found.map((p, k) => ({ ...p, row: rowOf[k] }))
+  const rows = placed.reduce((r, p) => Math.max(r, p.row + 1), 0)
+  const lane = 26
+  m.top += rows * lane
+  const height = 260 + rows * lane
+  const ih = height - m.top - m.bottom
   const y = (v: number) => m.top + ((5 - v) / 4) * ih
   const tick = opts.tick ?? ((d: string) => formatDay(d))
 
@@ -234,6 +314,16 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       svg.append(area)
     }
   }
+
+  // Events: a band over the days they cover, above the area and under the lines, in a solid tint
+  // so it never mixes with the area into a muddy colour.
+  for (const p of placed) {
+    const [a, b] = p.edges
+    svg.append(s('rect', { x: a, y: m.top, width: b - a, height: ih, class: `event-band ${eventClass(p.e)}` }))
+  }
+  // While marking: the days pressed so far, outlined so they don't look like a saved event.
+  const preview = s('rect', { y: m.top, height: ih, class: 'event-preview', visibility: 'hidden' })
+  svg.append(preview)
 
   // Lines are joined only between consecutive points that both have a value.
   for (const se of series) {
@@ -308,7 +398,14 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
       focus[k].setAttribute('visibility', 'visible')
       top = Math.min(top, y(v))
     })
-    tooltip.replaceChildren(...opts.tooltip(i))
+    const covering = placed.filter((p) => p.lo <= i && i <= p.hi)
+    // The day's events go right under its date, so they read as that day's.
+    const [title, ...rest] = opts.tooltip(i)
+    tooltip.replaceChildren(
+      title,
+      ...covering.map((p) => h('div', { class: `tooltip-event ${eventClass(p.e)}` }, icons.inline(icons.bookmark), p.e.title)),
+      ...rest,
+    )
     tooltip.hidden = false
     svg.classList.add('hovering')
     const left = Math.min(Math.max(x(i) - tooltip.offsetWidth / 2, 0), width - tooltip.offsetWidth)
@@ -321,17 +418,91 @@ function drawLines(xs: string[], series: Series[], opts: LineChartOptions, width
     tooltip.hidden = true
     svg.classList.remove('hovering')
   }
-  hit.addEventListener('pointermove', (e) => show(e.clientX))
-  hit.addEventListener('pointerdown', (e) => show(e.clientX))
-  hit.addEventListener('pointerleave', hide)
+  // Marking: from the day pressed to the day let go, outlined as it goes. The click that follows
+  // the release must not also open that day's comments.
+  let pressed: number | null = null
+  let justMarked = false
+  const stretch = (a: number, b: number) => {
+    const [l, r] = edge(Math.min(a, b), Math.max(a, b))
+    preview.setAttribute('x', String(l))
+    preview.setAttribute('width', String(r - l))
+    preview.setAttribute('visibility', 'visible')
+    opts.mark?.preview?.(span(Math.min(a, b)).from, span(Math.max(a, b)).to)
+  }
+  hit.addEventListener('pointermove', (e) => {
+    if (pressed !== null) stretch(pressed, at(e.clientX))
+    show(e.clientX)
+  })
+  hit.addEventListener('pointerdown', (e) => {
+    if (opts.mark?.on()) {
+      pressed = at(e.clientX)
+      hit.setPointerCapture(e.pointerId)
+      stretch(pressed, pressed)
+    }
+    show(e.clientX)
+  })
+  hit.addEventListener('pointerup', (e) => {
+    if (pressed === null) return
+    const a = Math.min(pressed, at(e.clientX))
+    const b = Math.max(pressed, at(e.clientX))
+    pressed = null
+    justMarked = true
+    preview.setAttribute('visibility', 'hidden')
+    hide()
+    opts.mark!.done(span(a).from, span(b).to)
+  })
+  hit.addEventListener('pointercancel', () => {
+    pressed = null
+    preview.setAttribute('visibility', 'hidden')
+    opts.mark?.preview?.(null, null)
+  })
+  hit.addEventListener('pointerleave', () => {
+    if (pressed === null) hide()
+  })
   hit.addEventListener('click', (e) => {
+    if (justMarked || opts.mark?.on()) {
+      justMarked = false
+      return
+    }
     const i = at(e.clientX)
     if (opts.pick && opts.pickable?.(i)) opts.pick(i)
   })
   svg.append(hit)
   // The label says what the chart shows; its tick and note texts would only be read as a jumble.
   svg.querySelectorAll('text').forEach((el) => el.setAttribute('aria-hidden', 'true'))
-  return svg
+  if (placed.length === 0) return [svg]
+
+  // Bookmarks: buttons over the chart, each a toggletip (hover or focus, click or Enter) with
+  // what happened. A line along their row shows how many days an event lasts.
+  const layer = h('div', { class: 'event-layer' })
+  for (const p of placed) {
+    const [a, b] = p.edges
+    const top = 4 + p.row * lane
+    // The bookmark starts where its band does; a line from it to the band's end shows how long.
+    const left = Math.min(Math.max(0, a), width - markWidth)
+    if (b - (left + markWidth) > 4) {
+      const run = h('span', { class: `event-run ${eventClass(p.e)}`, 'aria-hidden': 'true' })
+      run.style.left = `${left + markWidth}px`
+      run.style.width = `${b - left - markWidth}px`
+      run.style.top = `${top + 11}px`
+      layer.append(run)
+    }
+    const id = `event-tip-${++eventTips}`
+    const name = t('event.bookmark', { title: p.e.title, dates: eventDates(p.e) })
+    const button = h('button', {
+      type: 'button', class: `event-mark ${eventClass(p.e)}`, 'aria-label': name, 'aria-expanded': 'false',
+      interestfor: id, popovertarget: id, popovertargetaction: 'show', 'data-toggletip': id,
+    }, icons.bookmark())
+    button.style.left = `${left}px`
+    button.style.top = `${top}px`
+    const tip = h('div', { id, popover: 'hint', role: 'tooltip', class: 'tip event-tip' },
+      h('strong', {}, p.e.title),
+      h('div', { class: 'muted' }, p.e.where ? `${eventDates(p.e)} · ${p.e.where}` : eventDates(p.e)),
+      p.e.description ? h('p', {}, p.e.description) : null,
+    )
+    layer.append(button, tip)
+  }
+  return [svg, layer]
 }
 
 // A point's name: its day, or «Week of 2 Nov», with «(in progress)» while that week isn't over.
