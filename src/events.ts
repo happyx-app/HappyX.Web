@@ -48,7 +48,7 @@ export function eventDialog(guildID: string, today: string, start: { from: strin
 
   const form = h(
     'form',
-    // The date fields follow the page's language (day/month in Spanish), not the browser's.
+    // The page's language, for browsers whose date fields follow it (Chrome uses its own).
     { class: 'event-form', novalidate: true, lang },
     h('h2', { id: ids.head }, t(existing ? 'event.edit.title' : 'event.new.title')),
     h('div', { class: 'field' }, h('label', { for: ids.title }, t('event.field.title')), title),
